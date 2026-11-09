@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { CandidateCard, Notice } from "../../ui";
 
+// Candidate pages read the link token, the session cookie and the database on
+// every request, so they wait on the server rather than show a prefetched shell.
+export const instant = false;
+
 export const metadata = { title: "Submitted" };
 
 /** Thank-you page. Candidates never see scores (decision Q7, option A). */

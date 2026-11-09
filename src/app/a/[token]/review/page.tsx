@@ -4,6 +4,10 @@ import { getReview } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
 import { CandidateCard, Notice, primaryButton, secondaryButton } from "../../ui";
 
+// Candidate pages read the link token, the session cookie and the database on
+// every request, so they wait on the server rather than show a prefetched shell.
+export const instant = false;
+
 export const metadata = { title: "Review and submit" };
 
 export default async function ReviewPage({ params }: PageProps<"/a/[token]/review">) {

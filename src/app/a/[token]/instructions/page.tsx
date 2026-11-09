@@ -3,6 +3,10 @@ import { getIntro } from "@/lib/candidate/attempt";
 import { requireSessionPage } from "@/lib/candidate/pages";
 import { CandidateCard, Facts, primaryButton } from "../../ui";
 
+// Candidate pages read the link token, the session cookie and the database on
+// every request, so they wait on the server rather than show a prefetched shell.
+export const instant = false;
+
 export const metadata = { title: "Instructions" };
 
 export default async function InstructionsPage({ params }: PageProps<"/a/[token]/instructions">) {

@@ -4,6 +4,10 @@ import { CONSENT_TEXT } from "@/lib/candidate/config";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { CandidateCard, ERROR_TEXT, Notice, primaryButton, secondaryButton } from "../../ui";
 
+// Candidate pages read the link token, the session cookie and the database on
+// every request, so they wait on the server rather than show a prefetched shell.
+export const instant = false;
+
 export const metadata = { title: "Verify your email" };
 
 /** Name, emailed code and consent. Posting the form is what creates (or resumes) the attempt. */
