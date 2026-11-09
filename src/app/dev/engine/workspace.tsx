@@ -6,10 +6,12 @@ import type { AttemptScore, PublicMessage, PublicStep } from "@/lib/engine/types
 import { scoreDemoAttempt } from "./actions";
 
 export function DevWorkspace({
+  slug,
   seed,
   messages,
   steps,
 }: {
+  slug: string;
   seed: string;
   messages: PublicMessage[];
   steps: PublicStep[];
@@ -78,7 +80,7 @@ export function DevWorkspace({
               startTransition(async () => {
                 setError(null);
                 try {
-                  setResult(await scoreDemoAttempt(seed, answers));
+                  setResult(await scoreDemoAttempt(slug, seed, answers));
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e));
                 }
@@ -100,6 +102,7 @@ export function DevWorkspace({
               {Object.entries(result.steps).map(([id, s]) => (
                 <li key={id}>
                   <span className="font-mono">{id}</span>: {s.points}/{s.maxPoints}
+                  {s.needsReview ? " (needs review)" : ""}
                   {s.items.map((i) => (i.note ? ` · ${i.note}` : "")).join("")}
                 </li>
               ))}
