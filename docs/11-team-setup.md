@@ -29,10 +29,34 @@ There is no local database. Everyone develops against the shared cloud project, 
 
 ## 2. Get access to Supabase (Athul does this)
 
-1. Supabase dashboard → organization **athul16's Org** → **Settings → Team → Invite**.
-2. Enter the teammate's email. Give **Developer** for day-to-day work, or **Administrator** if they'll change Auth settings such as SMTP (the Resend step below). Roles can be lowered later.
+The `assessment-platform` project lives in its **own Supabase organization** (moved out of "athul16's Org" on 2026-11-08), so inviting someone here gives them this project only.
 
-Note: org membership gives access to **every project in the org**, which today includes `field-service-platform` as well as `assessment-platform`. If that's not wanted, move `assessment-platform` into its own organization first (project → Settings → General → Transfer project), then invite people there.
+1. [supabase.com/dashboard](https://supabase.com/dashboard) → organization menu (top left) → pick the org that holds **assessment-platform**.
+2. **Settings → Team → Invite**.
+3. Enter the teammate's email and a role:
+
+   | Role | Use for | Can change Auth/SMTP settings? |
+   | --- | --- | --- |
+   | Administrator | Setting up Resend, Auth URLs, anything in settings | Yes |
+   | Developer | Day-to-day coding and reading the database | No |
+
+   Start with **Administrator** for whoever connects Resend; lower it to Developer afterwards.
+4. They get an email, accept it, and the project appears in their dashboard.
+5. Send them the **secret key** privately (password manager or similar) for their `.env.local`. Never by git, chat, or email.
+
+### If Supabase says "you need additional permissions"
+
+This can show up even for the owner, especially right after creating an org or moving a project. In order:
+
+1. Hard-refresh the page (Cmd+Shift+R / Ctrl+Shift+R).
+2. Sign out of Supabase and back in.
+3. Org → **Settings → Team**: confirm your row says **Owner**.
+4. Check you're signed in with the same account that created the org (avatar menu, top right). GitHub login and email login are different accounts.
+5. If the org requires MFA, set up an authenticator app under your account settings first.
+
+### Tools connected to the old org
+
+The project's URL and API keys didn't change when it moved, so the app, `.env.local`, and the tests keep working. But anything authorized per organization (for example the Supabase connector used by Claude, or a Vercel integration) must be re-authorized for the new org.
 
 ## 3. Connect Resend (email)
 
