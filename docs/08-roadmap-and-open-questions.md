@@ -12,16 +12,20 @@ Each phase starts only after a real company clears the gate.
 
 ## Build order for phase 1
 
-1. Repo, Next.js app, Supabase project, schema + RLS
-2. Company auth, orgs, memberships
-3. Jobs, invites, invite emails
-4. Candidate flow: verify, system check, instructions, workspace shell, timer, autosave, submit
-5. Engine: step type interface + `inbox_reply` + `spreadsheet`
-6. Results table + candidate report
-7. Proctoring: browser signals, camera snapshots, screen share, flags
-8. `journal_entry` + `document_review`; Example 1 simulation end to end (Example 4 is a shorter 30-minute option that needs only `spreadsheet`, `journal_entry`, and `inbox_reply`)
+Status detail and stages to the MVP: `10-progress.md`.
+
+1. ✅ Repo, Next.js app, Supabase project, schema + RLS
+2. ✅ Company auth, orgs, memberships (company URLs `/app/<slug>`)
+3. ⬜ Jobs, invites, invite emails (needs Resend connected)
+4. ⬜ Candidate flow: verify, system check, instructions, workspace shell, timer, autosave, submit
+5. 🟡 Engine: step type interface ✅ + `inbox_reply` + `spreadsheet` (only the demo `numeric` type so far)
+6. ⬜ Results table + candidate report
+7. ⬜ Proctoring: browser signals, camera snapshots, screen share, flags
+8. ⬜ `journal_entry` + `document_review`; Example 1 simulation end to end (Example 4 is a shorter 30-minute option that needs only `spreadsheet`, `journal_entry`, and `inbox_reply`)
 
 ## Open questions
+
+Technical and design questions from the build are researched in `decisions/` (e.g. `decisions/2026-11-08-skeleton-open-questions.md`: email provider, invite links, profiles table, login methods, and more). Product questions:
 
 - **Pharma scope:** pharmacy students (dispensing, dosing, interactions, counseling) or industry roles (QA, regulatory, batch records, SOPs)? Confirm with the first pilot company.
 - **Pricing:** free first pilot, then per completed candidate? Per seat? Per job?

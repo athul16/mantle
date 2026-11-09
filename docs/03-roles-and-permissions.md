@@ -32,3 +32,7 @@ Roles are per organization, stored as `memberships.role` (`admin` | `recruiter` 
 4. **Better decisions:** manager notes and votes sit next to the score.
 
 MVP may ship with admin + recruiter only.
+
+## As built (Nov 2026)
+
+All three roles are built and enforced twice: in server code (`requireMembership` / `requireOrgMembership` in `src/lib/auth.ts`) and in the database (RLS policies). The team page (`/app/<slug>/team`) lets admins invite by email, change roles, and remove members; others see it read-only. A company can't drop to zero admins (checked in app code; a database rule for this is open decision Q4). Viewers see proctoring media only when the company setting `viewers_see_media` is on.

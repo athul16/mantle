@@ -63,3 +63,13 @@ Our differentiator: make reviewing a flag take seconds (evidence inline), so rec
 - **SOC 2:** not needed for pilots; start once there's revenue.
 
 Not legal advice. Check hiring-law points with a lawyer before selling to larger employers.
+
+## As built (Nov 2026)
+
+- **Tenant isolation:** RLS on all 16 tables; `pnpm test:rls` runs 28 tests that sign in as admin, recruiter, and viewer of two companies and try cross-company reads and writes, role escalation, secret-table reads, and anonymous access.
+- **Candidate secrets** (invite token hash, email-code hash, seed, session hash) are in `invite_secrets` / `attempt_secrets`, readable only by the server. Raw tokens and codes are never stored.
+- **Service key** is used only in server code marked `server-only` (Supabase Auth admin calls today; candidate routes later). Company-side writes use the signed-in user's client so RLS applies.
+- **Answer keys** live in `src/lib/engine/server/` and step types' `server.ts`, all `server-only`; a unit test fails if any key value appears in what's sent to the candidate.
+- **Company URLs** return 404 to non-members, so they don't reveal which companies exist.
+- **Email links and scanners:** Microsoft 365 Safe Links can open one-time links before the recipient. Invite and candidate links should require a click before the token is used (decision Q3, open).
+- **Not built yet:** admin MFA (free on all Supabase plans; recommended before pilot, Q9), audit-log writes, retention jobs, proctoring.
