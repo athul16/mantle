@@ -1,6 +1,10 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
+import { InboxReplyStep } from "../step-types/inbox_reply/client";
+import { INBOX_REPLY } from "../step-types/inbox_reply/public";
 import { NumericStep } from "../step-types/numeric/client";
 import { NUMERIC } from "../step-types/numeric/public";
+import { SpreadsheetStep } from "../step-types/spreadsheet/client";
+import { SPREADSHEET } from "../step-types/spreadsheet/public";
 import type { StepComponentProps } from "../types";
 
 /**
@@ -13,6 +17,8 @@ export type AnyStepComponent = ComponentType<StepComponentProps<any, any>>;
 
 export const clientStepTypes: Record<string, AnyStepComponent> = {
   [NUMERIC]: NumericStep,
+  [INBOX_REPLY]: InboxReplyStep,
+  [SPREADSHEET]: SpreadsheetStep,
 };
 
 export function hasStepComponent(type: string): boolean {
