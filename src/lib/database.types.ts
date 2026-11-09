@@ -549,6 +549,7 @@ export type Database = {
           logo_path: string | null
           name: string
           settings: Json
+          slug: string
         }
         Insert: {
           created_at?: string
@@ -556,6 +557,7 @@ export type Database = {
           logo_path?: string | null
           name: string
           settings?: Json
+          slug: string
         }
         Update: {
           created_at?: string
@@ -563,6 +565,7 @@ export type Database = {
           logo_path?: string | null
           name?: string
           settings?: Json
+          slug?: string
         }
         Relationships: []
       }
