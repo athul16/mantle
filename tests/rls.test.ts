@@ -9,20 +9,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { requireDbEnv } from "./helpers/env";
 import type { Database } from "@/lib/database.types";
 
-try {
-  process.loadEnvFile(".env.local");
-} catch {
-  // CI provides env vars directly.
-}
-
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-const SECRET = process.env.SUPABASE_SECRET_KEY!;
-if (!URL || !PUBLISHABLE || !SECRET) {
-  throw new Error("Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY");
-}
+// Local throwaway Supabase only (.env.test); see tests/helpers/env.ts.
+const { url: URL, publishableKey: PUBLISHABLE, secretKey: SECRET } = requireDbEnv();
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
 const service = createClient<Database>(URL, SECRET, noSession);

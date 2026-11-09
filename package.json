@@ -12,6 +12,16 @@
     "test:engine": "vitest run tests/engine",
     "test:jobs": "vitest run tests/jobs --passWithNoTests",
     "test:candidate": "vitest run tests/candidate --passWithNoTests",
+    "test:integration": "vitest run tests/rls.test.ts tests/jobs tests/candidate",
+    "test:components": "vitest run --project components",
+    "test:coverage": "vitest run --coverage",
+    "test:db": "supabase test db",
+    "test:e2e": "playwright test",
+    "test:lhci": "lhci autorun",
+    "db:test:start": "supabase start -x studio,imgproxy,logflare,vector,edge-runtime,supavisor,realtime && pnpm db:test:env",
+    "db:test:stop": "supabase stop --no-backup",
+    "db:test:reset": "supabase db reset && pnpm db:test:env",
+    "db:test:env": "tsx scripts/test-env.mts",
     "scenarios:publish": "tsx --conditions=react-server scripts/publish-scenarios.ts"
   },
   "dependencies": {

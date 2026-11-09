@@ -1,5 +1,5 @@
 /**
- * Jobs, assessments and candidate invites, end to end against the shared cloud
+ * Jobs, assessments and candidate invites, end to end against the local test
  * database. The server actions run for real; only the Next.js request context
  * is swapped out: `createClient()` from `@/lib/supabase/server` returns a
  * supabase-js client signed in as whichever test user is "acting", so
@@ -13,26 +13,18 @@ import { randomBytes } from "node:crypto";
 import { readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { requireDbEnv } from "../helpers/env";
 import type { Database } from "@/lib/database.types";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => acting.client }));
 
-try {
-  process.loadEnvFile(".env.local");
-} catch {
-  // CI provides env vars directly.
-}
 // Emails must land in .dev-outbox, never go out through Resend.
 delete process.env.RESEND_API_KEY;
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-const SECRET = process.env.SUPABASE_SECRET_KEY!;
-if (!URL || !PUBLISHABLE || !SECRET) {
-  throw new Error("Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY");
-}
+// Local throwaway Supabase only (.env.test); see tests/helpers/env.ts.
+const { url: URL, publishableKey: PUBLISHABLE, secretKey: SECRET } = requireDbEnv();
 
 const { hashToken } = await import("@/lib/tokens");
 const actions = await import("@/app/app/[orgSlug]/jobs/actions");
