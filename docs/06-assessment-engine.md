@@ -65,19 +65,55 @@ It produces the numbers (bank balance, check amounts, NSF amount) **and** the an
 3. Compute integrity label from events and snapshot analysis (see `02-security-and-integrity.md`).
 4. Store results; notify the company.
 
-## Data model (draft)
+## As built (engine core)
 
-All tenant tables carry `org_id` with RLS.
+Code: `src/lib/engine/`. Split so answer keys can't reach the browser:
+
+| Folder | Holds | Runs in |
+| --- | --- | --- |
+| `types.ts` | Shared shapes (`ScenarioDefinition`, `Step`, `Message`, `StepScore`, `AttemptScore`); no keys | Both |
+| `server/` | Seeded RNG (sfc32 + cyrb128), `{{name}}` / `{{name\|money}}` templates, step-type interface, registry, render, score | Server only (`import "server-only"`) |
+| `client/` | Browser registry, `StepView` | Browser |
+| `step-types/<type>/` | `public.ts` (what the candidate sees, answer shape), `client.tsx` (input), `server.ts` (key schema, `parseAnswer`, `score`) | Split per file |
+| `scenarios/` | Code-defined scenarios + generators, registered by `slug@version` | Server only |
+
+Differences from the sketch above:
+
+- `generate(seed)` returns `{ values, keys }`. Only `values` reach templates; `keys` go to `score()`.
+- `score()` receives `{ config, key, variant, answer }`.
+- Scheduled messages (`arriveAtMinute`) and the steps they deliver are withheld by the server until that minute (elapsed time from `attempts.started_at`).
+- Money is generated in whole cents.
+- `numeric` partial credit: full within `tolerance`, half within `partialTolerance`, else 0.
+
+Entry points: `renderAttemptForCandidate(scenario, seed, elapsedMinutes)`, `renderStepForCandidate`, `parseAnswerForStep` (autosave), `scoreAttempt(scenario, seed, answers)`, `getScenario(slug, version)`.
+
+Built step types: `numeric`. Preview: `/dev/engine?seed=abc&minute=5` (dev only).
+
+Scenario storage (decision Q6): code is the source of truth. Publishing a version copies its definition into a `scenarios` row, which is then immutable; attempts point at that row.
+
+## Data model (as built)
+
+All tenant tables carry `org_id` with RLS. Child tables of an attempt repeat `org_id`, and a composite foreign key forces it to match the attempt's. Migrations: `supabase/migrations/`. Isolation tests: `tests/rls.test.ts`.
+
+Changes from the original draft:
+
+- `organizations.slug`: unique URL name, generated from the name by `create_organization()` (lowercase, hyphens, 3–48 chars, reserved words blocked).
+- Candidate secrets moved to server-only tables (RLS on, no policies): `invite_secrets` (token hash, email-code hash, code expiry and attempt count) and `attempt_secrets` (seed, session-token hash).
+- `invites.candidate_name`, `invites.created_by`; `attempts.scenario_id`, `attempts.submit_reason`; `assessments.title`, `assessments.pass_score`.
+- Triggers: published scenarios can't be edited; an assessment's time limit, proctoring, and scenario lock once a candidate starts.
+- Role-check helpers live in a `private` schema the API doesn't expose.
+
+Original draft table list (still accurate for the main columns):
 
 | Table | Key columns |
 | --- | --- |
-| `organizations` | id, name, logo, settings |
+| `organizations` | id, name, slug, logo, settings |
 | `memberships` | org_id, user_id, role |
 | `scenarios` | id, org_id (null = platform library), title, role_family, version, definition (JSON), published_at |
 | `assessments` | id, org_id, scenario_id, time_limit, proctoring (JSON), locked_at |
 | `jobs` | id, org_id, title, assessment_id, deadline |
-| `invites` | id, org_id, job_id, email, token_hash, expires_at, status |
-| `attempts` | id, org_id, invite_id, seed, started_at, deadline_at, submitted_at, status, score, integrity_label |
+| `invites` | id, org_id, job_id, email, expires_at, status (token hash → `invite_secrets`) |
+| `attempts` | id, org_id, invite_id, scenario_id, started_at, deadline_at, submitted_at, status, score, integrity_label (seed → `attempt_secrets`) |
 | `step_responses` | attempt_id, step_id, answer (JSON), updated_at, score (JSON) |
 | `action_events` | attempt_id, at, kind, payload (opened message, started step, ...) |
 | `integrity_events` | attempt_id, at, kind, payload (tab switch, paste, face missing, ...) |

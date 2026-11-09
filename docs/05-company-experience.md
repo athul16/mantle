@@ -36,3 +36,9 @@ Example summary:
 > Invoice review: caught duplicate, missed math error
 > Client email: 3/4 on rubric
 > Answered the urgent email within 2 minutes; finished in 38 min
+
+## As built (Nov 2026)
+
+- Screen 1 (sign up / org setup) is built: `/signup`, `/login`, `/onboarding`, then `/app/<company-slug>`. Teammates are managed at `/app/<company-slug>/team`.
+- Every company page has the company in its URL (decision Q8), so links can be shared between teammates and two companies can be open in two tabs. Plain `/app` opens the last-used company.
+- Jobs and Candidates pages exist as placeholders. Screens 2–8 are next (see `10-progress.md`).

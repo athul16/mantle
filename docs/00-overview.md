@@ -34,7 +34,13 @@ Simulations are the core approach. Multiple choice is supported as one simple st
 | Test format | Job simulations built from pluggable step types |
 | Integrity model | AI labels candidates as suspicious with evidence; the company decides |
 | Proctoring | Camera snapshots + full-screen share in MVP; phone side camera later |
-| Roles | Admin, recruiter, viewer (viewer may ship after MVP) |
+| Roles | Admin, recruiter, viewer (all three built) |
+| Email | Resend for Supabase Auth emails and the app's own emails |
+| Company URLs | Company in the URL: `/app/<company-slug>/...` |
+| Scenario versions | Defined in code; publishing freezes a copy in the `scenarios` table; attempts point at that copy |
+| Database | One shared Supabase cloud project (us-east-1); no local database |
+
+Open and decided questions with research: `decisions/`. Build status: `10-progress.md`.
 
 ## Doc index
 
@@ -49,3 +55,6 @@ Simulations are the core approach. Multiple choice is supported as one simple st
 | `07-accounting-simulations.md` | Worked accounting simulation examples |
 | `08-roadmap-and-open-questions.md` | Phases, gates, open questions |
 | `09-go-to-market.md` | Accounting target firms, how they hire, pitch, outreach, contacts |
+| `10-progress.md` | What's built, what's left, stages to the MVP |
+| `11-team-setup.md` | Local setup, Supabase access, connecting Resend |
+| `decisions/` | Decision briefs: background, options, recommendation, what was decided |

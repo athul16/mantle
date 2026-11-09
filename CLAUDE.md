@@ -10,3 +10,12 @@ Non-negotiable rules for any code in this repo:
 - Proctoring media uploads go from the browser straight to storage via signed upload URLs, never through API routes.
 - Integrity signals produce **suspicious labels with evidence**. Nothing in the code auto-rejects a candidate.
 - New question or task kinds are added as **step types** (see `docs/06-assessment-engine.md`), not as special cases in the attempt flow.
+
+Working rules:
+
+- Schema changes only through new files in `supabase/migrations/` (one shared cloud database, no local one). After applying, regenerate `src/lib/database.types.ts` and run `pnpm test:rls`.
+- Candidate secrets (invite token hashes, email codes, seeds, session hashes) live in `invite_secrets` / `attempt_secrets`, which only the service role can read. Don't add them as columns on tables company users can read.
+- The service client (`src/lib/supabase/service.ts`) is for Supabase Auth admin calls and candidate routes only. Company-side writes go through the user's own client so RLS checks them.
+- Company pages live under `/app/[orgSlug]`; get the company with `requireOrgMembership(slug)` from `src/lib/auth.ts`.
+- This is Next.js 16: read `node_modules/next/dist/docs/` before writing app code (middleware is `src/proxy.ts`, `cookies()`/`params` are async, Cache Components is on).
+- Update `docs/10-progress.md` when a build step lands.
