@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -15,11 +15,13 @@ export const ROLES: readonly Role[] = ["admin", "recruiter", "viewer"] as const;
 export type Membership = {
   orgId: string;
   orgName: string;
+  orgSlug: string;
   role: Role;
 };
 
-// Cookie holding the org the user last switched to. It is only a preference:
-// every read re-checks it against the user's memberships.
+// The company being worked in comes from the URL (/app/<orgSlug>/...). This
+// cookie only remembers which company plain /app should open; every read
+// re-checks it against the user's memberships.
 export const ACTIVE_ORG_COOKIE = "active_org";
 
 export class AuthorizationError extends Error {
@@ -51,27 +53,38 @@ export const listMemberships = cache(async (): Promise<Membership[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("memberships")
-    .select("org_id, role, organizations(name)")
+    .select("org_id, role, organizations(name, slug)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data.map((m) => ({
-    orgId: m.org_id,
-    orgName: m.organizations?.name ?? "Unnamed company",
-    role: m.role as Role,
-  }));
+  return data.flatMap((m) =>
+    m.organizations
+      ? [{ orgId: m.org_id, orgName: m.organizations.name, orgSlug: m.organizations.slug, role: m.role as Role }]
+      : [],
+  );
 });
 
 /**
- * The org the user is working in. Uses the active_org cookie if it matches a
- * real membership, otherwise their first org. No orgs → /onboarding.
+ * Which company plain /app should open: the remembered one if the user still
+ * belongs to it, otherwise their first. No companies → /onboarding.
  */
-export const requireActiveMembership = cache(async (): Promise<Membership> => {
+export async function resolveDefaultMembership(): Promise<Membership> {
   await requireUser();
   const memberships = await listMemberships();
   if (memberships.length === 0) redirect("/onboarding");
   const preferred = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
   return memberships.find((m) => m.orgId === preferred) ?? memberships[0];
+}
+
+/**
+ * The company named in the URL, if the signed-in user belongs to it. Anyone
+ * else gets a 404, so URLs don't reveal which companies exist.
+ */
+export const requireOrgMembership = cache(async (orgSlug: string): Promise<Membership> => {
+  await requireUser();
+  const membership = (await listMemberships()).find((m) => m.orgSlug === orgSlug);
+  if (!membership) notFound();
+  return membership;
 });
 
 /**

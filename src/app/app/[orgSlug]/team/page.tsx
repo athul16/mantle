@@ -1,4 +1,4 @@
-import { requireActiveMembership, requireUser, type Role } from "@/lib/auth";
+import { requireOrgMembership, requireUser, type Role } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ROLES_FOR_UI } from "./roles";
@@ -35,9 +35,9 @@ async function loadMembers(orgId: string): Promise<Member[]> {
   );
 }
 
-export default async function TeamPage() {
+export default async function TeamPage({ params }: PageProps<"/app/[orgSlug]/team">) {
   const user = await requireUser();
-  const { orgId, orgName, role } = await requireActiveMembership();
+  const { orgId, orgName, role } = await requireOrgMembership((await params).orgSlug);
   const members = await loadMembers(orgId);
   const isAdmin = role === "admin";
 
