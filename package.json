@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:rls": "vitest run tests/rls.test.ts",
     "test:engine": "vitest run tests/engine",
+    "test:jobs": "vitest run tests/jobs --passWithNoTests",
+    "test:candidate": "vitest run tests/candidate --passWithNoTests",
     "scenarios:publish": "tsx --conditions=react-server scripts/publish-scenarios.ts"
   },
   "dependencies": {
