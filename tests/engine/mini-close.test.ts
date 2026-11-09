@@ -106,6 +106,14 @@ describe("what the candidate receives (every scenario, many seeds)", () => {
     });
   }
 
+  it("the leak check fires on a planted adjusted balance", () => {
+    const adjusted = keysFor("abc").num.value;
+    const money = adjusted.toLocaleString("en-US", { minimumFractionDigits: 2 });
+    const planted = JSON.stringify({ body: "Adjusted: $" + money });
+    expect(leakPatterns(adjusted).some((p) => p.test(planted))).toBe(true);
+    expect(leakPatterns(adjusted).some((p) => p.test(JSON.stringify({ v: adjusted })))).toBe(true);
+  });
+
   it("withholds scheduled messages and their steps until they arrive", () => {
     const ids = (m: number) => renderAttemptForCandidate(demoMiniClose, "abc", m);
     expect(ids(0).steps.map((s) => s.id)).toEqual(["bank-rec"]);
