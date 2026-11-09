@@ -44,6 +44,19 @@ export interface ScenarioDefinition {
   messages: Message[];
 }
 
+/**
+ * Scenario metadata + content, matching a scenarios table row. Its variant
+ * generator is code and lives server-side (see server/scenario.ts).
+ */
+export interface Scenario {
+  slug: string;
+  version: number;
+  title: string;
+  roleFamily: string;
+  timeLimitMinutes: number;
+  definition: ScenarioDefinition;
+}
+
 export interface StepScoreItem {
   id: string;
   label: string;
