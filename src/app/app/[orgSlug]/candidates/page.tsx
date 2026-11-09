@@ -1,10 +1,10 @@
-import { requireActiveMembership } from "@/lib/auth";
+import { requireOrgMembership } from "@/lib/auth";
 
 export const metadata = { title: "Candidates · Assessment Platform" };
 
 // Placeholder until the results table (skeleton step 6).
-export default async function CandidatesPage() {
-  await requireActiveMembership();
+export default async function CandidatesPage({ params }: PageProps<"/app/[orgSlug]/candidates">) {
+  await requireOrgMembership((await params).orgSlug);
   return (
     <div className="space-y-2">
       <h1 className="text-2xl font-semibold tracking-tight">Candidates</h1>

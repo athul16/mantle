@@ -24,8 +24,11 @@ export async function createOrganization(_state: FormState, formData: FormData):
   const { data: orgId, error } = await supabase.rpc("create_organization", { org_name: parsed.data.name });
   if (error || !orgId) return { error: "Could not create the company. Try again." };
 
+  // The database picked the URL slug; read it back to land on the new company.
+  const { data: org } = await supabase.from("organizations").select("slug").eq("id", orgId).single();
+
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions);
   // Drop any cached /app render from before the org existed (it redirected here).
   revalidatePath("/", "layout");
-  redirect("/app");
+  redirect(org ? `/app/${org.slug}` : "/app");
 }

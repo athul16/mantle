@@ -68,7 +68,7 @@ export async function inviteTeammate(_state: FormState, formData: FormData): Pro
     return { error: "Could not add them to the team." };
   }
 
-  revalidatePath("/app/team");
+  revalidatePath("/app/[orgSlug]/team", "page");
   return {
     message: emailed
       ? `Invite sent to ${email}. They'll set a password from the email link.`
@@ -116,7 +116,7 @@ export async function changeRole(_state: FormState, formData: FormData): Promise
   const { data, error } = await supabase.from("memberships").update({ role: newRole }).eq("org_id", orgId).eq("user_id", userId).select("user_id");
   if (error || data.length !== 1) return { error: "Could not change the role." };
 
-  revalidatePath("/app");
+  revalidatePath("/app/[orgSlug]", "layout");
   return { message: "Role updated." };
 }
 
@@ -141,6 +141,6 @@ export async function removeMember(_state: FormState, formData: FormData): Promi
   const { data, error } = await supabase.from("memberships").delete().eq("org_id", orgId).eq("user_id", userId).select("user_id");
   if (error || data.length !== 1) return { error: "Could not remove them." };
 
-  revalidatePath("/app");
+  revalidatePath("/app/[orgSlug]", "layout");
   return { message: "Removed from the team." };
 }

@@ -1,35 +1,40 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { signOut } from "@/app/(auth)/actions";
-import { listMemberships, requireActiveMembership, requireUser } from "@/lib/auth";
+import { listMemberships, requireOrgMembership, requireUser } from "@/lib/auth";
 import { OrgSwitcher } from "./org-switcher";
 
 const NAV = [
-  { href: "/app", label: "Dashboard" },
-  { href: "/app/jobs", label: "Jobs" },
-  { href: "/app/candidates", label: "Candidates" },
-  { href: "/app/team", label: "Team" },
+  { path: "", label: "Dashboard" },
+  { path: "/jobs", label: "Jobs" },
+  { path: "/candidates", label: "Candidates" },
+  { path: "/team", label: "Team" },
 ] as const;
 
-// The shell renders statically; anything that reads the session streams in
-// behind a Suspense boundary (required with cacheComponents).
-export default function AppLayout({ children }: LayoutProps<"/app">) {
+// The shell renders statically. The company slug comes from the URL and the
+// session from cookies, so both are read inside Suspense boundaries (required
+// with cacheComponents); the params promise is passed down, not awaited here.
+export default function OrgLayout({ children, params }: LayoutProps<"/app/[orgSlug]">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-neutral-200 dark:border-neutral-800">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <div className="flex items-center gap-6">
             <Link href="/app" className="font-semibold">Assessment Platform</Link>
-            <nav className="flex gap-4 text-sm text-neutral-600 dark:text-neutral-400">
-              {NAV.map((item) => (
-                <Link key={item.href} href={item.href} className="hover:text-neutral-900 dark:hover:text-white">
-                  {item.label}
-                </Link>
+            <Suspense fallback={<div className="h-5 w-64" />}>
+              {params.then(({ orgSlug }) => (
+                <nav className="flex gap-4 text-sm text-neutral-600 dark:text-neutral-400">
+                  {NAV.map((item) => (
+                    <Link key={item.path} href={`/app/${orgSlug}${item.path}`} className="hover:text-neutral-900 dark:hover:text-white">
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
               ))}
-            </nav>
+            </Suspense>
           </div>
           <Suspense fallback={<div className="h-8 w-48" />}>
-            <AccountBar />
+            <AccountBar params={params} />
           </Suspense>
         </div>
       </header>
@@ -40,9 +45,10 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
   );
 }
 
-async function AccountBar() {
+async function AccountBar({ params }: { params: LayoutProps<"/app/[orgSlug]">["params"] }) {
+  const { orgSlug } = await params;
   const user = await requireUser();
-  const active = await requireActiveMembership();
+  const active = await requireOrgMembership(orgSlug);
   const memberships = await listMemberships();
   return (
     <div className="flex items-center gap-3 text-sm">

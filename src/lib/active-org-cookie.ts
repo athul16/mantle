@@ -1,5 +1,6 @@
-// Options for the active_org preference cookie. The value is only an org id
-// the user picked; it grants nothing by itself (see requireActiveMembership).
+// Options for the active_org preference cookie. The value is only the org id
+// plain /app should open; it grants nothing by itself (see
+// resolveDefaultMembership). The company being worked in comes from the URL.
 export const activeOrgCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,

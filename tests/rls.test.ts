@@ -319,6 +319,39 @@ describe("roles inside an org", () => {
   });
 });
 
+describe("org slugs (company URLs)", () => {
+  it("create_organization picks a URL-safe slug from the name", async () => {
+    const org = must(await users.A.admin.client.from("organizations").select("name, slug").eq("id", seed.A.orgId).single());
+    expect(org.slug).toBe(`rls-test-a-${run}`);
+  });
+
+  it("another company's slug is invisible", async () => {
+    const rows = must(await users.A.admin.client.from("organizations").select("slug").eq("slug", `rls-test-b-${run}`));
+    expect(rows).toEqual([]);
+  });
+
+  it("only admins can change the slug, and only to a valid one", async () => {
+    const recruiter = must(
+      await users.A.recruiter.client.from("organizations").update({ slug: `renamed-${run}` }).eq("id", seed.A.orgId).select("id"),
+    );
+    expect(recruiter).toEqual([]);
+
+    const admin = users.A.admin.client;
+    for (const bad of ["Has Spaces", "UPPER", "-edge-", "ab", "settings", `rls-test-b-${run}`]) {
+      const res = await admin.from("organizations").update({ slug: bad }).eq("id", seed.A.orgId);
+      expect(res.error, `slug "${bad}" should be rejected`).not.toBeNull();
+    }
+    must(await admin.from("organizations").update({ slug: `renamed-a-${run}` }).eq("id", seed.A.orgId).select("id"));
+  });
+
+  it("a duplicate company name gets a numbered slug", async () => {
+    const dupe = must(await users.B.admin.client.rpc("create_organization", { org_name: `RLS test B ${run}` }));
+    const org = must(await service.from("organizations").select("slug").eq("id", dupe).single());
+    expect(org.slug).toBe(`rls-test-b-${run}-2`);
+    await service.from("organizations").delete().eq("id", dupe);
+  });
+});
+
 describe("scenarios and orgs", () => {
   it("every signed-in user sees published library scenarios", async () => {
     for (const key of ["A", "B"] as const) {
