@@ -2,7 +2,7 @@
 
 Where the phase 1 build stands. Update this file whenever a build step lands.
 
-_Last updated: 2026-11-08._
+_Last updated: 2026-11-09._
 
 ## Skeleton build order (from `08-roadmap-and-open-questions.md`)
 
@@ -10,7 +10,7 @@ _Last updated: 2026-11-08._
 | --- | --- | --- | --- |
 | 1 | Repo, app, Supabase, schema + RLS | ✅ Done | Next.js 16 app; Supabase cloud project; 3 migrations; 28 cross-org isolation tests |
 | 2 | Company auth, orgs, memberships | ✅ Done | Sign up / log in, onboarding, company URLs (`/app/<slug>`), org switcher, team page (invite, change role, remove, last-admin guard) |
-| 3 | Jobs, invites, invite emails | ⬜ Not started | Waiting on Resend setup |
+| 3 | Jobs, invites, invite emails | ⬜ Not started | Shared helpers ready: `sendEmail` (`src/lib/email`, writes to `.dev-outbox/` without `RESEND_API_KEY`), invite tokens and codes (`src/lib/tokens.ts`) |
 | 4 | Candidate flow: verify, system check, instructions, workspace, timer, autosave, submit | ⬜ Not started | Engine functions it needs are ready |
 | 5 | Engine: step type interface + `inbox_reply` + `spreadsheet` | 🟡 Core done | Step-type plug-in interface, seeded variants, server-only scoring, `numeric` step type, demo scenario, `/dev/engine` preview, 44 unit tests. `inbox_reply` and `spreadsheet` not built |
 | 6 | Results table + candidate report | ⬜ | |
@@ -49,4 +49,5 @@ Roughly 2.5 of 8 steps. The finished parts are the ones every later step depends
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-09 | Stage A shared setup: email helper, token helpers, `publishScenario` + `pnpm scenarios:publish` (demo scenario published to the platform library), `test:jobs` / `test:candidate` scripts |
 | 2026-11-08 | PR #2: schema + RLS, company auth, engine core, decision brief. PR #3: company pages under `/app/<slug>` |

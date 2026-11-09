@@ -42,5 +42,8 @@ next-env.d.ts
 
 !.env.example
 
+# emails written locally when RESEND_API_KEY is not set
+/.dev-outbox/
+
 # claude code agent worktrees
 /.claude/worktrees/
