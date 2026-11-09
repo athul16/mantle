@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import * as z from "zod";
@@ -24,5 +25,7 @@ export async function createOrganization(_state: FormState, formData: FormData):
   if (error || !orgId) return { error: "Could not create the company. Try again." };
 
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions);
+  // Drop any cached /app render from before the org existed (it redirected here).
+  revalidatePath("/", "layout");
   redirect("/app");
 }

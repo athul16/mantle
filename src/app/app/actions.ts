@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACTIVE_ORG_COOKIE, requireMembership } from "@/lib/auth";
@@ -10,5 +11,6 @@ export async function switchOrg(formData: FormData) {
   // Only store an org the user really belongs to.
   await requireMembership(orgId);
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions);
+  revalidatePath("/app", "layout");
   redirect("/app");
 }
