@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { renderAttemptForCandidate } from "@/lib/engine/server/render";
 import { latestScenario, scenarioChoices } from "./scenarios";
@@ -10,13 +11,19 @@ import { DevWorkspace } from "./workspace";
  * simulates time since the attempt started, to show scheduled messages. In the
  * real attempt flow seed and minute come from the server, never the URL.
  */
-export default async function DevEnginePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  if (process.env.NODE_ENV === "production") notFound();
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
+export default function DevEnginePage({ searchParams }: { searchParams: SearchParams }) {
+  if (process.env.NODE_ENV === "production") notFound();
+  // searchParams is request data, so read it inside Suspense (Cache Components).
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-5xl px-4 py-8 text-sm text-neutral-500">Loading…</main>}>
+      <EnginePreview searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function EnginePreview({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const slug = typeof params.scenario === "string" ? params.scenario : "demo-petty-cash";
   const scenario = latestScenario(slug);
