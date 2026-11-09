@@ -48,3 +48,4 @@ Simulations are the core approach. Multiple choice is supported as one simple st
 | `06-assessment-engine.md` | Scenarios, step types, scoring, variants, data model |
 | `07-accounting-simulations.md` | Worked accounting simulation examples |
 | `08-roadmap-and-open-questions.md` | Phases, gates, open questions |
+| `09-go-to-market.md` | Accounting target firms, how they hire, pitch, outreach, contacts |
