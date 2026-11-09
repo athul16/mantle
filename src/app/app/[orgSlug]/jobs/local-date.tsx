@@ -1,18 +1,19 @@
 "use client";
 
-// Formats a timestamp in the viewer's own time zone. The server renders UTC;
-// the browser re-renders it locally (hence suppressHydrationWarning).
+import { useSyncExternalStore } from "react";
+
+const noopSubscribe = () => () => {};
+
+// Formats a timestamp in the viewer's own time zone. The server (and the
+// hydration pass) render UTC, labelled; right after hydration it re-renders
+// in the browser's zone.
 export function LocalDate({ iso, withTime = false }: { iso: string | null; withTime?: boolean }) {
+  const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false);
   if (!iso) return <span>—</span>;
-  const date = new Date(iso);
-  const text = date.toLocaleString("en-US", {
+  const text = new Date(iso).toLocaleString("en-US", {
     dateStyle: "medium",
     ...(withTime ? { timeStyle: "short" } : {}),
-    ...(typeof window === "undefined" ? { timeZone: "UTC" } : {}),
+    ...(inBrowser ? {} : { timeZone: "UTC" }),
   });
-  return (
-    <time dateTime={iso} suppressHydrationWarning>
-      {text}
-    </time>
-  );
+  return <time dateTime={iso}>{inBrowser || !withTime ? text : `${text} UTC`}</time>;
 }

@@ -42,8 +42,8 @@ export default async function AssessmentsPage({ params }: PageProps<"/app/[orgSl
             {scenarios.map((s) => (
               <li key={s.id} className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
                 <p className="font-medium">{s.title}</p>
-                <p className="text-xs capitalize text-neutral-500">
-                  {s.roleFamily} · v{s.version} · written for {suggestedMinutes(s.slug, s.version)} min
+                <p className="text-xs text-neutral-500">
+                  <span className="capitalize">{s.roleFamily}</span> · v{s.version} · written for {suggestedMinutes(s.slug, s.version)} min
                 </p>
               </li>
             ))}
