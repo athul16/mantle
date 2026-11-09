@@ -1,0 +1,5 @@
+// Suspense boundary for every /app page, so navigating between them shows this
+// instantly while the session-dependent content streams in.
+export default function Loading() {
+  return <p className="text-sm text-neutral-500">Loading…</p>;
+}
