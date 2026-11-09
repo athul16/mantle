@@ -70,6 +70,150 @@ Rubric:
 
 30 unpaid invoices with dates. Bucket into current, 31–60, 61–90, 90+; apply the firm's bad-debt rates per bucket (given in the email); compute the allowance and adjusting entry. Scored on key cell values.
 
+## Example 4: Bank rec with a mid-task update (~30 min)
+
+A short, single-task version of Example 1 for the first build. It tests whether the candidate notices and acts on new information while working. Numbers shown are one variant.
+
+**Setup:** "You're a new staff accountant at Oakline CPA Group. Your client is Harbor Lane Coffee Co. Your senior, Dana Ruiz, needs the October bank reconciliation for checking ending 4471 before a 10 AM client call."
+
+### Messages
+
+**Minute 0 · Dana · "Harbor Lane: October bank rec"** (attachment: workbook)
+
+> Hi {first_name},
+>
+> Welcome aboard! First assignment: Harbor Lane Coffee Co. needs their October bank reconciliation for their operating account (checking ending 4471).
+>
+> The attached workbook has four tabs: Bank Statement, GL Cash, and two blank templates, Reconciliation and Journal Entries, for you to fill in.
+>
+> Please:
+> 1. Reconcile the bank balance to the book balance as of October 31.
+> 2. Draft any journal entries the client needs to fix their books.
+> 3. Reply to me with the adjusted cash balance and a short summary of anything the client should know about.
+>
+> September's reconciliation was clean, so nothing carries over from last month. I need this before my 10 AM call with the client.
+>
+> Thanks!
+> Dana Ruiz
+> Senior Associate, Oakline CPA Group
+
+**Minute 12 · Dana · "RE: Harbor Lane: one more thing"**
+
+> Quick update: Marcus (Harbor Lane's owner) just told me check #1046 to Office Depot for $300.00 was voided. The order was cancelled and the check was never mailed, but it's still in their books. It was originally booked to Office Supplies Expense. Please factor that into your rec.
+>
+> Dana
+
+### Workbook (`spreadsheet` + `journal_entry`)
+
+Tabs 1 and 2 are read-only; tabs 3 and 4 are answered.
+
+**Tab 1 · Bank Statement** (Piedmont Community Bank, checking ending 4471, Oct 1–31)
+
+| Date | Description | Debit | Credit | Balance |
+| --- | --- | --- | --- | --- |
+| 10/01 | Opening balance | | | 24,500.00 |
+| 10/02 | Deposit | | 5,200.00 | 29,700.00 |
+| 10/05 | Check #1041 | 3,150.00 | | 26,550.00 |
+| 10/08 | Check #1042 | 875.00 | | 25,675.00 |
+| 10/12 | Deposit | | 4,760.00 | 30,435.00 |
+| 10/14 | Check #1043 | 2,610.00 | | 27,825.00 |
+| 10/18 | Check #1044 | 1,920.00 | | 25,905.00 |
+| 10/20 | Returned item: NSF, Maple St. Bakery | 480.00 | | 25,425.00 |
+| 10/22 | Deposit | | 6,035.00 | 31,460.00 |
+| 10/25 | Check #1045 | 4,400.00 | | 27,060.00 |
+| 10/27 | Check #1047 | 1,140.00 | | 25,920.00 |
+| 10/31 | Monthly service fee | 35.00 | | 25,885.00 |
+| 10/31 | Interest earned | | 12.50 | 25,897.50 |
+
+**Tab 2 · GL Cash** (account 1010 Cash, Operating)
+
+| Date | Ref | Description | Debit | Credit | Balance |
+| --- | --- | --- | --- | --- | --- |
+| 10/01 | | Beginning balance | | | 24,500.00 |
+| 10/02 | DEP | Daily sales deposit | 5,200.00 | | 29,700.00 |
+| 10/05 | 1041 | Coastal Roasters, coffee beans | | 3,150.00 | 26,550.00 |
+| 10/08 | 1042 | Piedmont Dairy | | 875.00 | 25,675.00 |
+| 10/12 | DEP | Daily sales deposit | 4,760.00 | | 30,435.00 |
+| 10/14 | 1043 | Coastal Roasters, coffee beans | | 2,160.00 | 28,275.00 |
+| 10/18 | 1044 | Bull City Equipment Repair | | 1,920.00 | 26,355.00 |
+| 10/22 | DEP | Sales deposit incl. Maple St. Bakery wholesale check | 6,035.00 | | 32,390.00 |
+| 10/25 | 1045 | Triangle Property Mgmt, rent | | 4,400.00 | 27,990.00 |
+| 10/26 | 1046 | Office Depot, office supplies | | 300.00 | 27,690.00 |
+| 10/27 | 1047 | City Utilities | | 1,140.00 | 26,550.00 |
+| 10/30 | 1048 | Cardinal Linens | | 1,250.00 | 25,300.00 |
+| 10/31 | DEP | Daily sales deposit | 3,420.00 | | 28,720.00 |
+
+**Tab 3 · Reconciliation:** fixed labels (balance per bank; add deposits in transit; less outstanding checks; bank errors; adjusted bank; balance per books; add; less; book errors; adjusted book; difference). Candidate fills amounts and may insert rows.
+
+**Tab 4 · Journal Entries:** columns Entry #, Date, Account, Debit, Credit, Description. Account is a dropdown: 1010 Cash, 1200 Accounts Receivable, 2000 Accounts Payable, 5100 Cost of Goods Sold, 6100 Office Supplies Expense, 6200 Bank Service Charges, 6300 Rent Expense, 6400 Utilities Expense, 6500 Repairs Expense, 7100 Interest Income.
+
+### Planted items
+
+- Deposit in transit $3,420 (10/31)
+- Outstanding check #1048 $1,250
+- Unrecorded bank fee $35
+- Unrecorded NSF customer check $480 (Maple St. Bakery)
+- Unrecorded interest $12.50
+- Check #1043 cleared at $2,610 but booked at $2,160 (transposition, $450)
+- **Update at minute 12:** check #1046 $300 voided; add back to books, do not list as outstanding
+
+### Expected reconciliation (after the update)
+
+| | Amount |
+| --- | --- |
+| Bank balance | 25,897.50 |
+| + Deposit in transit | 3,420.00 |
+| − Outstanding check #1048 | (1,250.00) |
+| **Adjusted bank** | **28,067.50** |
+| Book balance | 28,720.00 |
+| + Interest earned | 12.50 |
+| + Voided check #1046 | 300.00 |
+| − Bank fee | (35.00) |
+| − NSF check | (480.00) |
+| − Correction, check #1043 | (450.00) |
+| **Adjusted book** | **28,067.50** |
+
+Missed-update trap: a candidate who ignores the minute-12 message lists #1046 as outstanding and both sides tie at **27,767.50**. Scoring must check for this case specifically, since the rec still balances.
+
+### Expected entries
+
+- Bank service charges 35 / Cash 35
+- Accounts receivable (Maple St. Bakery) 480 / Cash 480
+- Cash 12.50 / Interest income 12.50
+- Cost of goods sold 450 / Cash 450 (accept Accounts payable if the candidate explains the check paid a booked invoice)
+- Cash 300 / Office supplies expense 300
+
+Net change to Cash: −652.50 (28,720.00 → 28,067.50).
+
+### Scoring (100 points)
+
+| Area | What earns points | Points |
+| --- | --- | --- |
+| Reconciliation | Each of the 6 planted items on the correct side and amount (5 each) | 30 |
+| Update | #1046 removed from outstanding and added back to books | 10 |
+| Final balance | Both sides equal 28,067.50 | 5 |
+| Journal entries | Each of the 5 entries balanced with correct accounts and amounts (3 each) | 15 |
+| Reply · answer | States 28,067.50 up front | 10 |
+| Reply · client issues | Flags the $480 NSF for follow-up and the $450 error on #1043 | 10 |
+| Reply · update | Confirms the voided check was handled | 5 |
+| Reply · clarity | Under ~150 words, organized | 10 |
+| Reply · tone | Professional and friendly, greeting and sign-off | 5 |
+
+Strong reply (rubric reference, never shown to candidates):
+
+> Hi Dana,
+>
+> October is reconciled. Adjusted cash is $28,067.50 on both the bank and book side, and the workbook has five journal entries ready for the client.
+>
+> Two things to raise on your call: Maple St. Bakery's $480 check bounced, so that's back in receivables and needs follow-up. Check #1043 to Coastal Roasters was recorded as $2,160 but cleared at $2,610, a $450 entry error now corrected.
+>
+> I also reversed voided check #1046 per your note.
+>
+> Thanks,
+> {first_name}
+
+Process signals worth reporting: time from the minute-12 message arriving to it being opened, and whether the reconciliation changed afterward.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.

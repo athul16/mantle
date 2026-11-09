@@ -7,7 +7,7 @@ Each phase starts only after a real company clears the gate.
 | Phase | Scope | Gate to next phase |
 | --- | --- | --- |
 | 1. Build the MVP | Skeleton (accounts, invites, candidate flow, timer, autosave, results table, reports); engine with `inbox_reply` + `spreadsheet` first, then `journal_entry` + `document_review`; camera snapshots + screen share; one accounting simulation | First pilot company signed |
-| 2. Pilots | 1 to 2 companies, set up by us; one real hiring round each; phone side camera; recruiter feedback | A pilot company would pay |
+| 2. Pilots | 1 to 2 companies, set up by us (accounting targets and outreach order in `09-go-to-market.md`); one real hiring round each; phone side camera; recruiter feedback | A pilot company would pay |
 | 3. Self-serve | Company signup and billing, scenario builder, analytics, ATS integrations, viewer role if not shipped, SOC 2 when asked | |
 
 ## Build order for phase 1
@@ -19,7 +19,7 @@ Each phase starts only after a real company clears the gate.
 5. Engine: step type interface + `inbox_reply` + `spreadsheet`
 6. Results table + candidate report
 7. Proctoring: browser signals, camera snapshots, screen share, flags
-8. `journal_entry` + `document_review`; Example 1 simulation end to end
+8. `journal_entry` + `document_review`; Example 1 simulation end to end (Example 4 is a shorter 30-minute option that needs only `spreadsheet`, `journal_entry`, and `inbox_reply`)
 
 ## Open questions
 
