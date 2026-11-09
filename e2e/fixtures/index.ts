@@ -33,28 +33,27 @@ type Fixtures = {
   axe: (options?: AxeOptions) => Promise<void>;
 };
 
+// The fixture callback is named `provide` (Playwright calls it `use`) so the React hooks lint rule leaves it alone.
 export const test = base.extend<Fixtures>({
-  // eslint-disable-next-line no-empty-pattern
-  data: async ({}, use, testInfo) => {
+  data: async ({}, provide, testInfo) => {
     const data = createTestData(`e2e-${testInfo.project.name}-w${testInfo.workerIndex}`);
-    await use(data);
+    await provide(data);
     await data.cleanup();
   },
-  company: async ({ data }, use) => {
-    await use(await data.company());
+  company: async ({ data }, provide) => {
+    await provide(await data.company());
   },
-  signInAs: async ({ page, company }, use) => {
-    await use((role, next) => signInViaUi(page, company.users[role], next));
+  signInAs: async ({ page, company }, provide) => {
+    await provide((role, next) => signInViaUi(page, company.users[role], next));
   },
-  hiring: async ({ data }, use) => {
-    await use(await data.hiringSetup());
+  hiring: async ({ data }, provide) => {
+    await provide(await data.hiringSetup());
   },
-  // eslint-disable-next-line no-empty-pattern
-  outbox: async ({}, use) => {
-    await use(outboxHelpers);
+  outbox: async ({}, provide) => {
+    await provide(outboxHelpers);
   },
-  axe: async ({ page }, use, testInfo) => {
-    await use((options) => expectNoAxeViolations(page, testInfo, options));
+  axe: async ({ page }, provide, testInfo) => {
+    await provide((options) => expectNoAxeViolations(page, testInfo, options));
   },
 });
 

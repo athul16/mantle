@@ -17,7 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:db": "supabase test db",
     "test:e2e": "playwright test",
-    "test:lhci": "lhci autorun",
+    "test:lhci": "tsx scripts/lhci-fixture.mts && lhci autorun",
     "db:test:start": "supabase start -x studio,imgproxy,logflare,vector,edge-runtime,supavisor,realtime && pnpm db:test:env",
     "db:test:stop": "supabase stop --no-backup",
     "db:test:reset": "supabase db reset && pnpm db:test:env",
