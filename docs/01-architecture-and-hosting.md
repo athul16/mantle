@@ -20,7 +20,7 @@
 | Piece | Detail |
 | --- | --- |
 | Next.js | 16.4 with the App Router, TypeScript, Tailwind 4, pnpm 12. Middleware is called **proxy** in Next 16 (`src/proxy.ts`). **Cache Components** is on (decision Q10): pages that read cookies or params do so inside `<Suspense>` |
-| Supabase | Cloud project `assessment-platform` (ref `fexzsiizgcjuddtoeaui`), region us-east-1, Free plan, in "athul16's Org". No local Docker database; migrations in `supabase/migrations/` are the source of truth |
+| Supabase | Cloud project `assessment-platform` (ref `fexzsiizgcjuddtoeaui`), region us-east-1, Free plan, in its own Supabase organization (moved there 2026-11-08 so invites cover only this project). No local Docker database; migrations in `supabase/migrations/` are the source of truth |
 | Auth (company) | Email + password via `@supabase/ssr` cookies. Session refreshed in `src/proxy.ts`; real checks in `src/lib/auth.ts` on every page and action |
 | Vercel | Not set up yet |
 | Email | Resend chosen; not connected yet (see `11-team-setup.md`) |
