@@ -1,0 +1,46 @@
+# Manual: regenerate Playwright toHaveScreenshot baselines on Linux (the only
+# platform baselines are committed for). Download the "screenshot-baselines"
+# artifact and commit its contents under e2e/__screenshots__/. Pushes nothing.
+name: e2e-snapshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: "Only tests matching this (playwright --grep); empty for all"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  update:
+    name: update-snapshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:test:start
+      - run: pnpm db:test:env --github-env
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm build
+      - name: update baselines
+        env:
+          E2E_PREBUILT: "1"
+          GREP: ${{ inputs.grep }}
+        run: pnpm test:e2e --update-snapshots ${GREP:+--grep "$GREP"}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-baselines
+          path: e2e/__screenshots__/
+          if-no-files-found: warn

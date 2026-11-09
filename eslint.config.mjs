@@ -14,7 +14,14 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Agent worktrees (separate checkouts, gitignored).
     ".claude/**",
+    // Test output.
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
+    ".lighthouseci/**",
   ]),
+  // CommonJS config files (lighthouserc.cjs) use require().
+  { files: ["**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
 ]);
 
 export default eslintConfig;

@@ -24,9 +24,15 @@ pnpm dev                     # http://localhost:3000
 | `pnpm build` | Production build |
 | `pnpm lint` | ESLint |
 | `pnpm test:engine` | Engine unit tests (no network) |
-| `pnpm test:rls` | Cross-company isolation tests against the cloud database |
+| `pnpm db:test:start` / `db:test:stop` | Local throwaway Supabase for tests (Docker), writes `.env.test` |
+| `pnpm test` | All Vitest tests (unit, integration, components) |
+| `pnpm test:rls` / `test:jobs` / `test:candidate` | Integration tests against the local test database |
+| `pnpm test:components` | Component tests (jsdom) |
+| `pnpm test:db` | pgTAP schema and RLS tests |
+| `pnpm test:e2e` | Playwright in chromium, firefox and webkit |
+| `pnpm test:coverage` / `test:lhci` | Coverage report / Lighthouse CI |
 
-Schema changes go only through `supabase/migrations/` (one shared cloud database). Environment variables are listed in `docs/01-architecture-and-hosting.md`.
+Tests never touch the cloud database; see [`docs/11-testing.md`](docs/11-testing.md). Schema changes go only through `supabase/migrations/`. Environment variables are listed in `docs/01-architecture-and-hosting.md`.
 
 ## Layout
 
@@ -38,7 +44,10 @@ src/lib/engine/          assessment engine (types, server/, client/, step-types/
 src/lib/database.types.ts  generated from the schema; regenerate after each migration
 src/proxy.ts             session refresh + signed-out redirect (Next 16 "proxy" = old middleware)
 supabase/migrations/     every schema change, named by the version Supabase recorded
-tests/                   rls.test.ts (cloud DB), engine/ (unit)
+supabase/tests/          pgTAP tests (pnpm test:db)
+tests/                   Vitest: rls.test.ts, jobs/, candidate/ (local test DB), engine/ (unit), components/ (jsdom), helpers/ (shared fixtures)
+e2e/                     Playwright specs and fixtures
+.github/workflows/       ci (checks, database, e2e), nightly (lighthouse, cloud smoke), e2e-snapshots
 docs/                    product + technical specs; decisions/ holds decision briefs
 ```
 

@@ -13,7 +13,8 @@ Non-negotiable rules for any code in this repo:
 
 Working rules:
 
-- Schema changes only through new files in `supabase/migrations/` (one shared cloud database, no local one). After applying, regenerate `src/lib/database.types.ts` and run `pnpm test:rls`.
+- The cloud Supabase project is the only real database. Tests run against a local throwaway Supabase (`pnpm db:test:start`, Docker) and never against the cloud; the test setup refuses a non-local URL. See `docs/11-testing.md`.
+- Schema changes only through new files in `supabase/migrations/`. After applying to the cloud project, regenerate `src/lib/database.types.ts`; check them locally with `pnpm db:test:reset && pnpm test:db && pnpm test:rls`.
 - Candidate secrets (invite token hashes, email codes, seeds, session hashes) live in `invite_secrets` / `attempt_secrets`, which only the service role can read. Don't add them as columns on tables company users can read.
 - The service client (`src/lib/supabase/service.ts`) is for Supabase Auth admin calls and candidate routes only. Company-side writes go through the user's own client so RLS checks them.
 - Company pages live under `/app/[orgSlug]`; get the company with `requireOrgMembership(slug)` from `src/lib/auth.ts`.

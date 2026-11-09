@@ -47,3 +47,10 @@ next-env.d.ts
 
 # claude code agent worktrees
 /.claude/worktrees/
+
+# test output (docs/11-testing.md)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/.lighthouseci/

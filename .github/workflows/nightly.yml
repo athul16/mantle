@@ -1,0 +1,76 @@
+# Nightly: Lighthouse CI on a local production build, plus an optional
+# read-only smoke check of the real deployment (only if secrets are set).
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  lighthouse:
+    name: lighthouse
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: start local supabase
+        run: pnpm db:test:start
+      - name: export test env for next build
+        run: pnpm db:test:env --github-env
+      - name: install chromium for lighthouse
+        run: pnpm exec playwright install --with-deps chromium
+      - name: build against local supabase
+        run: pnpm build
+      - name: lighthouse ci (warn-only budgets)
+        run: pnpm test:lhci
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/reports/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  cloud-smoke:
+    name: cloud-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUD_SUPABASE_URL: ${{ secrets.CLOUD_SUPABASE_URL }}
+      CLOUD_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.CLOUD_SUPABASE_PUBLISHABLE_KEY }}
+      CLOUD_APP_URL: ${{ secrets.CLOUD_APP_URL }}
+    steps:
+      - name: skip without secrets
+        if: ${{ env.CLOUD_SUPABASE_URL == '' || env.CLOUD_SUPABASE_PUBLISHABLE_KEY == '' }}
+        run: echo "Cloud smoke skipped; set CLOUD_SUPABASE_URL and CLOUD_SUPABASE_PUBLISHABLE_KEY repository secrets to enable it." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+        if: ${{ env.CLOUD_SUPABASE_URL != '' && env.CLOUD_SUPABASE_PUBLISHABLE_KEY != '' }}
+      - uses: pnpm/action-setup@v4
+        if: ${{ env.CLOUD_SUPABASE_URL != '' && env.CLOUD_SUPABASE_PUBLISHABLE_KEY != '' }}
+      - uses: actions/setup-node@v4
+        if: ${{ env.CLOUD_SUPABASE_URL != '' && env.CLOUD_SUPABASE_PUBLISHABLE_KEY != '' }}
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: ${{ env.CLOUD_SUPABASE_URL != '' && env.CLOUD_SUPABASE_PUBLISHABLE_KEY != '' }}
+      - name: read-only cloud smoke
+        if: ${{ env.CLOUD_SUPABASE_URL != '' && env.CLOUD_SUPABASE_PUBLISHABLE_KEY != '' }}
+        run: pnpm exec tsx scripts/cloud-smoke.mts

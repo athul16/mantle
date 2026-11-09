@@ -1,5 +1,5 @@
 /**
- * Candidate flow against the shared cloud database: invite link, email code,
+ * Candidate flow against the local test database: invite link, email code,
  * attempt, autosave, deadline, submit and scoring. Creates its own company,
  * assessment, job and invites with the service key and deletes them after.
  * Codes are read from .dev-outbox (sendEmail's fallback without Resend).
@@ -10,15 +10,13 @@ import { readdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { requireDbEnv } from "../helpers/env";
 import type { Database } from "@/lib/database.types";
 
 vi.mock("server-only", () => ({}));
 
-try {
-  process.loadEnvFile(".env.local");
-} catch {
-  // CI provides env vars directly.
-}
+// Local throwaway Supabase only (.env.test); see tests/helpers/env.ts.
+requireDbEnv();
 // Codes must land in .dev-outbox, never a real inbox.
 delete process.env.RESEND_API_KEY;
 

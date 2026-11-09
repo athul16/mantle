@@ -2,3 +2,5 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   supabase: true
+  # esbuild ships its binary as an optional dependency; its postinstall check is not needed.
+  esbuild: false
