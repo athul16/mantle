@@ -1,0 +1,65 @@
+# 02 · Security and integrity
+
+## Data protection
+
+| Area | Rule |
+| --- | --- |
+| Tenant isolation | `org_id` on every tenant row; RLS policies; automated tests that attempt cross-org reads |
+| Company login | Email + password or magic link; MFA required for admins; SAML SSO later |
+| Candidate access | Single-use invite token (long, random, expires) + 6-digit email code before starting |
+| Encryption | HTTPS everywhere; encrypted at rest; private buckets with short-lived signed URLs |
+| Secrets | Service keys only in server env vars, never in browser code |
+| Audit log | Record who viewed or exported each candidate report |
+| Retention | Per-org setting to delete candidate data and media after N days; delete on request |
+
+## Protecting the test
+
+- Answer keys, scoring, and variant generators live on the server only.
+- Steps are served one at a time from the API.
+- Timer is enforced server-side; late answers are rejected; a cron job auto-submits abandoned attempts.
+- Every answer autosaves, so refreshes and dropped connections resume with the remaining time.
+- Each candidate gets the same scenario structure with **generated numbers** (see `06-assessment-engine.md`), so leaked answers are useless.
+
+## Proctoring
+
+All of this runs in a normal browser with no download. A browser cannot see other apps by itself, so full-screen sharing is how we see other windows.
+
+| Feature | How | Stored | Phase |
+| --- | --- | --- | --- |
+| Front camera | Snapshot every 30 to 60 s plus on events; on-device face check (no face, multiple faces) | JPEG + events | MVP |
+| Other windows | Required **entire-screen** share (verify the shared surface is a monitor, not a tab); periodic screenshots; test pauses if sharing stops | Screenshots | MVP |
+| Second monitor | Chromium Window Management API reports multiple displays (with permission) | Event | MVP |
+| Browser signals | Tab switch, blur, fullscreen exit, paste | Events | MVP |
+| Phone side camera | QR code pairs phone to the attempt via one-time token; phone shows desk, hands, screen | Snapshots, later video | Phase 2 |
+| Continuous video | Chunked recording to R2/S3, or managed live streaming | Video | Later, paid |
+| Desktop lockdown app | OS-level monitoring | Process list | Only if a client requires it |
+
+Storage estimate: one camera + one screen at one capture per 30 s for 60 minutes ≈ 240 images ≈ 10 to 25 MB per candidate.
+
+## Integrity model: suspicious labels
+
+Decided: **AI labels, company decides.** Same model HackerRank uses.
+
+- Signals (events, snapshot analysis, answer similarity, timing anomalies) produce an attempt-level label: `clear`, `review`, or `suspicious`, plus a list of flags.
+- Every flag carries evidence: timestamp, reason, and the matching snapshot or screenshot.
+- Recruiters can confirm or clear each flag. Clearing is logged.
+- Nothing auto-rejects a candidate. Companies may filter by label; that's their decision.
+- Proctoring settings lock once the first candidate starts a published assessment, so every candidate in a round has the same rules. To change them, clone the assessment.
+
+### How HackerRank does it (reference)
+
+- Proctor Mode: screenshots and webcam images every 15 s, analyzed by automated models (face detection via Amazon Rekognition / Google Gemini); flags phones in the webcam feed, unauthorized apps on screen, and similar answers across candidates.
+- Recruiters get an Integrity Summary rated High or Medium, plus a session replay with flagged events.
+- Recruiters can manually override flags. A suspicion score also lets companies filter.
+
+Our differentiator: make reviewing a flag take seconds (evidence inline), so recruiters actually look instead of bulk-filtering. Optional paid tier later: our team reviews flags before the company sees them.
+
+## Compliance
+
+- **Fair hiring:** tests must be job-related; watch for adverse impact. Simulations mirroring real tasks help here. Have a working professional review each scenario.
+- **Consent:** tell candidates what is captured, why, and for how long, before starting.
+- **Biometrics:** detect whether a face is present; do not build face recognition or identity matching without legal review (e.g., Illinois BIPA). Some jurisdictions also regulate automated hiring tools.
+- **Accessibility:** extra-time accommodations; a path for candidates without a webcam.
+- **SOC 2:** not needed for pilots; start once there's revenue.
+
+Not legal advice. Check hiring-law points with a lawyer before selling to larger employers.
