@@ -7,9 +7,9 @@ const { clientStepTypes, hasStepComponent } = await import("@/lib/engine/client/
 const { listScenarios, getScenario } = await import("@/lib/engine/scenarios");
 
 describe("step type registries", () => {
-  it("looks up numeric on both sides", () => {
-    expect(getServerStepType("numeric").type).toBe("numeric");
-    expect(hasStepComponent("numeric")).toBe(true);
+  it.each(["numeric", "inbox_reply", "spreadsheet"])("looks up %s on both sides", (type) => {
+    expect(getServerStepType(type).type).toBe(type);
+    expect(hasStepComponent(type)).toBe(true);
   });
 
   it("throws on unknown server types and reports missing client types", () => {
@@ -26,6 +26,7 @@ describe("scenario registry", () => {
   it("finds scenarios by slug and version", () => {
     expect(getScenario("demo-petty-cash", 1).title).toMatch(/petty cash/i);
     expect(() => getScenario("demo-petty-cash", 99)).toThrow(/unknown scenario/);
+    expect(getScenario("demo-mini-close", 1).title).toMatch(/mini month-end close/i);
   });
 
   for (const scenario of listScenarios()) {
