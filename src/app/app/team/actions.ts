@@ -51,10 +51,15 @@ export async function inviteTeammate(_state: FormState, formData: FormData): Pro
     // returns the existing user without sending any email.
     const existing = await service.auth.admin.generateLink({ type: "magiclink", email });
     userId = existing.data.user?.id;
+  } else if (invited.error?.code === "email_address_invalid") {
+    return { fieldErrors: { email: ["Supabase rejected this address. Check it's a real, deliverable email."] } };
   } else if (invited.error?.code === "over_email_send_rate_limit") {
     return { error: "Supabase's email limit was hit. Try again later, or set up custom SMTP." };
   }
-  if (!userId) return { error: "Could not invite that email. Try again." };
+  if (!userId) {
+    console.error("inviteTeammate failed", { code: invited.error?.code, status: invited.error?.status, message: invited.error?.message });
+    return { error: "Could not invite that email. Try again." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("memberships").insert({ org_id: orgId, user_id: userId, role: newRole });

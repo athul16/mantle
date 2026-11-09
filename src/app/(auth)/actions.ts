@@ -37,6 +37,7 @@ export async function signup(_state: FormState, formData: FormData): Promise<For
   if (error) {
     if (error.code === "user_already_exists") return { error: "An account with this email already exists. Sign in instead." };
     if (error.code === "weak_password") return { error: error.message };
+    if (error.code === "email_address_invalid") return { fieldErrors: { email: ["Use a real, deliverable email address."] } };
     if (error.code === "over_email_send_rate_limit") return { error: "Too many sign-up emails sent. Try again in a few minutes." };
     return { error: "Could not create your account. Try again." };
   }

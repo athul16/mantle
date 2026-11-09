@@ -35,12 +35,12 @@ export function InviteForm({ orgId }: { orgId: string }) {
 export function MemberControls({ orgId, userId, role, isSelf }: { orgId: string; userId: string; role: UiRole; isSelf: boolean }) {
   const [roleState, roleAction, rolePending] = useActionState(changeRole, undefined);
   const [removeState, removeAction, removePending] = useActionState(removeMember, undefined);
-  const error = roleState?.error ?? removeState?.error;
 
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
-        <form action={roleAction}>
+        {/* Remount after each attempt so a rejected change snaps back to the saved role. */}
+        <form action={roleAction} key={JSON.stringify(roleState ?? null)}>
           <input type="hidden" name="orgId" value={orgId} />
           <input type="hidden" name="userId" value={userId} />
           <select
@@ -69,7 +69,8 @@ export function MemberControls({ orgId, userId, role, isSelf }: { orgId: string;
           </Button>
         </form>
       </div>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {roleState?.error ? <p className="text-xs text-red-600">{roleState.error}</p> : null}
+      {removeState?.error ? <p className="text-xs text-red-600">{removeState.error}</p> : null}
     </div>
   );
 }
