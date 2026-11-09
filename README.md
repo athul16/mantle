@@ -14,7 +14,7 @@ Next.js 16 (TypeScript, App Router) on Vercel, Supabase (Postgres, Auth, Storage
 
 ```bash
 pnpm install
-cp .env.example .env.local   # fill in values; see docs/11-team-setup.md
+cp .env.example .env.local   # fill in values (secret key from Athul, privately)
 pnpm dev                     # http://localhost:3000
 ```
 
@@ -26,7 +26,7 @@ pnpm dev                     # http://localhost:3000
 | `pnpm test:engine` | Engine unit tests (no network) |
 | `pnpm test:rls` | Cross-company isolation tests against the cloud database |
 
-Full onboarding (Supabase access, Resend): [`docs/11-team-setup.md`](docs/11-team-setup.md).
+Schema changes go only through `supabase/migrations/` (one shared cloud database). Environment variables are listed in `docs/01-architecture-and-hosting.md`.
 
 ## Layout
 

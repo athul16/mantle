@@ -56,5 +56,4 @@ Open and decided questions with research: `decisions/`. Build status: `10-progre
 | `08-roadmap-and-open-questions.md` | Phases, gates, open questions |
 | `09-go-to-market.md` | Accounting target firms, how they hire, pitch, outreach, contacts |
 | `10-progress.md` | What's built, what's left, stages to the MVP |
-| `11-team-setup.md` | Local setup, Supabase access, connecting Resend |
 | `decisions/` | Decision briefs: background, options, recommendation, what was decided |

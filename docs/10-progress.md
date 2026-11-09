@@ -10,7 +10,7 @@ _Last updated: 2026-11-08._
 | --- | --- | --- | --- |
 | 1 | Repo, app, Supabase, schema + RLS | ✅ Done | Next.js 16 app; Supabase cloud project; 3 migrations; 28 cross-org isolation tests |
 | 2 | Company auth, orgs, memberships | ✅ Done | Sign up / log in, onboarding, company URLs (`/app/<slug>`), org switcher, team page (invite, change role, remove, last-admin guard) |
-| 3 | Jobs, invites, invite emails | ⬜ Not started | Waiting on Resend setup (see `11-team-setup.md`) |
+| 3 | Jobs, invites, invite emails | ⬜ Not started | Waiting on Resend setup |
 | 4 | Candidate flow: verify, system check, instructions, workspace, timer, autosave, submit | ⬜ Not started | Engine functions it needs are ready |
 | 5 | Engine: step type interface + `inbox_reply` + `spreadsheet` | 🟡 Core done | Step-type plug-in interface, seeded variants, server-only scoring, `numeric` step type, demo scenario, `/dev/engine` preview, 44 unit tests. `inbox_reply` and `spreadsheet` not built |
 | 6 | Results table + candidate report | ⬜ | |
@@ -40,7 +40,7 @@ Roughly 2.5 of 8 steps. The finished parts are the ones every later step depends
 
 ## Waiting on people, not code
 
-- [ ] Resend: account, verified sending subdomain, SMTP in Supabase (`11-team-setup.md`). Blocks stage A.
+- [ ] Resend: account, verified sending subdomain, SMTP in Supabase (setup guide sent as a PDF). Blocks stage A.
 - [ ] Supabase → Authentication → URL Configuration: Site URL and redirect URLs.
 - [ ] Vercel project from the GitHub repo, with the env vars in `01-architecture-and-hosting.md`.
 - [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
