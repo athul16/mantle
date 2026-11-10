@@ -4,10 +4,9 @@
  * action is held with page.route so the pending state is seen every time.
  * Sign in, Send invite (team), Create assessment, Send invites and Resend are
  * covered in their journeys; the rest are here. The candidate's buttons are
- * plain form posts to /api/candidate/*, held the same way.
+ * plain form posts to /api/candidate/*; see expectCandidatePending.
  */
-import type { Page, Request } from "@playwright/test";
-import { codeFrom, waitForEmail } from "../../tests/helpers/outbox";
+import type { Locator, Page } from "@playwright/test";
 import { signInViaUi } from "../fixtures";
 import { hold, isServerAction } from "../support/hold";
 import { memberIds, orgIdForSlug } from "../support/db";
@@ -15,8 +14,8 @@ import { chromiumOnly, expect, test } from "../support/test";
 
 chromiumOnly();
 
-async function expectPending(page: Page, click: () => Promise<void>, pendingName: string, match: (req: Request) => boolean = isServerAction) {
-  const held = await hold(page, match);
+async function expectPending(page: Page, click: () => Promise<void>, pendingName: string) {
+  const held = await hold(page, isServerAction);
   await click();
   await held.arrived;
   await expect(page.getByRole("button", { name: pendingName })).toBeDisabled();
@@ -60,28 +59,42 @@ test("Create job, Save, Clone and Revoke each show a pending state", async ({ pa
   await expect(page.getByRole("row").filter({ hasText: invite.email }).getByText("revoked", { exact: true })).toBeVisible();
 });
 
-const candidatePost = (req: Request) => req.method() === "POST" && /\/api\/candidate\/(code|verify|start|submit)$/.test(req.url());
+/**
+ * A form post is a navigation, and Playwright can't read the page while a held
+ * navigation is pending. So the first post is answered with 204 (the browser
+ * stays on the page), the pending state is checked, and the page is reloaded
+ * for the real click.
+ */
+async function expectCandidatePending(page: Page, button: Locator, pendingName: string) {
+  await page.route(/\/api\/candidate\/(code|verify|start|submit)$/, (route) => route.fulfill({ status: 204 }), { times: 1 });
+  await button.click();
+  await expect(page.getByRole("button", { name: pendingName })).toBeDisabled();
+  await page.reload();
+}
 
-test("the candidate's Continue, Verify, Start and Submit each show a pending state", async ({ page, hiring }) => {
+test("the candidate's Continue, Verify, Start and Submit each show a pending state", async ({ page, hiring, candidate }) => {
   const { invite } = hiring;
-  const before = new Date().toISOString();
   await page.goto(invite.link);
-  await expectPending(page, () => page.getByRole("button", { name: "Continue" }).click(), "Sending code…", candidatePost);
-  await expect(page).toHaveURL(/\/verify\?sent=1$/);
+  await expectCandidatePending(page, page.getByRole("button", { name: "Continue" }), "Sending code…");
+  const code = await candidate.requestCode(invite);
 
-  const code = codeFrom(await waitForEmail(invite.email, { after: before }));
   await page.getByLabel("Your full name").fill("Jamie Rivera");
   await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("checkbox").check();
-  await expectPending(page, () => page.getByRole("button", { name: "Verify and continue" }).click(), "Verifying…", candidatePost);
+  await expectCandidatePending(page, page.getByRole("button", { name: "Verify and continue" }), "Verifying…");
+  await candidate.submitCode(code);
   await expect(page).toHaveURL(/\/check$/);
 
   await page.getByRole("link", { name: "Continue to instructions" }).click();
-  await expectPending(page, () => page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click(), "Starting…", candidatePost);
+  const start = page.getByRole("button", { name: /^Start the \d+-minute timer$/ });
+  await expectCandidatePending(page, start, "Starting…");
+  await start.click();
   await expect(page).toHaveURL(/\/workspace$/);
 
   await page.getByRole("link", { name: "Review and submit" }).click();
   await expect(page).toHaveURL(/\/review$/);
-  await expectPending(page, () => page.getByRole("button", { name: "Submit my answers" }).click(), "Submitting…", candidatePost);
+  const submit = page.getByRole("button", { name: "Submit my answers" });
+  await expectCandidatePending(page, submit, "Submitting…");
+  await submit.click();
   await expect(page).toHaveURL(/\/done$/);
 });
