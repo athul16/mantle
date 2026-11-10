@@ -155,7 +155,7 @@ export function Workspace({ token, initial }: { token: string; initial: View }) 
         </div>
       </header>
 
-      <div className="grid flex-1 grid-cols-[300px_1fr]">
+      <main className="grid flex-1 grid-cols-[300px_1fr]">
         <aside className="border-r border-neutral-200 dark:border-neutral-800">
           <h2 className="px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
             Inbox · {messages.filter((m) => !opened.has(m.id)).length} unread
@@ -207,7 +207,7 @@ export function Workspace({ token, initial }: { token: string; initial: View }) 
             </div>
           )}
         </section>
-      </div>
+      </main>
     </div>
   );
 }
