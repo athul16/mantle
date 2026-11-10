@@ -46,7 +46,7 @@ interface StepScore {
 | `numeric` | Single calculations (e.g., dosage) | Tolerance | MVP |
 | `ordering` | Sequence steps of a procedure | Position-weighted | Later |
 
-First two to build for the skeleton: `inbox_reply` and `spreadsheet`.
+First two to build for the skeleton: `inbox_reply` and `spreadsheet`. Built so far: `numeric`, `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review` (see "As built" below).
 
 ## Variants (anti-leak)
 
@@ -87,7 +87,46 @@ Differences from the sketch above:
 
 Entry points: `renderAttemptForCandidate(scenario, seed, elapsedMinutes)`, `renderStepForCandidate`, `parseAnswerForStep` (autosave), `scoreAttempt(scenario, seed, answers)`, `getScenario(slug, version)`.
 
-Built step types: `numeric`. Preview: `/dev/engine?seed=abc&minute=5` (dev only).
+### Built step types
+
+Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and `server.ts` (config and key schemas, `toPublic`, `parseAnswer`, `score`). Points and labels for the company report are authored in the step config; per-variant expected values are in the key. Both are server only.
+
+| Type | Candidate sees | Answer | Scoring |
+| --- | --- | --- | --- |
+| `numeric` | Prompt, unit | `{ value }` | Full within `tolerance`, half within `partialTolerance`, else 0 |
+| `inbox_reply` | Prompt, to, subject, character limit | `{ body }` (≤ 20,000 chars) | Rubric criteria with guidance and per-variant reference notes. No AI scorer wired yet: a written reply scores 0 provisional points with `needsReview`; a blank one is final at 0 |
+| `spreadsheet` | Grid of read-only cells and number input cells | `{ cells: { id: number \| null } }` | Each keyed cell full within its tolerance, else 0. Input cells not in the key are scratch |
+| `journal_entry` | Prompt, chart of accounts (code + name), entry and line limits; running totals and a "Balanced / Out of balance by" check per entry | `{ entries: [{ memo, lines: [{ account, debit, credit }] }] }` | See below |
+| `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision | `{ flags: [{ target, reason, note }], decision }`, one flag per item | See below |
+
+**`journal_entry` scoring.** The config lists the expected entries (`id`, `label`, `points`, default 3); the key gives each one's lines as `{ accounts, side, amount }`, where `accounts` may list several acceptable accounts (docs/07: COGS or Accounts payable for the #1043 fix). Key entries must balance. Per expected entry:
+
+- Each expected line earns 1 for the right account, side and amount (within `tolerance`, default half a cent) and ½ for the right account and side with a wrong amount. Each candidate line counts once.
+- Each leftover candidate line costs ½, so listing every account can't buy credit. A line with both or neither amount filled counts as leftover.
+- Entry share = (line credit − ½ × leftover lines) ÷ expected lines, floored at 0. An unbalanced entry earns at most half its points, since it couldn't be posted.
+- Candidates may write entries in any order. Candidate entries are matched to expected entries to maximise the total, one to one (exact search; config allows ≤ 12 expected entries).
+- Candidate entries that match nothing are listed in a 0-point "Entries not in the key" item for the reviewer. They aren't penalised.
+
+**`document_review` scoring.** The config lists the findings (`id`, `label`, `points`, default 2), `falseFlagPenalty` (default 1) and an optional `decision` (`options`, `points`, default 1). The key gives each finding's `targets` (item ids it can be flagged on, e.g. the wrong line or the total it inflates), accepted `reasons`, a reviewer `note`, and accepted `decision` ids.
+
+- A finding earns full points for a flag on one of its targets with an accepted reason, half for the right item with another or no reason. Exact matches are assigned first; each flag answers one finding.
+- A flag on an item that belongs to no finding is a false flag. A second flag on another target of a found issue is not.
+- False flags appear as one "False flags" item with negative `earned` and `max` 0. The deduction is capped at the points earned elsewhere, so the step never goes below 0 and `points` always equals the sum of item `earned`.
+- Flags on ids that aren't in the document are ignored.
+
+Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`) are skipped.
+
+### Demo scenarios
+
+Code-defined, in `src/lib/engine/scenarios/`. Not real test content.
+
+| Slug | Steps | Shows |
+| --- | --- | --- |
+| `demo-petty-cash` | `numeric` | Engine core, seeded numbers |
+| `demo-mini-close` | `spreadsheet`, `numeric` (minute 5), `inbox_reply` (minute 10) | Scheduled messages, a small bank rec |
+| `demo-entries-review` | `journal_entry`, `document_review` (minute 8) | Four bank-rec adjusting entries (fee, NSF, interest, transposed check, from docs/07 Example 4); a vendor invoice with one line billed for extra units and an invoice number already paid in September (docs/07 Example 1 task 4), plus approve / reject / ask-vendor |
+
+Preview (dev only): `/dev/engine?scenario=<slug>&seed=abc&minute=10`. The page lists every scenario, links to each message's arrival minute, and scores the answers on submit.
 
 Scenario storage (decision Q6): code is the source of truth. Publishing a version copies its definition into a `scenarios` row, which is then immutable; attempts point at that row.
 
