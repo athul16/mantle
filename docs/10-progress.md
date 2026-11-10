@@ -2,7 +2,7 @@
 
 Where the phase 1 build stands. Update this file whenever a build step lands.
 
-_Last updated: 2026-11-09._
+_Last updated: 2026-11-10._
 
 ## Skeleton build order (from `08-roadmap-and-open-questions.md`)
 
@@ -45,11 +45,13 @@ _Last updated: 2026-11-09._
 - [ ] Vercel project from the GitHub repo, with the env vars in `01-architecture-and-hosting.md`.
 - [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
 - [ ] Stage A provisional decisions in `decisions/2026-11-09-stage-a-open-decisions.md`, including two schema decisions (S1, S2).
+- [ ] App bugs found by the E2E suite (`e2e/known-issues.spec.ts`): low colour contrast on grey labels (serious), Safari hydration error in LocalTime/LocalDate, no pending state on candidate buttons, revoke confirmation never shows, message read state lost on reload, other company's URL returns 200 instead of 404.
 
 ## Log
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-10 | Tests: PR #13 pgTAP schema, constraints, RLS policies, secret tables, triggers and functions; PR #14 component tests (191) and `Field` error fix; PR #15 Playwright journeys for employer, candidate and recruiter-to-candidate (3 browsers), button and page-change checks, axe on every page, Linux screenshot baselines. 6 app bugs logged as `test.fixme` in `e2e/known-issues.spec.ts` |
 | 2026-11-09 | PR #12 testing foundation: tests moved off the cloud database to a local throwaway Supabase; pgTAP, component, Playwright (3 browsers) and Lighthouse set up; CI jobs `checks`, `database`, `e2e` (`11-testing.md`) |
 | 2026-11-09 | Stage A: PR #8 `inbox_reply` + `spreadsheet` step types and `demo-mini-close`; PR #9 jobs, assessments and invites; PR #10 candidate flow. All checks pass on main after each merge |
 | 2026-11-09 | Stage A shared setup: email helper, token helpers, `publishScenario` + `pnpm scenarios:publish` (demo scenario published to the platform library), `test:jobs` / `test:candidate` scripts |
