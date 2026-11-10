@@ -130,7 +130,10 @@ export const test = base.extend<Options & Fixtures>({
   allowConsole: [[], { option: true }],
 
   guard: [
-    async ({ page, context, browserName, allowHttp, allowConsole }, provide) => {
+    // Depends on `data` so it is torn down first: the page is closed before the test's rows are deleted,
+    // otherwise a still-open page can hit the server mid-cleanup and log errors that aren't the app's.
+    async ({ page, context, browserName, allowHttp, allowConsole, data }, provide) => {
+      void data;
       await relaxSecureCookies(context, browserName);
       const problems: string[] = [];
       const allowedUrl = (url: string) => allowHttp.some((re) => re.test(url));
@@ -160,6 +163,7 @@ export const test = base.extend<Options & Fixtures>({
       });
       await page.addInitScript(CLS_SCRIPT);
       await provide();
+      await context.close();
       expect(problems, "console errors or failed requests during the journey").toEqual([]);
     },
     { auto: true },
