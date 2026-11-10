@@ -241,8 +241,10 @@ export type Database = {
           id: string
           org_id: string
           reason: string
+          review_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          rule: string | null
           status: string
         }
         Insert: {
@@ -252,8 +254,10 @@ export type Database = {
           id?: string
           org_id: string
           reason: string
+          review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rule?: string | null
           status?: string
         }
         Update: {
@@ -263,8 +267,10 @@ export type Database = {
           id?: string
           org_id?: string
           reason?: string
+          review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rule?: string | null
           status?: string
         }
         Relationships: [

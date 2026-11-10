@@ -1,4 +1,4 @@
-/** Candidate system check: desktop browser and screen size, with placeholders for camera and screen share. */
+/** Candidate system check: desktop browser and screen size (camera and screen share: system-check-proctoring.test.tsx). */
 import { act, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,12 +45,12 @@ describe("SystemCheck", () => {
     expect(screen.getByRole("link", { name: "Continue to instructions" })).toHaveAttribute("href", "/a/tok123/instructions");
   });
 
-  it("shows camera and screen share as coming soon", async () => {
+  it("shows camera and screen share as not used when the assessment has no proctoring", async () => {
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Camera")).toHaveTextContent("Coming soon");
-    expect(row("Camera")).toHaveTextContent("Not required yet.");
-    expect(row("Screen share")).toHaveTextContent("Coming soon");
+    expect(row("Camera")).toHaveTextContent("Not used");
+    expect(row("Camera")).toHaveTextContent("Not used in this test.");
+    expect(row("Screen share")).toHaveTextContent("Not used in this test.");
   });
 
   it("blocks a small screen", async () => {

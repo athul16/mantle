@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StepView } from "@/lib/engine/client/StepView";
 import type { PublicMessage, PublicStep } from "@/lib/engine/types";
+import { Proctoring } from "@/lib/proctoring/client/proctoring";
+import type { Proctoring as ProctoringSettings } from "@/lib/proctoring/config";
 
 /** Mirrors WorkspaceView from src/lib/candidate/attempt.ts (that module is server-only). */
 interface View {
@@ -35,11 +37,24 @@ function postJson(url: string, body: unknown, init?: RequestInit) {
   return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), ...init });
 }
 
+const NO_PROCTORING: ProctoringSettings = { camera: false, screen: false };
+
 /**
  * `openedIds`: messages already opened in this attempt (from the server's
- * action events), so they stay read after a reload.
+ * action events), so they stay read after a reload. `proctoring`: the
+ * assessment's camera / screen settings; browser signals are recorded either way.
  */
-export function Workspace({ token, initial, openedIds = [] }: { token: string; initial: View; openedIds?: string[] }) {
+export function Workspace({
+  token,
+  initial,
+  openedIds = [],
+  proctoring = NO_PROCTORING,
+}: {
+  token: string;
+  initial: View;
+  openedIds?: string[];
+  proctoring?: ProctoringSettings;
+}) {
   const router = useRouter();
   const [messages, setMessages] = useState(initial.messages);
   const [steps, setSteps] = useState(initial.steps);
@@ -144,7 +159,7 @@ export function Workspace({ token, initial, openedIds = [] }: { token: string; i
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
         <h1 className="text-sm font-semibold">{initial.title}</h1>
         <div className="flex items-center gap-4 text-sm">
-          <span className={saveState === "error" ? "text-red-600" : "text-neutral-500"} aria-live="polite">
+          <span className={saveState === "error" ? "text-red-600" : "text-neutral-600 dark:text-neutral-400"} aria-live="polite">
             {saveLabel}
           </span>
           <span
@@ -160,58 +175,61 @@ export function Workspace({ token, initial, openedIds = [] }: { token: string; i
         </div>
       </header>
 
+      {/* The header (timer, review) stays usable while monitoring is off; only the inbox and task are covered. */}
       <main className="grid flex-1 grid-cols-[300px_1fr]">
-        <aside className="border-r border-neutral-200 dark:border-neutral-800">
-          <h2 className="px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Inbox · {messages.filter((m) => !opened.has(m.id)).length} unread
-          </h2>
-          <ul>
-            {messages.map((m) => {
-              const unread = !opened.has(m.id);
-              return (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => openMessage(m.id)}
-                    className={`w-full px-4 py-3 text-left text-sm ${
-                      m.id === selectedId ? "bg-neutral-100 dark:bg-neutral-800" : "hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                    }`}
-                  >
-                    <div className={`flex items-center gap-2 ${unread ? "font-semibold" : "font-medium"}`}>
-                      {unread ? <span className="size-2 shrink-0 rounded-full bg-blue-600" aria-label="unread" /> : null}
-                      <span className="truncate">{m.from}</span>
-                    </div>
-                    <div className="truncate text-neutral-600 dark:text-neutral-400">{m.subject}</div>
-                    <div className="text-xs text-neutral-400">{m.arriveAtMinute === 0 ? "At start" : `${m.arriveAtMinute} min in`}</div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </aside>
+        <Proctoring settings={proctoring}>
+          <aside className="border-r border-neutral-200 dark:border-neutral-800">
+            <h2 className="px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-600 uppercase dark:text-neutral-400">
+              Inbox · {messages.filter((m) => !opened.has(m.id)).length} unread
+            </h2>
+            <ul>
+              {messages.map((m) => {
+                const unread = !opened.has(m.id);
+                return (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => openMessage(m.id)}
+                      className={`w-full px-4 py-3 text-left text-sm ${
+                        m.id === selectedId ? "bg-neutral-100 dark:bg-neutral-800" : "hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                      }`}
+                    >
+                      <div className={`flex items-center gap-2 ${unread ? "font-semibold" : "font-medium"}`}>
+                        {unread ? <span className="size-2 shrink-0 rounded-full bg-blue-600" aria-label="unread" /> : null}
+                        <span className="truncate">{m.from}</span>
+                      </div>
+                      <div className="truncate text-neutral-600 dark:text-neutral-400">{m.subject}</div>
+                      <div className="text-xs text-neutral-600 dark:text-neutral-400">{m.arriveAtMinute === 0 ? "At start" : `${m.arriveAtMinute} min in`}</div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </aside>
 
-        <section className="space-y-6 p-6">
-          {selected ? (
-            <>
-              <article className="space-y-2">
-                <h3 className="text-base font-semibold">{selected.subject}</h3>
-                <p className="text-xs text-neutral-500">From {selected.from}</p>
-                <p className="text-sm leading-6 whitespace-pre-line">{selected.body}</p>
-              </article>
-              {step ? (
-                <div className="space-y-3 rounded border border-neutral-200 p-4 dark:border-neutral-800">
-                  <h4 className="text-sm font-semibold">{step.title}</h4>
-                  <StepView key={step.id} step={step} answer={answers[step.id]} onChange={(a) => changeAnswer(step.id, a)} />
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-              <p className="leading-6 whitespace-pre-line">{initial.intro}</p>
-              <p>Open a message in the inbox to start.</p>
-            </div>
-          )}
-        </section>
+          <section className="space-y-6 p-6">
+            {selected ? (
+              <>
+                <article className="space-y-2">
+                  <h3 className="text-base font-semibold">{selected.subject}</h3>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">From {selected.from}</p>
+                  <p className="text-sm leading-6 whitespace-pre-line">{selected.body}</p>
+                </article>
+                {step ? (
+                  <div className="space-y-3 rounded border border-neutral-200 p-4 dark:border-neutral-800">
+                    <h4 className="text-sm font-semibold">{step.title}</h4>
+                    <StepView key={step.id} step={step} answer={answers[step.id]} onChange={(a) => changeAnswer(step.id, a)} />
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+                <p className="leading-6 whitespace-pre-line">{initial.intro}</p>
+                <p>Open a message in the inbox to start.</p>
+              </div>
+            )}
+          </section>
+        </Proctoring>
       </main>
     </div>
   );

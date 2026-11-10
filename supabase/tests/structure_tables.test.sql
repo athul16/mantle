@@ -225,7 +225,9 @@ select set_eq(
        ('status', 'text', true, '''open''::text', ''),
        ('reviewed_by', 'uuid', false, '', ''),
        ('reviewed_at', 'timestamp with time zone', false, '', ''),
-       ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
+       ('created_at', 'timestamp with time zone', true, 'now()', ''),
+       ('rule', 'text', false, '', ''),
+       ('review_note', 'text', false, '', '') $$,
   'flags: columns, types, nullability, defaults'
 );
 select col_is_pk('public', 'flags', array['id'], 'flags: primary key (id)');
