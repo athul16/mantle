@@ -45,7 +45,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
-**Known gaps before a pilot.** Admin MFA; retention and delete on request; the candidate report returns 200 for another company's invite id; email fails silently in production without Resend; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant. The first three are batch 3 below.
+**Known gaps before a pilot.** Admin MFA; retention and delete on request; the candidate report returns 200 for another company's invite id; Resend not set up (since PR #24 production email errors clearly instead of failing silently); Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant. The first three are batch 3 below.
 
 ## The MVP, piece by piece
 
@@ -66,7 +66,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 | D. Trustworthy results | Step 7 | Companies can believe the scores |
 | E. Pilot-ready | Deploy on Vercel, Resend Pro, Supabase Pro, consent text, accountant review, admin MFA | First pilot company (the phase 1 gate) |
 
-**Stage E, batch 3 (in progress):** `pilot-admin-mfa` (admin MFA, candidate report 404), `pilot-retention` (retention setting, delete on request, daily purge; one migration), `pilot-hardening` (production email guard, env check, `/api/health`, error pages, rate limits, `docs/12-pilot-runbook.md`). Vercel is done; Resend, Supabase Pro, consent wording and the accountant review are on people.
+**Stage E, batch 3:** `pilot-hardening` merged as PR #24 (production email guard: invites and codes error clearly on Vercel until Resend is set; `/api/health`; error pages; code resend cooldown; `docs/12-pilot-runbook.md`). `pilot-retention` is PR #25, open (per-org retention, default 180 days; admin delete on request; daily purge at 03:30 UTC; migration `20261110200000_retention`, not yet in the cloud). `pilot-admin-mfa` in progress (TOTP required for admins; candidate report 404). Open team decisions: `decisions/2026-11-10-pilot-decisions.md`. Vercel is done; Resend, Supabase Pro, consent wording and the accountant review are on people.
 
 ## Waiting on people, not code
 
