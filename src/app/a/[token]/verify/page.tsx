@@ -3,6 +3,7 @@ import { maskEmail } from "@/lib/candidate/code";
 import { CONSENT_TEXT } from "@/lib/candidate/config";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { CandidateCard, ERROR_TEXT, Notice, primaryButton, secondaryButton } from "../../ui";
+import { SubmitButton } from "../submit-button";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
@@ -68,16 +69,16 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
         <p className="text-xs text-neutral-500">
           Need extra time or another accommodation? Contact {invite.companyName} before you start.
         </p>
-        <button type="submit" className={primaryButton}>
+        <SubmitButton className={primaryButton} pendingText="Verifying…">
           Verify and continue
-        </button>
+        </SubmitButton>
       </form>
 
       <form action="/api/candidate/code" method="post">
         <input type="hidden" name="token" value={token} />
-        <button type="submit" className={secondaryButton}>
+        <SubmitButton className={secondaryButton} pendingText="Sending…">
           Send a new code
-        </button>
+        </SubmitButton>
       </form>
     </CandidateCard>
   );

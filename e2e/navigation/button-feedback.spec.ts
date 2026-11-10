@@ -3,9 +3,10 @@
  * (label change and disabled), then lands on the right result. The server
  * action is held with page.route so the pending state is seen every time.
  * Sign in, Send invite (team), Create assessment, Send invites and Resend are
- * covered in their journeys; the rest are here.
+ * covered in their journeys; the rest are here. The candidate's buttons are
+ * plain form posts to /api/candidate/*; see expectCandidatePending.
  */
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { signInViaUi } from "../fixtures";
 import { hold, isServerAction } from "../support/hold";
 import { memberIds, orgIdForSlug } from "../support/db";
@@ -56,4 +57,44 @@ test("Create job, Save, Clone and Revoke each show a pending state", async ({ pa
     "Revoking…",
   );
   await expect(page.getByRole("row").filter({ hasText: invite.email }).getByText("revoked", { exact: true })).toBeVisible();
+});
+
+/**
+ * A form post is a navigation, and Playwright can't read the page while a held
+ * navigation is pending. So the first post is answered with 204 (the browser
+ * stays on the page), the pending state is checked, and the page is reloaded
+ * for the real click.
+ */
+async function expectCandidatePending(page: Page, button: Locator, pendingName: string) {
+  await page.route(/\/api\/candidate\/(code|verify|start|submit)$/, (route) => route.fulfill({ status: 204 }), { times: 1 });
+  await button.click();
+  await expect(page.getByRole("button", { name: pendingName })).toBeDisabled();
+  await page.reload();
+}
+
+test("the candidate's Continue, Verify, Start and Submit each show a pending state", async ({ page, hiring, candidate }) => {
+  const { invite } = hiring;
+  await page.goto(invite.link);
+  await expectCandidatePending(page, page.getByRole("button", { name: "Continue" }), "Sending code…");
+  const code = await candidate.requestCode(invite);
+
+  await page.getByLabel("Your full name").fill("Jamie Rivera");
+  await page.getByLabel("6-digit code").fill(code);
+  await page.getByRole("checkbox").check();
+  await expectCandidatePending(page, page.getByRole("button", { name: "Verify and continue" }), "Verifying…");
+  await candidate.submitCode(code);
+  await expect(page).toHaveURL(/\/check$/);
+
+  await page.getByRole("link", { name: "Continue to instructions" }).click();
+  const start = page.getByRole("button", { name: /^Start the \d+-minute timer$/ });
+  await expectCandidatePending(page, start, "Starting…");
+  await start.click();
+  await expect(page).toHaveURL(/\/workspace$/);
+
+  await page.getByRole("link", { name: "Review and submit" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const submit = page.getByRole("button", { name: "Submit my answers" });
+  await expectCandidatePending(page, submit, "Submitting…");
+  await submit.click();
+  await expect(page).toHaveURL(/\/done$/);
 });

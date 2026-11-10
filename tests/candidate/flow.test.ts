@@ -25,7 +25,7 @@ const { publishScenario } = await import("@/lib/scenarios/publish");
 const { requestCode, verifyCode } = await import("@/lib/candidate/code");
 const { findInviteByToken, findAttemptForInvite } = await import("@/lib/candidate/invite");
 const { getCandidateSession, sessionForToken } = await import("@/lib/candidate/session");
-const { startAttempt, saveAnswer, submitAttempt, getWorkspaceView, recordClientEvent } = await import(
+const { startAttempt, saveAnswer, submitAttempt, getWorkspaceView, recordClientEvent, getOpenedMessageIds } = await import(
   "@/lib/candidate/attempt"
 );
 const { SESSION_COOKIE, MAX_CODE_ATTEMPTS } = await import("@/lib/candidate/config");
@@ -244,7 +244,12 @@ describe("attempt", () => {
     expect((await getWorkspaceView(session, later))!.steps.map((s) => s.id)).toEqual(["expected-cash", "shortage"]);
     expect(await saveAnswer(session, "shortage", { value: 5 }, later)).toMatchObject({ ok: true });
 
+    const attemptRef = session.attempt;
+    expect(await getOpenedMessageIds(attemptRef)).toEqual([]);
     expect(await recordClientEvent(session, "opened_message", { messageId: "m1" })).toBe(true);
+    expect(await recordClientEvent(session, "opened_message", { messageId: "m1" })).toBe(true);
+    // Read state for the workspace comes back from the events, once per message.
+    expect(await getOpenedMessageIds(attemptRef)).toEqual(["m1"]);
     expect(await recordClientEvent(session, "integrity_cleared", { stepId: "x" })).toBe(false);
     const kinds = must(await service.from("action_events").select("kind").eq("attempt_id", c.attemptId)).map((e) => e.kind);
     expect(kinds).toEqual(expect.arrayContaining(["verified", "started_attempt", "saved_step", "opened_message"]));

@@ -188,6 +188,18 @@ describe("InviteRowActions", () => {
     expect(await screen.findByText("Already submitted.")).toBeVisible();
   });
 
+  it("keeps the revoke confirmation visible after the row loses its actions", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    revokeInviteAction.mockResolvedValueOnce({ message: "Revoked jane@example.com's invite." });
+    const { rerender } = render(<InviteRowActions orgId="o" inviteId="i" email="jane@example.com" canResend canRevoke />);
+    await user.click(screen.getByRole("button", { name: "Revoke" }));
+    // The page re-renders the row as revoked: nothing left to resend or revoke.
+    rerender(<InviteRowActions orgId="o" inviteId="i" email="jane@example.com" canResend={false} canRevoke={false} />);
+    expect(await screen.findByText("Revoked jane@example.com's invite.")).toBeVisible();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
   it("doesn't revoke if cancelled", async () => {
     const user = userEvent.setup();
     vi.stubGlobal("confirm", vi.fn(() => false));

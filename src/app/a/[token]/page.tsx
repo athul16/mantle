@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { LocalTime } from "../local-time";
 import { CandidateCard, ERROR_TEXT, Facts, Notice, primaryButton } from "../ui";
+import { SubmitButton } from "./submit-button";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
@@ -79,9 +80,9 @@ export default async function InviteLandingPage({ params, searchParams }: PagePr
       </p>
       <form action="/api/candidate/code" method="post">
         <input type="hidden" name="token" value={token} />
-        <button type="submit" className={primaryButton}>
+        <SubmitButton className={primaryButton} pendingText="Sending code…">
           Continue
-        </button>
+        </SubmitButton>
       </form>
     </CandidateCard>
   );
