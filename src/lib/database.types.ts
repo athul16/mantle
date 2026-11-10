@@ -654,6 +654,10 @@ export type Database = {
     }
     Functions: {
       create_organization: { Args: { org_name: string }; Returns: string }
+      review_rubric_step: {
+        Args: { p_attempt_id: string; p_scores: Json; p_step_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
