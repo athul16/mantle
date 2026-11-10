@@ -58,5 +58,5 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
-export { signInViaUi, storageStateFor } from "./auth";
+export { completeMfaIfAsked, enterCode, signInViaUi, storageStateFor } from "./auth";
 export { expectNoAxeViolations } from "./axe";

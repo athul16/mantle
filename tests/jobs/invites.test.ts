@@ -14,6 +14,7 @@ import { readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { requireDbEnv } from "../helpers/env";
+import { enrollTotp } from "../helpers/totp";
 import type { Database } from "@/lib/database.types";
 
 vi.mock("server-only", () => ({}));
@@ -119,6 +120,8 @@ beforeAll(async () => {
   if (b.error) throw b.error;
   orgB = b.data as string;
   orgIds.push(orgB);
+  // The outsider is org B's admin, so their actions need two-factor (aal2).
+  await enrollTotp(outsider.client);
 
   const m = await service.from("memberships").insert([
     { org_id: orgA, user_id: recruiter.id, role: "recruiter" },

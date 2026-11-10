@@ -16,9 +16,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { clearEmails } from "./outbox";
 import { must, serviceClient, signedInClient, type Db } from "./supabase";
+import { enrollTotp, rememberTotpSecret } from "./totp";
 
 export type Role = "admin" | "recruiter" | "viewer";
-export type TestUser = { id: string; email: string; password: string };
+/** `totpSecret` is set when the user has a verified authenticator factor (company admins, by default). */
+export type TestUser = { id: string; email: string; password: string; totpSecret?: string };
 export type TestCompany = { orgId: string; name: string; slug: string; users: Record<Role, TestUser> };
 
 /** sha256 hex, same as hashToken in src/lib/tokens.ts (which is server-only). */
@@ -50,8 +52,12 @@ export function createTestData(prefix = "t") {
     return { id: data.user.id, email: address, password };
   }
 
-  /** A company created by its admin through `create_organization` (so the slug is generated), plus a recruiter and a viewer. */
-  async function company({ name }: { name?: string } = {}): Promise<TestCompany> {
+  /**
+   * A company created by its admin through `create_organization` (so the slug is generated), plus a recruiter and a viewer.
+   * Admins must use two-factor authentication, so the admin gets a verified authenticator factor
+   * (`users.admin.totpSecret`) unless `adminMfa: false`.
+   */
+  async function company({ name, adminMfa = true }: { name?: string; adminMfa?: boolean } = {}): Promise<TestCompany> {
     const label = `c${++n}`;
     const orgName = name ?? `Test ${prefix} ${run} ${label}`;
     const admin = await user(`${label}-admin`);
@@ -60,6 +66,10 @@ export function createTestData(prefix = "t") {
     const adminClient = await signedInClient(admin.email, admin.password);
     const orgId = must(await adminClient.rpc("create_organization", { org_name: orgName })) as string;
     orgIds.push(orgId);
+    if (adminMfa) {
+      admin.totpSecret = (await enrollTotp(adminClient)).secret;
+      rememberTotpSecret(admin.email, admin.totpSecret);
+    }
     await adminClient.auth.signOut();
     must(
       await db().from("memberships").insert([

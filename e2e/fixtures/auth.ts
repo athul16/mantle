@@ -3,21 +3,49 @@ import { expect, type Browser, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { TestUser } from "../../tests/helpers/factories";
+import { totpCode, totpSecretFor } from "../../tests/helpers/totp";
 
-/** Fills and submits /login, then waits until the app has redirected away from it. */
-export async function signInViaUi(page: Page, user: Pick<TestUser, "email" | "password">, next?: string) {
+type SignInUser = Pick<TestUser, "email" | "password"> & { totpSecret?: string };
+
+/**
+ * Fills and submits /login, then waits until the app has redirected away from it.
+ * A user with an authenticator factor (company admins from the factories) also
+ * enters the sign-in code, unless `{ mfa: false }` leaves them on the code page.
+ */
+export async function signInViaUi(page: Page, user: SignInUser, next?: string, { mfa = true }: { mfa?: boolean } = {}) {
   await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
   await page.getByLabel("Work email").fill(user.email);
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).not.toHaveURL(/\/login(\?|$)/);
+  if (mfa) await completeMfaIfAsked(page, user);
+}
+
+/** On the sign-in code page (/app/account/verify), enter the current code and wait to leave it. */
+export async function completeMfaIfAsked(page: Page, user: SignInUser) {
+  const secret = user.totpSecret ?? totpSecretFor(user.email);
+  if (!secret) return;
+  // Company admins are sent to the code page by the server; give the redirect a moment to land.
+  const onVerify = await page
+    .waitForURL(/\/app\/account\/verify/, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!onVerify) return;
+  await enterCode(page, secret);
+  await expect(page).not.toHaveURL(/\/app\/account\/verify/);
+}
+
+/** Types the current authenticator code into the form on the page and submits it. */
+export async function enterCode(page: Page, secret: string, button: string | RegExp = /^(Verify|Turn on two-factor)/) {
+  await page.getByLabel("6-digit code").fill(totpCode(secret));
+  await page.getByRole("button", { name: button }).click();
 }
 
 /**
  * Signs `user` in once in a throwaway context and saves the cookies to a file,
  * for `browser.newContext({ storageState })` or `test.use({ storageState })`.
  */
-export async function storageStateFor(browser: Browser, user: Pick<TestUser, "email" | "password">): Promise<string> {
+export async function storageStateFor(browser: Browser, user: SignInUser): Promise<string> {
   const dir = path.join(process.cwd(), "test-results", ".auth");
   await mkdir(dir, { recursive: true });
   const file = path.join(dir, `${user.email}.json`);
