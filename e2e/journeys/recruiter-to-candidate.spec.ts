@@ -17,6 +17,9 @@ test("a recruiter invites, the candidate completes, the recruiter sees it", asyn
   const form = page.locator("form").filter({ has: page.getByRole("heading", { name: "New assessment" }) });
   await form.getByLabel("Simulation").selectOption({ label: "Demo: petty cash count (v1)" });
   await form.getByLabel("Title").fill("Petty cash round");
+  // Proctoring has its own journeys (e2e/proctoring); firefox and webkit can't fake a camera or screen share.
+  await form.getByLabel("Camera snapshots").uncheck();
+  await form.getByLabel("Screen share").uncheck();
   await form.getByRole("button", { name: "Create assessment" }).click();
   await expect(page.getByText('Created "Petty cash round".')).toBeVisible();
 
