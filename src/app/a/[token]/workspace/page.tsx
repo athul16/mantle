@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getOpenedMessageIds, getWorkspaceView } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
+import { getProctoringSettings } from "@/lib/proctoring/server";
 import { Workspace } from "./workspace";
 
 // Candidate pages read the link token, the session cookie and the database on
@@ -17,7 +18,11 @@ export const metadata = { title: "Assessment" };
 export default async function WorkspacePage({ params }: PageProps<"/a/[token]/workspace">) {
   const { token } = await params;
   const { session, attempt } = await requireSessionPage(token, ["in_progress"]);
-  const [view, openedIds] = await Promise.all([getWorkspaceView(session), getOpenedMessageIds(attempt)]);
+  const [view, openedIds, proctoring] = await Promise.all([
+    getWorkspaceView(session),
+    getOpenedMessageIds(attempt),
+    getProctoringSettings(session),
+  ]);
   if (!view) redirect(pageForStatus(token, attempt));
-  return <Workspace token={token} initial={view} openedIds={openedIds} />;
+  return <Workspace token={token} initial={view} openedIds={openedIds} proctoring={proctoring} />;
 }

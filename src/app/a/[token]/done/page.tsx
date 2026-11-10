@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { CandidateCard, Notice } from "../../ui";
+import { ReleaseMedia } from "./release-media";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
@@ -19,6 +20,7 @@ export default async function DonePage({ params }: PageProps<"/a/[token]/done">)
     const timedOut = attempt.submit_reason === "timeout";
     return (
       <CandidateCard title={timedOut ? "Time's up" : "Thanks, you're done"}>
+        <ReleaseMedia />
         <Notice tone="success">
           {timedOut
             ? "The time limit was reached, so we submitted the answers you had saved."
