@@ -3,7 +3,6 @@
  * no secrets in the body, and a missing key degrades to false rather than a
  * crash.
  */
-import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requireDbEnv } from "../helpers/env";
 
@@ -14,7 +13,7 @@ const { secretKey } = requireDbEnv();
 const { GET } = await import("@/app/api/health/route");
 
 const KEY = "re_DO_NOT_LEAK_health";
-const call = () => GET(new NextRequest("http://localhost:3102/api/health"));
+const call = () => GET();
 
 afterEach(() => vi.unstubAllEnvs());
 
