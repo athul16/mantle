@@ -58,7 +58,12 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
       ) : null}
 
       <section className="space-y-2">
-        <h2 className="font-medium">Candidates ({invites.length})</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-medium">Candidates ({invites.length})</h2>
+          <Link href={`/app/${orgSlug}/candidates?job=${job.id}`} className="text-sm underline">
+            Results and reports
+          </Link>
+        </div>
         {invites.length === 0 ? (
           <p className="text-sm text-neutral-500">No one invited yet.</p>
         ) : (
