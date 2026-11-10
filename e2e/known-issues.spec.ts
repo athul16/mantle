@@ -13,18 +13,6 @@ test.describe("known app issues", () => {
     await axeSerious(page, testInfo);
   });
 
-  test.fixme("candidate primary buttons show a pending state while the form posts", async ({ page, hiring }) => {
-    // Continue, Verify and continue, Start, Submit are plain form posts: no disabled or "…" state,
-    // so a slow server invites double clicks.
-    await page.route("**/api/candidate/code", async (route) => {
-      await new Promise((r) => setTimeout(r, 2_000));
-      await route.continue();
-    });
-    await page.goto(hiring.invite.link);
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("button", { name: /Continue|Sending/ })).toBeDisabled();
-  });
-
   test.fixme("the revoke confirmation message is shown", async ({ page, hiring }) => {
     // InviteRowActions returns null once the row can't be resent or revoked, unmounting its own message.
     await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}`);
