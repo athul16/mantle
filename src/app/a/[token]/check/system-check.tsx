@@ -152,7 +152,7 @@ export function SystemCheck({
             <input
               type="checkbox"
               className="mt-1"
-              checked={agreed}
+              checked={agreed || saving}
               disabled={agreed || saving}
               onChange={(e) => {
                 if (e.target.checked) void agree();

@@ -155,28 +155,29 @@ export function Workspace({
   ];
 
   return (
-    <Proctoring settings={proctoring}>
-      <div className="flex min-h-screen flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-          <h1 className="text-sm font-semibold">{initial.title}</h1>
-          <div className="flex items-center gap-4 text-sm">
-            <span className={saveState === "error" ? "text-red-600" : "text-neutral-600 dark:text-neutral-400"} aria-live="polite">
-              {saveLabel}
-            </span>
-            <span
-              className={`font-mono text-base tabular-nums ${lowTime ? "font-semibold text-red-600" : ""}`}
-              title="Time left. The official clock is on our server."
-              role="timer"
-            >
-              {formatRemaining(remaining)}
-            </span>
-            <Link href={`/a/${token}/review`} className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900">
-              Review and submit
-            </Link>
-          </div>
-        </header>
+    <div className="flex min-h-screen flex-col">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <h1 className="text-sm font-semibold">{initial.title}</h1>
+        <div className="flex items-center gap-4 text-sm">
+          <span className={saveState === "error" ? "text-red-600" : "text-neutral-600 dark:text-neutral-400"} aria-live="polite">
+            {saveLabel}
+          </span>
+          <span
+            className={`font-mono text-base tabular-nums ${lowTime ? "font-semibold text-red-600" : ""}`}
+            title="Time left. The official clock is on our server."
+            role="timer"
+          >
+            {formatRemaining(remaining)}
+          </span>
+          <Link href={`/a/${token}/review`} className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900">
+            Review and submit
+          </Link>
+        </div>
+      </header>
 
-        <main className="grid flex-1 grid-cols-[300px_1fr]">
+      {/* The header (timer, review) stays usable while monitoring is off; only the inbox and task are covered. */}
+      <main className="grid flex-1 grid-cols-[300px_1fr]">
+        <Proctoring settings={proctoring}>
           <aside className="border-r border-neutral-200 dark:border-neutral-800">
             <h2 className="px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-600 uppercase dark:text-neutral-400">
               Inbox · {messages.filter((m) => !opened.has(m.id)).length} unread
@@ -228,8 +229,8 @@ export function Workspace({
               </div>
             )}
           </section>
-        </main>
-      </div>
-    </Proctoring>
+        </Proctoring>
+      </main>
+    </div>
   );
 }

@@ -148,7 +148,7 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
 
   return (
     <>
-      <div data-testid="proctored-content" inert={!active} aria-hidden={active ? undefined : true} className="contents">
+      <div data-testid="proctored-content" inert={!active} className="contents">
         {children}
       </div>
 
