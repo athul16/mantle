@@ -135,7 +135,7 @@ function perfectAnswers(seed: string) {
         bank_err: null,
         adj_bank: dollars(s.adjBank),
         interest: dollars(s.interest),
-        voided: dollars(s.voided.credit),
+        cancelled: dollars(s.voided.credit),
         fee: dollars(s.fee),
         nsf: dollars(s.nsf),
         book_err: dollars(s.bookError),
@@ -258,7 +258,7 @@ describe("harbor-lane-bank-rec: every variant is internally consistent", () => {
       expect(k("dit")).toBe(s.dit);
       expect(k("oc")).toBe(s.oc);
       expect(k("interest")).toBe(s.interest);
-      expect(k("voided")).toBe(s.voided.credit);
+      expect(k("cancelled")).toBe(s.voided.credit);
       expect(k("fee")).toBe(s.fee);
       expect(k("nsf")).toBe(s.nsf);
       expect(k("book_err")).toBe(s.bookError);
@@ -324,7 +324,7 @@ describe("harbor-lane-bank-rec: scoring", () => {
       const s = solve(seed);
       const a = clone(perfectAnswers(seed));
       a["bank-rec"].cells.oc = dollars(s.oc + s.voided.credit);
-      a["bank-rec"].cells.voided = null as unknown as number;
+      a["bank-rec"].cells.cancelled = null as unknown as number;
       a["bank-rec"].cells.adj_bank = dollars(s.trap);
       a["bank-rec"].cells.adj_book = dollars(s.trap);
       a["rec-entries"].entries.pop();
@@ -335,7 +335,7 @@ describe("harbor-lane-bank-rec: scoring", () => {
       // total (5, since the voided check is in it) and the final balance (5).
       expect(rec.points).toBe(25);
       const item = (id: string) => rec.items.find((i) => i.id === id)!;
-      expect(item("voided").earned).toBe(0);
+      expect(item("cancelled").earned).toBe(0);
       expect(item("oc").earned).toBe(0);
       expect(item("adj_bank").earned).toBe(0);
       expect(item("adj_book").earned).toBe(0);
