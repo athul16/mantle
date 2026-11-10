@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button, FormMessage } from "@/components/ui";
 import { NOTE_MAX_CHARS, VOTE_LABELS, VOTES } from "@/lib/results/schemas";
 import { addNote, deleteNote, reviewRubricStep } from "../actions";
@@ -26,6 +26,10 @@ export function RubricReviewForm({
   reviewed: boolean;
 }) {
   const [state, action, pending] = useActionState(reviewRubricStep, undefined);
+  // Controlled, so React's reset after a submit doesn't wipe what was typed when the save fails.
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(criteria.map((c) => [c.id, reviewed ? String(c.earned) : ""])),
+  );
   return (
     <form action={action} aria-label={`Review ${stepTitle}`} className="space-y-3 rounded-md border border-purple-200 bg-purple-50/50 p-3 dark:border-purple-900 dark:bg-purple-950/30">
       <input type="hidden" name="orgId" value={orgId} />
@@ -49,7 +53,8 @@ export function RubricReviewForm({
                   max={c.max}
                   step="any"
                   required
-                  defaultValue={reviewed ? c.earned : ""}
+                  value={values[c.id] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [c.id]: e.target.value }))}
                   aria-invalid={err ? true : undefined}
                   className={inputClass}
                 />
