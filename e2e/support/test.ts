@@ -49,6 +49,8 @@ const ERROR_PAGE = /Application error|This page couldn.t load|Internal Server Er
  * e2e/known-issues.spec.ts.
  */
 const WEBKIT_HYDRATION = /Minified React error #418/;
+// WebKit's wording when navigation cancels an in-flight RSC fetch (a prefetch); the same abort as ABORTED above.
+const WEBKIT_ABORTED_RSC = /_rsc=.*due to access control checks/;
 
 /**
  * Harness adaptation, not an app change: under `next start` the candidate
@@ -146,7 +148,7 @@ export const test = base.extend<Options & Fixtures>({
         problems.push(`console error: ${text}`);
       });
       page.on("pageerror", (err) => {
-        if (browserName === "webkit" && WEBKIT_HYDRATION.test(err.message)) return;
+        if (browserName === "webkit" && (WEBKIT_HYDRATION.test(err.message) || WEBKIT_ABORTED_RSC.test(err.message))) return;
         if (allowConsole.some((re) => re.test(err.message))) return;
         problems.push(`page error: ${err.message}`);
       });
