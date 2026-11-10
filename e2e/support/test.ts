@@ -97,7 +97,7 @@ const CLS_SCRIPT = `
 /**
  * App bug (reported, not ours to fix): `text-neutral-400` labels ("Coming soon" on
  * the system check, "At start" / "5 min in" in the inbox) fail colour contrast
- * (2.5:1). Journeys skip just those nodes; e2e/a11y/known-issues.spec.ts tracks it.
+ * (2.5:1). Journeys skip just those nodes; e2e/known-issues.spec.ts tracks it.
  */
 export const KNOWN_FAINT_TEXT: A11yOptions = { exclude: [".text-neutral-400"] };
 
