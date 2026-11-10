@@ -71,7 +71,8 @@ from unnest(array['a_admin', 'a_recruiter', 'anon']) who;
 
 select is(pg_temp.try_as('a_admin', $$update storage.objects set name = name || '.moved' where bucket_id = 'proctoring'$$), '0',
           'storage: an admin cannot rename snapshots');
-select is(pg_temp.try_as('a_admin', $$delete from storage.objects where bucket_id = 'proctoring'$$), '0',
+-- Storage's own trigger also blocks direct deletes (42501); either way nothing is removed.
+select ok(pg_temp.try_as('a_admin', $$delete from storage.objects where bucket_id = 'proctoring'$$) in ('0', '42501'),
           'storage: an admin cannot delete snapshots through the API');
 
 -- ---------------------------------------------------------------------------
