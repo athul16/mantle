@@ -13,16 +13,6 @@ test.describe("known app issues", () => {
     await axeSerious(page, testInfo);
   });
 
-  test.fixme("dates hydrate without a mismatch in Safari (React #418)", async ({ page, hiring, browserName }) => {
-    // LocalTime/LocalDate format their server text with the browser's Intl; WebKit adds " at ".
-    test.skip(browserName !== "webkit", "WebKit-only bug");
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    await page.goto(hiring.invite.link);
-    await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
-    expect(errors).toEqual([]);
-  });
-
   test.fixme("candidate primary buttons show a pending state while the form posts", async ({ page, hiring }) => {
     // Continue, Verify and continue, Start, Submit are plain form posts: no disabled or "…" state,
     // so a slow server invites double clicks.
