@@ -41,7 +41,7 @@ export function DevWorkspace({
               >
                 <div className="font-medium">{m.from}</div>
                 <div className="truncate text-neutral-600 dark:text-neutral-400">{m.subject}</div>
-                <div className="text-xs text-neutral-400">minute {m.arriveAtMinute}</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">minute {m.arriveAtMinute}</div>
               </button>
             </li>
           ))}
