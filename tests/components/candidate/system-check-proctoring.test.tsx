@@ -16,7 +16,7 @@ async function load() {
   return (await import("@/app/a/[token]/check/system-check")).SystemCheck;
 }
 
-const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
+const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
 const bodiesTo = (url: string) =>
   fetchMock.mock.calls.filter(([u]) => u === url).map(([, init]) => JSON.parse((init as RequestInit).body as string));
 const row = (label: string) => screen.getByText(label, { selector: "li p" }).closest("li")!;

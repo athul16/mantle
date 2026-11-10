@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { createServiceClient } from "@/lib/supabase/service";
-import { PROCTORING_BUCKET } from "./config";
+import { PROCTORING_BUCKET, readProctoring, type Proctoring } from "./config";
 import type { EvidenceEvent } from "./rules";
 
 /**
@@ -128,4 +128,11 @@ async function reviewerEmails(ids: string[]): Promise<Map<string, string>> {
 export function flagCounts(flags: Pick<ReportFlag, "status">[]): { total: number; open: number; reviewed: number } {
   const open = flags.filter((f) => f.status === "open").length;
   return { total: flags.length, open, reviewed: flags.length - open };
+}
+
+/** The assessment's camera / screen settings for an invite (read through RLS). */
+export async function getInviteProctoring(db: Db, orgId: string, inviteId: string): Promise<Proctoring> {
+  const { data, error } = await db.from("invites").select("jobs(assessments(proctoring))").eq("org_id", orgId).eq("id", inviteId).maybeSingle();
+  if (error) throw error;
+  return readProctoring(data?.jobs?.assessments?.proctoring);
 }

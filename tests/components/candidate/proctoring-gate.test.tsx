@@ -16,7 +16,7 @@ const { SNAPSHOT_INTERVAL_MS } = await import("@/lib/proctoring/config");
 const { SIGNAL_FLUSH_MS } = await import("@/lib/proctoring/client/use-browser-signals");
 const { releaseMedia } = await import("@/lib/proctoring/client/media-store");
 
-const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
+const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
 const signalKinds = () =>
   fetchMock.mock.calls
     .filter(([u]) => u === "/api/candidate/proctoring/signals")

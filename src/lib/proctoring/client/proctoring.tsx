@@ -33,7 +33,7 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
   const streams = useRef<Partial<Record<SnapshotSource, MediaStream>>>({});
   const [camera, setCamera] = useState<DeviceState>(() => ({ on: !!(settings.camera && heldMedia("camera")) }));
   const [screen, setScreen] = useState<DeviceState>(() => ({ on: !!(settings.screen && heldMedia("screen")) }));
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(() => (settings.camera ? (heldMedia("camera") ?? null) : null));
   const [fullscreen, setFullscreen] = useState(false);
 
   const snapshot = useCallback(() => {
@@ -56,7 +56,6 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
     (source: SnapshotSource, stream: MediaStream) => {
       streams.current[source] = stream;
       holdMedia(source, stream);
-      if (source === "camera") setPreviewStream(stream);
       const track = stream.getVideoTracks()[0];
       track?.addEventListener("ended", () => {
         if (streams.current[source] !== stream) return;
@@ -84,6 +83,7 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
       return;
     }
     attach("camera", result.stream);
+    setPreviewStream(result.stream);
     record("camera_started");
     setCamera({ on: true });
   }, [attach, record]);
@@ -104,15 +104,18 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
 
   // On mount: reuse streams from the system check, or start the camera (no click needed once allowed).
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (settings.camera) {
       const held = heldMedia("camera");
       if (held) attach("camera", held);
-      else void startCamera();
+      // Next tick, and cancelled on unmount, so a double-mounted effect asks once.
+      else timer = setTimeout(() => void startCamera(), 0);
     }
     if (settings.screen) {
       const held = heldMedia("screen");
       if (held) attach("screen", held);
     }
+    return () => clearTimeout(timer);
     // Run once per mount; settings don't change during an attempt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

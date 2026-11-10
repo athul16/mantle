@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import * as z from "zod";
 import { requireOrgMembership, requireUser } from "@/lib/auth";
 import type { StepDetail } from "@/lib/results/answer-key";
+import { flagCounts, getFlagsForReport, getInviteProctoring, type FlagsReport } from "@/lib/proctoring/report";
 import { getCandidateReport, type CandidateReport } from "@/lib/results/queries";
 import { VOTE_LABELS } from "@/lib/results/schemas";
 import { formatDuration, scorePercent } from "@/lib/results/summary";
+import { createClient } from "@/lib/supabase/server";
 import { LocalDate } from "../../jobs/local-date";
 import { StatusBadge } from "../status-badge";
+import { FlagsSection } from "./flags-section";
 import { AddNoteForm, DeleteNoteButton, RubricReviewForm } from "./report-forms";
 
 export const metadata = { title: "Candidate report · Assessment Platform" };
@@ -15,7 +18,8 @@ export const metadata = { title: "Candidate report · Assessment Platform" };
 const muted = "text-neutral-600 dark:text-neutral-400";
 
 // Candidate report (docs/05): summary, per-task answer vs expected, rubric
-// review for steps that need a person, attempt timeline, notes and votes.
+// review for steps that need a person, integrity flags with evidence (step 7),
+// attempt timeline, notes and votes.
 // Answer keys appear here because this page is for org members only.
 export default async function CandidateReportPage({ params }: PageProps<"/app/[orgSlug]/candidates/[inviteId]">) {
   const { orgSlug, inviteId } = await params;
@@ -28,6 +32,11 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
   const { attempt } = report;
   const canReview = role === "admin" || role === "recruiter";
   const score = attempt?.score ?? null;
+  const db = await createClient();
+  const [flags, proctoring] = await Promise.all([
+    attempt ? getFlagsForReport(db, orgId, attempt.id) : Promise.resolve<FlagsReport>({ flags: [], canSeeMedia: false }),
+    getInviteProctoring(db, orgId, inviteId),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -44,7 +53,7 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
         </p>
       </div>
 
-      <Summary report={report} />
+      <Summary report={report} flags={attempt && attempt.status !== "not_started" ? flags : null} />
 
       {report.steps.length ? (
         <section className="space-y-4" aria-labelledby="tasks-heading">
@@ -59,6 +68,17 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
             />
           ))}
         </section>
+      ) : null}
+
+      {attempt && attempt.status !== "not_started" ? (
+        <FlagsSection
+          orgId={orgId}
+          startedAt={attempt.startedAt}
+          flags={flags.flags}
+          canReview={canReview}
+          canSeeMedia={flags.canSeeMedia}
+          monitored={proctoring.camera || proctoring.screen}
+        />
       ) : null}
 
       {report.timeline.length ? (
@@ -99,7 +119,7 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
   );
 }
 
-function Summary({ report }: { report: CandidateReport }) {
+function Summary({ report, flags }: { report: CandidateReport; flags: FlagsReport | null }) {
   const { attempt } = report;
   const score = attempt?.score ?? null;
   const pass = report.assessment?.passScore ?? null;
@@ -112,10 +132,15 @@ function Summary({ report }: { report: CandidateReport }) {
   else if (attempt.needsReview.length) state = `${attempt.needsReview.length} task${attempt.needsReview.length > 1 ? "s" : ""} need${attempt.needsReview.length > 1 ? "" : "s"} review; the score may go up.`;
   else state = "Scored.";
 
+  const counts = flags ? flagCounts(flags.flags) : null;
+  const countDetail = counts
+    ? [counts.open ? `${counts.open} open` : "", counts.reviewed ? `${counts.reviewed} reviewed` : ""].filter(Boolean).join(" · ") || "none"
+    : "";
+
   return (
     <section aria-labelledby="summary-heading" className="space-y-3">
       <h2 id="summary-heading" className="sr-only">Summary</h2>
-      <dl className="grid grid-cols-2 gap-4 rounded-lg border border-neutral-200 p-4 sm:grid-cols-4 dark:border-neutral-800">
+      <dl className="grid grid-cols-2 gap-4 rounded-lg border border-neutral-200 p-4 sm:grid-cols-5 dark:border-neutral-800">
         <div>
           <dt className={`text-xs uppercase ${muted}`}>Final score</dt>
           <dd className="text-2xl font-semibold tabular-nums" data-testid="final-score">
@@ -140,6 +165,11 @@ function Summary({ report }: { report: CandidateReport }) {
         <div>
           <dt className={`text-xs uppercase ${muted}`}>Submitted</dt>
           <dd className="text-sm"><LocalDate iso={attempt?.submittedAt ?? null} withTime /></dd>
+        </div>
+        <div>
+          <dt className={`text-xs uppercase ${muted}`}>Integrity flags</dt>
+          <dd className="text-2xl font-semibold tabular-nums" data-testid="flag-count">{counts ? counts.total : "—"}</dd>
+          {counts ? <dd className={`text-xs ${muted}`} data-testid="flag-count-detail">{countDetail}</dd> : null}
         </div>
       </dl>
       <p className="text-sm" role="status">{state}</p>
