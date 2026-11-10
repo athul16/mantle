@@ -45,7 +45,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
-**Known gaps before a pilot.** Admin MFA; retention and delete on request; the candidate report returns 200 for another company's invite id; Resend not set up (since PR #24 production email errors clearly instead of failing silently); Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant. The first three are batch 3 below.
+**Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); retention migration not yet applied to the cloud; `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
 
 ## The MVP, piece by piece
 
@@ -66,7 +66,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 | D. Trustworthy results | Step 7 | Companies can believe the scores |
 | E. Pilot-ready | Deploy on Vercel, Resend Pro, Supabase Pro, consent text, accountant review, admin MFA | First pilot company (the phase 1 gate) |
 
-**Stage E, batch 3:** `pilot-hardening` merged as PR #24 (production email guard: invites and codes error clearly on Vercel until Resend is set; `/api/health`; error pages; code resend cooldown; `docs/12-pilot-runbook.md`). `pilot-retention` is PR #25, open (per-org retention, default 180 days; admin delete on request; daily purge at 03:30 UTC; migration `20261110200000_retention`, not yet in the cloud). `pilot-admin-mfa` in progress (TOTP required for admins; candidate report 404). Open team decisions: `decisions/2026-11-10-pilot-decisions.md`. Vercel is done; Resend, Supabase Pro, consent wording and the accountant review are on people.
+**Stage E, batch 3 (done):** PR #24 production email guard (invites and codes error clearly on Vercel until Resend is set), `/api/health`, error pages, code resend cooldown, `docs/12-pilot-runbook.md`; PR #25 per-org retention (default 180 days, 30 to 730), admin delete on request, daily purge at 03:30 UTC (`CRON_SECRET`), migration `20261110200000_retention`; PR #27 TOTP required for company admins (`/app/account/security`, `/app/account/verify`) and a real 404 for another company's candidate report. Open team decisions: `decisions/2026-11-10-pilot-decisions.md`. Vercel is done; Resend, Supabase Pro, consent wording and the accountant review are on people.
 
 ## Waiting on people, not code
 
@@ -76,6 +76,9 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 - [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
 - [ ] Stage A provisional decisions in `decisions/2026-11-09-stage-a-open-decisions.md`, including two schema decisions (S1, S2).
 - [x] Apply migration `20261110160000_proctoring.sql` to the cloud project (applied 2026-11-10, with the rubric review migration).
+- [ ] Apply migration `20261110200000_retention.sql` (PR #25) to the cloud project.
+- [ ] Vercel env vars: `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`; then `/api/health` should return all true (`12-pilot-runbook.md`).
+- [ ] Decide D1 to D16 in `decisions/2026-11-10-pilot-decisions.md` (D3, D2, D1, D13, D12 first).
 - [ ] Publish `harbor-lane-bank-rec` (`pnpm scenarios:publish`) after an accountant reviews it.
 - [ ] Open decisions from PR #19: viewers can add notes and votes; the report rebuilds expected answers from the attempt seed; a review overwrites the provisional score (audit log keeps the record).
 - [ ] Remaining app issue: the candidate report for another company's invite id may return 200 with the 404 page (same pattern fixed for jobs in PR #21). Colour contrast and the other E2E bugs are fixed (PRs #17, #21, #23).
@@ -85,6 +88,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-10 | Batch 3 (stage E): PR #24 launch hardening and pilot runbook; PR #25 retention and delete on request (migration `20261110200000_retention`); PR #27 admin MFA and candidate report 404; PR #26 pilot decisions brief. All test-first |
 | 2026-11-10 | Batch 2: PR #21 report rows for journal entries and document review, contrast, real 404 for foreign job ids; PR #22 `harbor-lane-bank-rec` (docs/07 Example 4); PR #23 proctoring with migration `20261110160000_proctoring`. All test-first |
 | 2026-11-10 | Batch 1: PR #17 fixes 5 app bugs (Safari hydration, candidate button pending state, revoke confirmation, read state on reload, cross-company 404); PR #18 `journal_entry` + `document_review` and `demo-entries-review`; PR #19 results table, candidate report, rubric review migration. All work test-driven from here on (`11-testing.md`) |
 | 2026-11-10 | Tests: PR #13 pgTAP schema, constraints, RLS policies, secret tables, triggers and functions; PR #14 component tests (191) and `Field` error fix; PR #15 Playwright journeys for employer, candidate and recruiter-to-candidate (3 browsers), button and page-change checks, axe on every page, Linux screenshot baselines. 6 app bugs logged as `test.fixme` in `e2e/known-issues.spec.ts` |

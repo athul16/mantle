@@ -25,7 +25,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 | D7 | Face check | Not for the pilot; later, on-device face counting only, after legal review | later | Nothing |
 | D16 | Pharma scope | Defer; ask pilot contacts; lean to industry roles (QA, batch records) | later | Nothing |
 
-**Decide first:** D3, D2, D1, D13 and D12. D3 gates the first real candidate, D2 and D1 set the scope of PRs already in progress, and D13 and D12 are schema changes that get harder once real companies and invites exist.
+**Decide first:** D3, D2, D1, D13 and D12. D3 gates the first real candidate, D2 and D1 decide whether to change what PRs #25 and #27 already built, and D13 and D12 are schema changes that get harder once real companies and invites exist.
 
 ## Decisions
 
@@ -47,7 +47,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** B. Recruiters see the same snapshots as admins, so they need the same protection, and the change to the batch 3 PR is small. Viewers should also have to enroll when `viewers_see_media` is on. Add D (Microsoft) only if the pilot firm runs Microsoft 365, keep the common tenant, and add `xms_edov`. Revisit E only when a client asks for it.
 
-> **Status 2026-11-10:** the batch 3 MFA session (in progress, no PR yet) is building option A, admins only. Picking B means a small follow-up to also force recruiters (and viewers when `viewers_see_media` is on).
+> **Status 2026-11-10:** PR #27 (merged) built option A: admins only must use an authenticator app. Picking B means a small follow-up to also force recruiters (and viewers when `viewers_see_media` is on).
 
 **Your decision:** _(blank)_
 
@@ -69,7 +69,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** C, with the invite row anonymised and notes and votes deleted. It keeps the riskiest data the shortest and matches what proctoring vendors do, while results last as long as the employer must keep them. If the retention PR has to stay at one setting, choose B, and tell the company in the notice that results last a year. Change this if the lawyer (D3) says otherwise.
 
-> **Status 2026-11-10:** PR #25 (open) built option B: one setting, default 180 days (30 to 730), and a purge that **deletes** the invite row (no anonymised shell) plus notes and votes; the audit log keeps a no-PII record. Picking C needs a second retention value for snapshots; keeping an anonymised row reverses the PR's choice (its reasoning: a blank shell leaves empty rows in job lists).
+> **Status 2026-11-10:** PR #25 (merged) built option A: one setting, default 180 days (30 to 730), and a purge that **deletes** the invite row (no anonymised shell) plus notes and votes; the audit log keeps a no-PII record. Picking C needs a second retention value for snapshots; keeping an anonymised row reverses the PR's choice (its reasoning: a blank shell leaves empty rows in job lists).
 
 **Your decision:** _(blank)_
 
@@ -367,11 +367,11 @@ Already built; revisit only if you disagree.
 - **PR #24:** `/api/health` is public and returns booleans only (`ok`, `db`, `storage`, `email`); 503 when not ok.
 - **PR #24:** candidate code resend cooldown is enforced in the database update, so double clicks can't send two codes. No new rate limits elsewhere.
 - **PR #24:** error pages show a reference id, never the message or stack.
-- **PR #25 (open):** retention clock starts at the candidate's last activity (latest of invite, expiry, attempt deadline, submission).
+- **PR #25 (merged):** retention clock starts at the candidate's last activity (latest of invite, expiry, attempt deadline, submission).
 - **PR #25:** only org admins may delete a candidate; recruiters and viewers can't. Typed "delete" confirmation.
 - **PR #25:** the daily purge runs at 03:30 UTC, refuses without `CRON_SECRET`, and continues past single failures.
 - **PR #25:** changing the notice bumps the consent version, so candidates mid-assessment are asked to agree again.
-- **MFA session (in progress):** admins only must use TOTP; enabled TOTP in local `supabase/config.toml`. Also fixing the candidate report 404.
+- **PR #27 (merged):** admins only must use TOTP (recruiters and viewers optional); enrol at `/app/account/security`, code at `/app/account/verify`; TOTP enabled in local `supabase/config.toml` (on by default in hosted Supabase). Also fixed: another company's candidate report now returns a real 404.
 
 ## Provisional calls to confirm (already built, not blocking)
 
