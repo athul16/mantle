@@ -45,7 +45,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
-**Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); retention migration not yet applied to the cloud; `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
+**Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
 
 ## The MVP, piece by piece
 
@@ -76,7 +76,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 - [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
 - [ ] Stage A provisional decisions in `decisions/2026-11-09-stage-a-open-decisions.md`, including two schema decisions (S1, S2).
 - [x] Apply migration `20261110160000_proctoring.sql` to the cloud project (applied 2026-11-10, with the rubric review migration).
-- [ ] Apply migration `20261110200000_retention.sql` (PR #25) to the cloud project.
+- [x] Apply migration `20261110200000_retention.sql` (PR #25) to the cloud project (applied 2026-11-10).
 - [ ] Vercel env vars: `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`; then `/api/health` should return all true (`12-pilot-runbook.md`).
 - [ ] Decide D1 to D16 in `decisions/2026-11-10-pilot-decisions.md` (D3, D2, D1, D13, D12 first).
 - [ ] Publish `harbor-lane-bank-rec` (`pnpm scenarios:publish`) after an accountant reviews it.

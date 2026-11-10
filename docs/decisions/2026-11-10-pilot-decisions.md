@@ -405,5 +405,5 @@ From `2026-11-09-stage-a-open-decisions.md`, built as described. Confirm or chan
 - [ ] Accountant reviews `harbor-lane-bank-rec`; then `pnpm scenarios:publish`
 - [ ] Lawyer reviews the consent and monitoring notice and retention promise (D3)
 - [ ] Pick and contact the first pilot company (`09-go-to-market.md`)
-- [ ] Apply `20261110200000_retention.sql` (PR #25) to the cloud after it merges (Claude does it on your yes)
+- [x] Apply `20261110200000_retention.sql` (PR #25) to the cloud (applied 2026-11-10)
 - [ ] Later: find a pharmacist reviewer
