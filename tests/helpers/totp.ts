@@ -46,11 +46,11 @@ export async function enrollTotp(client: AnyClient, friendlyName = "Test authent
 // The server accepts the previous, current and next 30-second code. Try the
 // current one, then its neighbours, so a test never fails on a window edge.
 async function verifyWithRetry(client: AnyClient, factorId: string, secret: string) {
-  let last: unknown;
+  const errors: string[] = [];
   for (const offset of [0, -30_000, 30_000]) {
     const { error } = await client.auth.mfa.challengeAndVerify({ factorId, code: totpCode(secret, Date.now() + offset) });
     if (!error) return;
-    last = error;
+    errors.push(`${offset / 1000}s: ${error.status ?? ""} ${error.code ?? ""} ${error.message}`);
   }
-  throw last;
+  throw new Error(`TOTP verify failed (${errors.join("; ")})`);
 }

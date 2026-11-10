@@ -27,7 +27,7 @@ test.describe("admin two-factor", () => {
     // A wrong code is refused and nothing changes.
     await page.getByLabel("6-digit code").fill("000000");
     await page.getByRole("button", { name: "Turn on two-factor authentication" }).click();
-    await expect(page.getByRole("alert")).toContainText(/code/i);
+    await expect(page.getByRole("alert").filter({ hasText: /code didn.t work/ })).toBeVisible();
 
     await enterCode(page, secret, "Turn on two-factor authentication");
     await land(new RegExp(`/app/${co.slug}/jobs$`), "Jobs");
@@ -55,7 +55,7 @@ test.describe("admin two-factor", () => {
     await page.goto(`/app/account/verify?next=${encodeURIComponent(`/app/${company.slug}/team`)}`);
     await page.getByLabel("6-digit code").fill("000000");
     await page.getByRole("button", { name: "Verify" }).click();
-    await expect(page.getByRole("alert")).toContainText(/code/i);
+    await expect(page.getByRole("alert").filter({ hasText: /code didn.t work/ })).toBeVisible();
 
     await enterCode(page, admin.totpSecret!, "Verify");
     await land(new RegExp(`/app/${company.slug}/team$`), "Team");
