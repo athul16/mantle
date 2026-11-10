@@ -72,7 +72,7 @@ export async function scoredAttempt(
     candidateName?: string;
     minutes?: number;
     submittedAt?: Date;
-    score?: ReturnType<typeof miniCloseScore>;
+    score?: { points: number; maxPoints: number; steps: Record<string, unknown> };
   },
 ) {
   const db = serviceClient();
@@ -90,7 +90,7 @@ export async function scoredAttempt(
     timeLimitMinutes: 20,
     seed: `results-seed-${inv.inviteId}`,
   });
-  const score = opts.score ?? miniCloseScore();
+  const score: { points: number; maxPoints: number; steps: Record<string, unknown> } = opts.score ?? miniCloseScore();
   must(
     await db
       .from("attempts")
@@ -104,7 +104,7 @@ export async function scoredAttempt(
         org_id: opts.orgId,
         step_id: stepId,
         answer,
-        score: (score.steps[stepId as keyof typeof score.steps] ?? null) as unknown as Json,
+        score: (score.steps[stepId] ?? null) as Json,
       })),
     ),
   );
