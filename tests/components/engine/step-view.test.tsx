@@ -17,9 +17,9 @@ const sheet: PublicStep = {
 
 describe("StepView", () => {
   it("registers every built step type", () => {
-    expect(Object.keys(clientStepTypes).sort()).toEqual(["inbox_reply", "numeric", "spreadsheet"]);
+    expect(Object.keys(clientStepTypes).sort()).toEqual(["document_review", "inbox_reply", "journal_entry", "numeric", "spreadsheet"]);
     expect(hasStepComponent("numeric")).toBe(true);
-    expect(hasStepComponent("journal_entry")).toBe(false);
+    expect(hasStepComponent("multiple_choice")).toBe(false);
   });
 
   it("renders a numeric step and passes its answer up", async () => {
@@ -47,8 +47,8 @@ describe("StepView", () => {
   });
 
   it("explains when a step type has no browser component", () => {
-    render(<StepView step={{ id: "x", type: "journal_entry", title: "JE", config: {} }} onChange={() => {}} />);
-    expect(screen.getByText("This task type (journal_entry) can't be shown. Please contact support.")).toBeVisible();
+    render(<StepView step={{ id: "x", type: "multiple_choice", title: "MC", config: {} }} onChange={() => {}} />);
+    expect(screen.getByText("This task type (multiple_choice) can't be shown. Please contact support.")).toBeVisible();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });

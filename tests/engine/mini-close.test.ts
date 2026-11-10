@@ -49,6 +49,8 @@ describe("demo-mini-close generator", () => {
   });
 });
 
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
+
 describe("what the candidate receives (every scenario, many seeds)", () => {
   // Every form an amount could take in serialized output: 120.1, 120.10, 1,120.10, 12010 (cents).
   const leakPatterns = (value: number) => {
@@ -64,9 +66,14 @@ describe("what the candidate receives (every scenario, many seeds)", () => {
       .map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
   };
 
-  /** Expected values (any `value` field) and text notes inside a key, whatever its step type's shape. Tolerances are skipped. */
+  /**
+   * Expected amounts (any `value` or `amount` field) and text notes inside a key, whatever its step type's shape.
+   * Tolerances are skipped, and so are ids the material lists on purpose (account codes, flaggable items,
+   * reasons, decision options, debit/credit side): they're in every candidate's choices, so they reveal nothing.
+   */
   const keyLeaves = (key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") => {
-    if (typeof key === "number" && field === "value") out.numbers.push(key);
+    if (PUBLIC_ID_FIELDS.has(field)) return out;
+    if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);
     else if (typeof key === "string") out.strings.push(key);
     else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k);
     return out;

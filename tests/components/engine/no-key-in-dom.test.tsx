@@ -25,9 +25,15 @@ function leakPatterns(value: number): RegExp[] {
     .map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
 }
 
-/** Expected numbers (any `value` field) and text notes inside a key, whatever its shape. */
+/**
+ * Expected amounts (any `value` or `amount` field) and text notes inside a key, whatever its shape. Ids the
+ * material lists on purpose (account codes, flaggable items, reasons, decision options, debit/credit side)
+ * are skipped: they're in every candidate's choices, so they reveal nothing.
+ */
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
 function keyLeaves(key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") {
-  if (typeof key === "number" && field === "value") out.numbers.push(key);
+  if (PUBLIC_ID_FIELDS.has(field)) return out;
+  if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);
   else if (typeof key === "string") out.strings.push(key);
   else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k);
   return out;
