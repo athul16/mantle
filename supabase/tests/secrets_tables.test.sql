@@ -70,8 +70,8 @@ select is_empty(
 select set_eq(
   $$ select p.proname::text from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef $$,
-  $$ values ('create_organization') $$,
-  'create_organization is the only security definer function in public'
+  $$ values ('create_organization'), ('review_rubric_step') $$,
+  'create_organization and review_rubric_step are the only security definer functions in public'
 );
 select is_empty(
   $$ select p.oid::regprocedure::text from pg_proc p
