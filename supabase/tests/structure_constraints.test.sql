@@ -70,7 +70,8 @@ select set_eq(
        ('attempts',        'id,org_id',            false),
        ('attempts',        'invite_id',            false),
        ('invite_secrets',  'token_hash',           false),
-       ('attempt_secrets', 'session_token_hash',   false) $$,
+       ('attempt_secrets', 'session_token_hash',   false),
+       ('flags',           'attempt_id,rule',      false) $$,
   'unique constraints (scenarios treats null org_id as one library namespace)'
 );
 
@@ -89,6 +90,7 @@ select set_eq(
        ('attempts',      'attempts_integrity_label_check'),
        ('media',         'media_source_check'),
        ('flags',         'flags_status_check'),
+       ('flags',         'flags_review_note_length'),
        ('notes',         'notes_vote_check') $$,
   'check constraints present (their values are exercised in enums_check_values)'
 );

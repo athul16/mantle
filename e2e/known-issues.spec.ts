@@ -24,9 +24,13 @@ test.describe("colour contrast", () => {
     }
   });
 
-  // Candidate pages are fixed separately ("Coming soon" on the system check, "At start" / "5 min in" in the inbox).
-  test.fixme("candidate pages meet colour contrast (system check, inbox times)", async ({ page, hiring, candidate }, testInfo) => {
+  // Candidate pages, with no excluded nodes: the system check and the workspace inbox (arrival times).
+  test("candidate pages meet colour contrast (system check, inbox times)", async ({ page, hiring, candidate }, testInfo) => {
     await candidate.verify(hiring.invite);
+    await axeSerious(page, testInfo);
+    await page.getByRole("link", { name: "Continue to instructions" }).click();
+    await page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click();
+    await expect(page.getByRole("timer")).toBeVisible();
     await axeSerious(page, testInfo);
   });
 });
