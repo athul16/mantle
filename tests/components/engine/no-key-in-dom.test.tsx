@@ -25,9 +25,15 @@ function leakPatterns(value: number): RegExp[] {
     .map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
 }
 
-/** Expected numbers (any `value` field) and text notes inside a key, whatever its shape. */
+/**
+ * Expected amounts (any `value` or `amount` field) and text notes inside a key, whatever its shape. Ids the
+ * material lists on purpose (account codes, flaggable items, reasons, decision options, debit/credit side)
+ * are skipped: they're in every candidate's choices, so they reveal nothing.
+ */
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
 function keyLeaves(key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") {
-  if (typeof key === "number" && field === "value") out.numbers.push(key);
+  if (PUBLIC_ID_FIELDS.has(field)) return out;
+  if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);
   else if (typeof key === "string") out.strings.push(key);
   else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k);
   return out;
@@ -99,5 +105,15 @@ describe("rendered candidate DOM never contains the answer key", () => {
     const key = scenario.generate("abc").keys["adjusted-balance"] as { value: number };
     const { container } = render(<p>Adjusted: ${key.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>);
     expect(leakPatterns(key.value).some((p) => p.test(container.innerHTML))).toBe(true);
+  });
+
+  it("journal_entry amounts in a key are checked too, and the check fires when one is planted", () => {
+    const scenario = listScenarios().find((s) => s.slug === "demo-entries-review")!;
+    const key = scenario.generate("abc").keys["rec-entries"];
+    const fix = (key as { entries: { transposition: { lines: { amount: number }[] } } }).entries.transposition.lines[0].amount;
+    expect(keyLeaves(key).numbers).toContain(fix);
+    expect(keyLeaves(key).strings).toEqual([]); // account codes and sides are public choices, not secrets
+    const { container } = render(<p>Correction: {fix.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>);
+    expect(leakPatterns(fix).some((p) => p.test(container.innerHTML))).toBe(true);
   });
 });

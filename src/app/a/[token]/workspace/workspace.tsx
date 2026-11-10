@@ -31,17 +31,21 @@ function formatRemaining(ms: number): string {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-function postJson(url: string, body: unknown) {
-  return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+function postJson(url: string, body: unknown, init?: RequestInit) {
+  return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), ...init });
 }
 
-export function Workspace({ token, initial }: { token: string; initial: View }) {
+/**
+ * `openedIds`: messages already opened in this attempt (from the server's
+ * action events), so they stay read after a reload.
+ */
+export function Workspace({ token, initial, openedIds = [] }: { token: string; initial: View; openedIds?: string[] }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initial.messages);
   const [steps, setSteps] = useState(initial.steps);
   const [answers, setAnswers] = useState<Record<string, unknown>>(initial.answers);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const [opened, setOpened] = useState<Set<string>>(() => new Set(openedIds));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [deadline] = useState(() => new Date(initial.deadlineAt).getTime());
   // Server time minus browser time, so a wrong local clock doesn't skew the display.
@@ -104,7 +108,8 @@ export function Workspace({ token, initial }: { token: string; initial: View }) 
     setSelectedId(id);
     if (!opened.has(id)) {
       setOpened((prev) => new Set(prev).add(id));
-      void postJson("/api/candidate/event", { kind: "opened_message", messageId: id }).catch(() => {});
+      // keepalive: the event (which is what keeps it read after a reload) still lands if the page unloads now.
+      void postJson("/api/candidate/event", { kind: "opened_message", messageId: id }, { keepalive: true }).catch(() => {});
     }
   }
 

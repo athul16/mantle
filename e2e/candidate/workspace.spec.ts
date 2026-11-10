@@ -40,8 +40,8 @@ test("mini close: spreadsheet, numeric and email reply, saved and submitted", as
   // Minutes 5 and 10 bring the next two messages.
   await backdateAttempt(invite.inviteId, 11, { keepDeadline: true });
   await page.reload();
-  // App bug (minor, reported): read state is kept only in the browser, so after a reload every message is unread again.
-  await expect(page.getByText("Inbox · 3 unread")).toBeVisible();
+  // The opened message stays read after the reload; the two new ones are unread.
+  await expect(page.getByText("Inbox · 2 unread")).toBeVisible();
   await candidate.message(/5 min in/).click();
   await page.getByLabel(/reconciled \(adjusted\) cash balance/).fill("19,850.50");
   await candidate.saved();
@@ -85,6 +85,18 @@ test("a scheduled message arrives while the candidate watches", async ({ page, h
   await page.clock.fastForward(21_000);
   await expect(candidate.message(/5 min in/)).toBeVisible();
   await expect(page.getByText("Inbox · 2 unread")).toBeVisible();
+});
+
+test("opened messages stay read after a reload", async ({ page, hiring, candidate }) => {
+  await candidate.startTest(hiring.invite);
+  await expect(page.getByText("Inbox · 1 unread")).toBeVisible();
+  const logged = page.waitForResponse((r) => r.url().endsWith("/api/candidate/event") && r.request().postData()?.includes("opened_message") === true);
+  await candidate.message(/At start/).click();
+  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
+  expect((await logged).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("timer")).toBeVisible();
+  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
 });
 
 test("an unanswered task is flagged on review and the candidate can go back", async ({ page, hiring, candidate, land }) => {

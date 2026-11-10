@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
@@ -42,6 +43,18 @@ export async function updateSession(request: NextRequest) {
     return redirectWithCookies(url, response);
   }
 
+  // Another company's URL (or one that doesn't exist) must answer HTTP 404.
+  // The /app/[orgSlug] layout also calls notFound(), but by then the static
+  // shell has streamed with a 200, so the status has to be decided here.
+  const orgSlug = user && (request.method === "GET" || request.method === "HEAD") ? pathname.match(/^\/app\/([^/]+)/)?.[1] : undefined;
+  if (orgSlug && !(await isMemberOf(supabase, user!.id, orgSlug))) {
+    const url = request.nextUrl.clone();
+    // No route matches this path, so Next renders the root not-found page with a 404 status.
+    url.pathname = "/_org-not-found";
+    url.search = "";
+    return rewriteWithCookies(url, response, 404);
+  }
+
   if (user && AUTH_PAGES.includes(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
@@ -50,6 +63,26 @@ export async function updateSession(request: NextRequest) {
   }
 
   return response;
+}
+
+// Same rule as requireOrgMembership: the user's own client, so RLS decides.
+async function isMemberOf(supabase: SupabaseClient<Database>, userId: string, orgSlug: string): Promise<boolean> {
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(orgSlug)) return false;
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("org_id, organizations!inner(slug)")
+    .eq("user_id", userId)
+    .eq("organizations.slug", orgSlug)
+    .limit(1);
+  // On a lookup error let the request through; the layout still checks.
+  if (error) return true;
+  return data.length > 0;
+}
+
+function rewriteWithCookies(url: URL, from: NextResponse, status: number) {
+  const rewrite = NextResponse.rewrite(url, { status });
+  for (const cookie of from.cookies.getAll()) rewrite.cookies.set(cookie);
+  return rewrite;
 }
 
 // Keep any refreshed auth cookies when redirecting.

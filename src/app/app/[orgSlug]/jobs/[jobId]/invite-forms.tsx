@@ -65,12 +65,14 @@ export function InviteRowActions({
 }) {
   const [resendState, resend, resending] = useActionState(resendInviteAction, undefined);
   const [revokeState, revoke, revoking] = useActionState(revokeInviteAction, undefined);
-  const note = resendState?.error ?? revokeState?.error ?? resendState?.message;
+  const note = resendState?.error ?? revokeState?.error ?? revokeState?.message ?? resendState?.message;
 
-  if (!canResend && !canRevoke) return null;
+  // Once an invite is revoked it can't be resent or revoked, but the component
+  // stays mounted so the "Revoked …" confirmation is still shown.
+  if (!canResend && !canRevoke && !note) return null;
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 empty:hidden">
         {canResend ? (
           <form
             action={resend}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getReview } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
 import { CandidateCard, Notice, primaryButton, secondaryButton } from "../../ui";
+import { SubmitButton } from "../submit-button";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
@@ -41,9 +42,9 @@ export default async function ReviewPage({ params }: PageProps<"/a/[token]/revie
         </Link>
         <form action="/api/candidate/submit" method="post">
           <input type="hidden" name="token" value={token} />
-          <button type="submit" className={primaryButton}>
+          <SubmitButton className={primaryButton} pendingText="Submitting…">
             Submit my answers
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </CandidateCard>
