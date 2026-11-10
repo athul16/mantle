@@ -48,12 +48,13 @@ test.describe("another company's URLs", () => {
     await signInViaUi(page, other.users.admin);
     const { slug } = hiring.company;
     for (const path of [`/app/${slug}`, `/app/${slug}/jobs`, `/app/${slug}/jobs/${hiring.jobId}`, `/app/${slug}/team`, `/app/no-such-company-${data.run}`]) {
-      // Soft 404 (reported, low): the page streams inside Suspense, so the status is 200; the 404 page is what counts.
-      await page.goto(path);
+      // A real 404 status, decided in the proxy before the page starts streaming.
+      const res = await page.goto(path);
+      expect(res?.status(), path).toBe(404);
       await expect(page.getByText("This page could not be found.")).toBeVisible();
       await expect(page.getByText(hiring.company.name)).toHaveCount(0);
     }
-    // Their job id under my own company is a 404 too.
+    // Their job id under my own company shows the 404 page too.
     await page.goto(`/app/${other.slug}/jobs/${hiring.jobId}`);
     await expect(page.getByText("This page could not be found.")).toBeVisible();
     await page.goto(`/app/${other.slug}`);
