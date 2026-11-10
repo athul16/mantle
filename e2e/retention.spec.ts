@@ -83,7 +83,8 @@ test("an admin deletes a candidate's data from the report", async ({ page, data,
     await confirm.click();
 
     await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Retention clerk");
-    await expect(page.getByText(invite.email)).toHaveCount(0);
+    await expect(page.getByText("No one invited to this job yet.")).toBeVisible();
+    await expect(page.getByText(invite.email)).toBeHidden();
 
     expect(must(await db().from("invites").select("id").eq("id", invite.inviteId))).toHaveLength(0);
     expect(must(await db().from("attempts").select("id").eq("id", attemptId))).toHaveLength(0);
