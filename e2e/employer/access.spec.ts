@@ -54,9 +54,17 @@ test.describe("another company's URLs", () => {
       await expect(page.getByText("This page could not be found.")).toBeVisible();
       await expect(page.getByText(hiring.company.name)).toHaveCount(0);
     }
-    // Their job id under my own company shows the 404 page too.
-    await page.goto(`/app/${other.slug}/jobs/${hiring.jobId}`);
-    await expect(page.getByText("This page could not be found.")).toBeVisible();
+    // Their job id under my own company, an unknown id and a malformed one: also a real 404.
+    for (const path of [
+      `/app/${other.slug}/jobs/${hiring.jobId}`,
+      `/app/${other.slug}/jobs/00000000-0000-4000-8000-000000000000`,
+      `/app/${other.slug}/jobs/not-a-job`,
+    ]) {
+      const res = await page.goto(path);
+      expect(res?.status(), path).toBe(404);
+      await expect(page.getByText("This page could not be found.")).toBeVisible();
+      await expect(page.getByText(hiring.company.name)).toHaveCount(0);
+    }
     await page.goto(`/app/${other.slug}`);
     await land(new RegExp(`/app/${other.slug}$`), other.name);
   });
