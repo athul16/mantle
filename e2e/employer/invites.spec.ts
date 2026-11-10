@@ -111,9 +111,8 @@ test("revoke withdraws the invite and the candidate sees that", async ({ page, h
 
   page.once("dialog", (d) => void d.accept());
   await inviteRow(page, invite.email).getByRole("button", { name: "Revoke" }).click();
-  // App bug (minor, reported): the "Revoked …" message never shows, because the row's
-  // actions component unmounts once the invite can no longer be resent or revoked.
   await expect(inviteRow(page, invite.email).getByText("revoked", { exact: true })).toBeVisible();
+  await expect(inviteRow(page, invite.email).getByText(`Revoked ${invite.email}'s invite.`)).toBeVisible();
   await expect(inviteRow(page, invite.email).getByRole("button", { name: "Revoke" })).toHaveCount(0);
 
   const candidate = await page.context().newPage();

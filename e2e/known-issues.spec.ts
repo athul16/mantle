@@ -13,14 +13,6 @@ test.describe("known app issues", () => {
     await axeSerious(page, testInfo);
   });
 
-  test.fixme("the revoke confirmation message is shown", async ({ page, hiring }) => {
-    // InviteRowActions returns null once the row can't be resent or revoked, unmounting its own message.
-    await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}`);
-    page.once("dialog", (d) => void d.accept());
-    await page.getByRole("button", { name: "Revoke" }).click();
-    await expect(page.getByText(`Revoked ${hiring.invite.email}'s invite.`)).toBeVisible();
-  });
-
   test.fixme("opened messages stay read after a reload", async ({ page, hiring, candidate }) => {
     // Read state lives only in React state in the workspace; a reload marks everything unread again.
     await candidate.startTest(hiring.invite);
