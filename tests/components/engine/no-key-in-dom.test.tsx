@@ -106,4 +106,14 @@ describe("rendered candidate DOM never contains the answer key", () => {
     const { container } = render(<p>Adjusted: ${key.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>);
     expect(leakPatterns(key.value).some((p) => p.test(container.innerHTML))).toBe(true);
   });
+
+  it("journal_entry amounts in a key are checked too, and the check fires when one is planted", () => {
+    const scenario = listScenarios().find((s) => s.slug === "demo-entries-review")!;
+    const key = scenario.generate("abc").keys["rec-entries"];
+    const fix = (key as { entries: { transposition: { lines: { amount: number }[] } } }).entries.transposition.lines[0].amount;
+    expect(keyLeaves(key).numbers).toContain(fix);
+    expect(keyLeaves(key).strings).toEqual([]); // account codes and sides are public choices, not secrets
+    const { container } = render(<p>Correction: {fix.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>);
+    expect(leakPatterns(fix).some((p) => p.test(container.innerHTML))).toBe(true);
+  });
 });
