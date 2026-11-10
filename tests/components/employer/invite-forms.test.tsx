@@ -36,7 +36,7 @@ describe("InviteCandidatesForm", () => {
 
   it("sends pasted emails and shows Sending invites… while it runs", async () => {
     const user = userEvent.setup();
-    const pending = deferred<{ message: string }>();
+    const pending = deferred<{ message: string; invited: string[] }>();
     inviteCandidates.mockReturnValueOnce(pending.promise);
     render(<InviteCandidatesForm orgId="org-1" jobId="job-1" max={200} />);
     await user.click(emailsBox());

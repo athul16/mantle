@@ -41,7 +41,7 @@ function view(over: Partial<Parameters<typeof Workspace>[0]["initial"]> = {}) {
 
 type Reply = { status?: number; body?: unknown } | Error;
 let replies: Record<string, Reply[]>;
-const fetchMock = vi.fn(async (url: string) => {
+const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) => {
   const queue = replies[url] ?? [];
   const next = queue.length > 1 ? queue.shift()! : (queue[0] ?? { status: 200, body: {} });
   if (next instanceof Error) throw next;
