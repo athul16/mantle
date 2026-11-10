@@ -3,6 +3,7 @@ import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Resend } from "resend";
+import { EnvError, emailEnvProblems, isDeployedEnv } from "@/lib/env";
 
 export interface EmailMessage {
   to: string;
@@ -22,10 +23,17 @@ const OUTBOX_DIR = ".dev-outbox";
 /**
  * Sends one email. With RESEND_API_KEY set it goes through Resend from
  * EMAIL_FROM; without it the message is written to .dev-outbox/ so local
- * development and tests work with no email provider. Throws if Resend
- * rejects the message.
+ * development and tests work with no email provider.
+ *
+ * On a Vercel deployment (production or preview) there is no outbox: a missing
+ * key or a missing/placeholder EMAIL_FROM throws an EnvError naming the
+ * variables, before anything is sent. Throws if Resend rejects the message.
  */
 export async function sendEmail(message: EmailMessage): Promise<SentEmail> {
+  if (isDeployedEnv()) {
+    const problems = emailEnvProblems();
+    if (problems.length) throw new EnvError(problems, "App email is not configured; see docs/12-pilot-runbook.md.");
+  }
   const from = process.env.EMAIL_FROM || DEFAULT_FROM;
   const apiKey = process.env.RESEND_API_KEY;
 
