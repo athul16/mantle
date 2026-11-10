@@ -55,6 +55,16 @@ export async function updateSession(request: NextRequest) {
     return rewriteWithCookies(url, response, 404);
   }
 
+  // Same for a job id that isn't one of this company's jobs (another
+  // company's, deleted, or malformed): the job page's notFound() comes too late.
+  const jobId = orgSlug ? pathname.match(/^\/app\/[^/]+\/jobs\/([^/]+)\/?$/)?.[1] : undefined;
+  if (jobId && jobId !== "assessments" && !(await isJobOf(supabase, orgSlug!, jobId))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/_org-not-found";
+    url.search = "";
+    return rewriteWithCookies(url, response, 404);
+  }
+
   if (user && AUTH_PAGES.includes(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
@@ -75,6 +85,22 @@ async function isMemberOf(supabase: SupabaseClient<Database>, userId: string, or
     .eq("organizations.slug", orgSlug)
     .limit(1);
   // On a lookup error let the request through; the layout still checks.
+  if (error) return true;
+  return data.length > 0;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// RLS limits jobs to the user's companies; the slug filter limits it to this one.
+async function isJobOf(supabase: SupabaseClient<Database>, orgSlug: string, jobId: string): Promise<boolean> {
+  if (!UUID.test(jobId)) return false;
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id, organizations!inner(slug)")
+    .eq("id", jobId)
+    .eq("organizations.slug", orgSlug)
+    .limit(1);
+  // On a lookup error let the request through; the page still checks.
   if (error) return true;
   return data.length > 0;
 }
