@@ -10,6 +10,7 @@ import { formatDuration, scorePercent } from "@/lib/results/summary";
 import { createClient } from "@/lib/supabase/server";
 import { LocalDate } from "../../jobs/local-date";
 import { StatusBadge } from "../status-badge";
+import { DeleteCandidateData } from "./delete-candidate";
 import { FlagsSection } from "./flags-section";
 import { AddNoteForm, DeleteNoteButton, RubricReviewForm } from "./report-forms";
 
@@ -115,6 +116,8 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
           <AddNoteForm orgId={orgId} attemptId={attempt.id} />
         </section>
       ) : null}
+
+      <DeleteCandidateData role={role} orgId={orgId} orgSlug={orgSlug} inviteId={inviteId} jobId={report.job.id} />
     </div>
   );
 }

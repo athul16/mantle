@@ -9,6 +9,7 @@ const NAV = [
   { path: "/jobs", label: "Jobs" },
   { path: "/candidates", label: "Candidates" },
   { path: "/team", label: "Team" },
+  { path: "/settings", label: "Settings" },
 ] as const;
 
 // The shell renders statically. The company slug comes from the URL and the

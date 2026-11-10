@@ -41,10 +41,12 @@ $$;
 -- ---------------------------------------------------------------------------
 
 select functions_are('private',
-  array['has_org_role', 'is_org_member', 'can_manage_org', 'can_view_media', 'slugify', 'unique_org_slug', 'reserved_org_slugs'],
+  array['has_org_role', 'is_org_member', 'can_manage_org', 'can_view_media', 'slugify', 'unique_org_slug', 'reserved_org_slugs',
+        'retention_days', 'purge_candidate'],
   'private has exactly the expected functions');
 select functions_are('public',
-  array['create_organization', 'prevent_locked_assessment_edits', 'prevent_published_scenario_edits', 'review_rubric_step'],
+  array['create_organization', 'prevent_locked_assessment_edits', 'prevent_published_scenario_edits', 'review_rubric_step',
+        'set_retention_days', 'delete_candidate_data', 'list_candidates_past_retention', 'purge_candidate_for_retention'],
   'public has exactly the expected functions (role helpers are not in the API schema)');
 
 select is(

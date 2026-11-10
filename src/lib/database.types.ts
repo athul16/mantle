@@ -660,10 +660,20 @@ export type Database = {
     }
     Functions: {
       create_organization: { Args: { org_name: string }; Returns: string }
+      delete_candidate_data: { Args: { p_invite_id: string }; Returns: string[] }
+      list_candidates_past_retention: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: { invite_id: string; org_id: string; retained_until: string }[]
+      }
+      purge_candidate_for_retention: {
+        Args: { p_invite_id: string; p_now?: string }
+        Returns: string[]
+      }
       review_rubric_step: {
         Args: { p_attempt_id: string; p_scores: Json; p_step_id: string }
         Returns: Json
       }
+      set_retention_days: { Args: { p_days: number; p_org_id: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never
