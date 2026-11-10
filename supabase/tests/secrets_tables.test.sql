@@ -5,7 +5,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(64);
+select plan(65);
 
 select table_privs_are('public', t, r, array[]::text[], t || ': ' || r || ' has no table privileges')
 from unnest(array['invite_secrets', 'attempt_secrets']) t
@@ -70,14 +70,24 @@ select is_empty(
 select set_eq(
   $$ select p.proname::text from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef $$,
-  $$ values ('create_organization'), ('review_rubric_step') $$,
-  'create_organization and review_rubric_step are the only security definer functions in public'
+  $$ values ('create_organization'), ('review_rubric_step'), ('set_retention_days'), ('delete_candidate_data'),
+            ('list_candidates_past_retention'), ('purge_candidate_for_retention') $$,
+  'only the known security definer functions are in public (signup, rubric review, retention)'
 );
-select is_empty(
+-- private.purge_candidate deletes a candidate's secret rows (retention); it
+-- never reads or returns them.
+select set_eq(
   $$ select p.oid::regprocedure::text from pg_proc p
       where p.pronamespace in ('public'::regnamespace, 'private'::regnamespace)
         and p.prosrc ~ '(invite_secrets|attempt_secrets)' $$,
-  'no public or private function touches the secret tables'
+  $$ values ('private.purge_candidate(uuid)') $$,
+  'only the retention purge touches the secret tables'
+);
+select is_empty(
+  $$ select 1 from pg_proc p
+      where p.oid = 'private.purge_candidate(uuid)'::regprocedure
+        and p.prosrc ~ '(select|returning)[^;]*(invite_secrets|attempt_secrets)' $$,
+  'the purge only deletes from the secret tables, never selects or returns them'
 );
 select is_empty(
   $$ select c.relname from pg_depend d

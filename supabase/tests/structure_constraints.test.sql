@@ -82,6 +82,7 @@ select set_eq(
   $$ values
        ('organizations', 'organizations_name_check'),
        ('organizations', 'organizations_slug_format'),
+       ('organizations', 'organizations_retention_days_range'),
        ('memberships',   'memberships_role_check'),
        ('assessments',   'assessments_time_limit_minutes_check'),
        ('invites',       'invites_status_check'),
@@ -106,6 +107,7 @@ select set_eq(
        ('assessments_org_idx',          'CREATE INDEX assessments_org_idx ON public.assessments USING btree (org_id)'),
        ('jobs_org_idx',                 'CREATE INDEX jobs_org_idx ON public.jobs USING btree (org_id)'),
        ('invites_org_job_idx',          'CREATE INDEX invites_org_job_idx ON public.invites USING btree (org_id, job_id)'),
+       ('invites_expires_at_idx',       'CREATE INDEX invites_expires_at_idx ON public.invites USING btree (expires_at)'),
        ('attempts_org_idx',             'CREATE INDEX attempts_org_idx ON public.attempts USING btree (org_id)'),
        ('attempts_open_deadline_idx',   'CREATE INDEX attempts_open_deadline_idx ON public.attempts USING btree (deadline_at) WHERE (status = ''in_progress''::text)'),
        ('action_events_attempt_idx',    'CREATE INDEX action_events_attempt_idx ON public.action_events USING btree (attempt_id, at)'),

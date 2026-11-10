@@ -4,7 +4,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(64);
+select plan(68);
 
 update public.invites set candidate_name = 'Ada Candidate' where id = pg_temp.fx('inv_a');
 insert into storage.objects (bucket_id, name)
