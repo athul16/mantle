@@ -1,18 +1,30 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 
 // Minimal shared form pieces. Plain Tailwind, no design system yet.
 
 export function Field({ label, name, error, ...input }: { label: string; name: string; error?: string } & ComponentProps<"input">) {
+  // The error sits outside the <label> so it isn't part of the input's
+  // accessible name; aria-describedby links it instead.
+  const errorId = `${useId()}-error`;
+  const describedBy = [input["aria-describedby"], error ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium">{label}</span>
-      <input
-        name={name}
-        className="w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-300"
-        {...input}
-      />
-      {error ? <span className="text-sm text-red-600">{error}</span> : null}
-    </label>
+    <div>
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">{label}</span>
+        <input
+          name={name}
+          className="w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-300"
+          {...input}
+          aria-invalid={error ? true : input["aria-invalid"]}
+          aria-describedby={describedBy}
+        />
+      </label>
+      {error ? (
+        <span id={errorId} className="text-sm text-red-600">
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

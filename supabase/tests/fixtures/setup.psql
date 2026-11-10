@@ -1,0 +1,160 @@
+-- Shared fixture for the pgTAP files. Include it right after `begin;` with
+--   \ir fixtures/setup.psql
+-- It is not a test file itself (`supabase test db` only runs *.sql), so it has
+-- no plan. Everything here lives inside the including file's transaction and
+-- is rolled back with it.
+--
+-- Helpers (all in pg_temp, so they vanish with the session):
+--   pg_temp.fx(name)           stable uuid for a fixture name (md5 based)
+--   pg_temp.act_as(who)        switch role for the rest of the transaction:
+--                              a user name below, 'anon', 'service' or 'owner'
+--   pg_temp.count_as(who, q)   rows query q returns when run as `who`
+--   pg_temp.try_as(who, q)     run statement q as `who` and undo it; returns
+--                              the affected row count ('0', '1', ...) or the
+--                              SQLSTATE it failed with ('42501' = denied)
+--
+-- Actors: org A has a_admin, a_recruiter, a_viewer; org B has b_admin and
+-- b_viewer; outsider is signed in with no membership.
+
+create extension if not exists pgtap with schema extensions;
+
+create function pg_temp.fx(name text) returns uuid
+language sql immutable as $$ select md5('pgtap:' || name)::uuid $$;
+
+create function pg_temp.act_as(who text) returns void
+language plpgsql as $$
+begin
+  if who = 'anon' then
+    perform set_config('role', 'anon', true);
+    perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  elsif who = 'service' then
+    perform set_config('role', 'service_role', true);
+    perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  elsif who = 'owner' then
+    perform set_config('role', 'postgres', true);
+    perform set_config('request.jwt.claims', '', true);
+  else
+    perform set_config('role', 'authenticated', true);
+    perform set_config(
+      'request.jwt.claims',
+      json_build_object('sub', pg_temp.fx(who), 'role', 'authenticated')::text,
+      true
+    );
+  end if;
+end;
+$$;
+
+-- The role switch happens inside a subtransaction that is always rolled back,
+-- so the caller's role and data are untouched afterwards.
+create function pg_temp.count_as(who text, q text) returns int
+language plpgsql as $$
+declare
+  n int;
+begin
+  begin
+    perform pg_temp.act_as(who);
+    execute 'select count(*) from (' || q || ') s' into n;
+    raise sqlstate 'TSTRB';
+  exception when sqlstate 'TSTRB' then
+    return n;
+  end;
+end;
+$$;
+
+create function pg_temp.try_as(who text, q text) returns text
+language plpgsql as $$
+declare
+  n int;
+begin
+  begin
+    perform pg_temp.act_as(who);
+    execute q;
+    get diagnostics n = row_count;
+    raise sqlstate 'TSTRB';
+  exception
+    when sqlstate 'TSTRB' then return n::text;
+    when others then return sqlstate;
+  end;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Data, inserted as the owner (RLS bypassed)
+-- ---------------------------------------------------------------------------
+
+insert into auth.users (id, email)
+select pg_temp.fx(n), 'pgtap-' || replace(n, '_', '-') || '@example.test'
+from unnest(array['a_admin', 'a_recruiter', 'a_viewer', 'b_admin', 'b_viewer', 'outsider']) n;
+
+insert into public.organizations (id, name, slug, settings) values
+  (pg_temp.fx('org_a'), 'pgTAP Org A', 'pgtap-org-a', '{}'),
+  (pg_temp.fx('org_b'), 'pgTAP Org B', 'pgtap-org-b', '{}');
+
+insert into public.memberships (org_id, user_id, role) values
+  (pg_temp.fx('org_a'), pg_temp.fx('a_admin'),     'admin'),
+  (pg_temp.fx('org_a'), pg_temp.fx('a_recruiter'), 'recruiter'),
+  (pg_temp.fx('org_a'), pg_temp.fx('a_viewer'),    'viewer'),
+  (pg_temp.fx('org_b'), pg_temp.fx('b_admin'),     'admin'),
+  (pg_temp.fx('org_b'), pg_temp.fx('b_viewer'),    'viewer');
+
+insert into public.scenarios (id, org_id, slug, title, role_family, version, definition, published_at) values
+  (pg_temp.fx('lib_pub'),   null,                 'pgtap-lib',       'Library published', 'accounting', 1, '{"steps":[]}', now()),
+  (pg_temp.fx('lib_draft'), null,                 'pgtap-lib-draft', 'Library draft',     'accounting', 1, '{"steps":[]}', null),
+  (pg_temp.fx('scn_a'),     pg_temp.fx('org_a'),  'pgtap-own',       'A draft',           'accounting', 1, '{"steps":[]}', null),
+  (pg_temp.fx('scn_a_pub'), pg_temp.fx('org_a'),  'pgtap-own',       'A published',       'accounting', 2, '{"steps":[]}', now()),
+  (pg_temp.fx('scn_b'),     pg_temp.fx('org_b'),  'pgtap-own',       'B draft',           'accounting', 1, '{"steps":[]}', null);
+
+insert into public.assessments (id, org_id, scenario_id, title, time_limit_minutes, proctoring, locked_at) values
+  (pg_temp.fx('asm_a'),        pg_temp.fx('org_a'), pg_temp.fx('lib_pub'), 'A assessment', 60, '{"camera":true}', null),
+  (pg_temp.fx('asm_a_locked'), pg_temp.fx('org_a'), pg_temp.fx('lib_pub'), 'A locked',     60, '{"camera":true}', now()),
+  (pg_temp.fx('asm_b'),        pg_temp.fx('org_b'), pg_temp.fx('lib_pub'), 'B assessment', 60, '{}',              null);
+
+insert into public.jobs (id, org_id, title, assessment_id) values
+  (pg_temp.fx('job_a'), pg_temp.fx('org_a'), 'A job', pg_temp.fx('asm_a')),
+  (pg_temp.fx('job_b'), pg_temp.fx('org_b'), 'B job', pg_temp.fx('asm_b'));
+
+insert into public.invites (id, org_id, job_id, email, expires_at, created_by) values
+  (pg_temp.fx('inv_a'),  pg_temp.fx('org_a'), pg_temp.fx('job_a'), 'cand-a@example.test',  now() + interval '7 days', pg_temp.fx('a_recruiter')),
+  (pg_temp.fx('inv_a2'), pg_temp.fx('org_a'), pg_temp.fx('job_a'), 'cand-a2@example.test', now() + interval '7 days', pg_temp.fx('a_recruiter')),
+  (pg_temp.fx('inv_b'),  pg_temp.fx('org_b'), pg_temp.fx('job_b'), 'cand-b@example.test',  now() + interval '7 days', pg_temp.fx('b_admin'));
+
+insert into public.attempts (id, org_id, invite_id, scenario_id, started_at, deadline_at, status) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), pg_temp.fx('inv_a'), pg_temp.fx('lib_pub'), now(), now() + interval '60 minutes', 'in_progress'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), pg_temp.fx('inv_b'), pg_temp.fx('lib_pub'), now(), now() + interval '60 minutes', 'in_progress');
+
+insert into public.invite_secrets (invite_id, org_id, token_hash, code_hash) values
+  (pg_temp.fx('inv_a'), pg_temp.fx('org_a'), 'pgtap-token-a', 'pgtap-code-a'),
+  (pg_temp.fx('inv_b'), pg_temp.fx('org_b'), 'pgtap-token-b', 'pgtap-code-b');
+
+insert into public.attempt_secrets (attempt_id, org_id, seed, session_token_hash) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'pgtap-seed-a', 'pgtap-session-a'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'pgtap-seed-b', 'pgtap-session-b');
+
+insert into public.step_responses (attempt_id, org_id, step_id, answer) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'step-1', '{"value":1}'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'step-1', '{"value":2}');
+
+insert into public.action_events (attempt_id, org_id, kind) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'started_step'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'started_step');
+
+insert into public.integrity_events (attempt_id, org_id, kind) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'tab_switch'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'tab_switch');
+
+insert into public.media (attempt_id, org_id, source, storage_path) values
+  (pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'camera', 'org-a/att-a/1.jpg'),
+  (pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'camera', 'org-b/att-b/1.jpg');
+
+insert into public.flags (id, attempt_id, org_id, reason, evidence) values
+  (pg_temp.fx('flag_a'), pg_temp.fx('att_a'), pg_temp.fx('org_a'), 'tab switches', '{"events":[1]}'),
+  (pg_temp.fx('flag_b'), pg_temp.fx('att_b'), pg_temp.fx('org_b'), 'tab switches', '{"events":[2]}');
+
+insert into public.notes (id, attempt_id, org_id, author_id, body, vote) values
+  (pg_temp.fx('note_a_admin'),  pg_temp.fx('att_a'), pg_temp.fx('org_a'), pg_temp.fx('a_admin'),  'admin note',  'hire'),
+  (pg_temp.fx('note_a_viewer'), pg_temp.fx('att_a'), pg_temp.fx('org_a'), pg_temp.fx('a_viewer'), 'viewer note', 'unsure'),
+  (pg_temp.fx('note_b'),        pg_temp.fx('att_b'), pg_temp.fx('org_b'), pg_temp.fx('b_admin'),  'b note',      null);
+
+insert into public.audit_log (org_id, actor_id, action, target) values
+  (pg_temp.fx('org_a'), pg_temp.fx('a_admin'), 'viewed_report', 'att_a'),
+  (pg_temp.fx('org_b'), pg_temp.fx('b_admin'), 'viewed_report', 'att_b');
