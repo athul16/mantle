@@ -142,6 +142,23 @@ export async function getWorkspaceView(session: CandidateSession, now = new Date
   };
 }
 
+/**
+ * Messages the candidate has already opened in this attempt, from the
+ * `opened_message` action events, so read state survives a reload or a
+ * second device.
+ */
+export async function getOpenedMessageIds(attempt: Pick<AttemptRow, "id" | "org_id">): Promise<string[]> {
+  const { data, error } = await createServiceClient()
+    .from("action_events")
+    .select("payload")
+    .eq("attempt_id", attempt.id)
+    .eq("org_id", attempt.org_id)
+    .eq("kind", "opened_message" satisfies ClientEventKind);
+  if (error) throw new Error(`loading opened messages failed: ${error.message}`);
+  const ids = data.map((r) => (r.payload as { messageId?: unknown } | null)?.messageId).filter((id): id is string => typeof id === "string");
+  return [...new Set(ids)];
+}
+
 /** Scenario intro for the instructions page (no variant-specific keys involved). */
 export async function getIntro(session: CandidateSession): Promise<{ title: string; intro: string; stepCount: number }> {
   const [scenario, seed] = await Promise.all([loadScenario(session.attempt.scenario_id), getSeed(session.attempt)]);

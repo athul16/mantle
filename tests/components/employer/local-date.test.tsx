@@ -1,13 +1,14 @@
 /** LocalDate: UTC (labelled) on the server, the viewer's zone in the browser. */
 import { render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocalDate } from "@/app/app/[orgSlug]/jobs/local-date";
 
 const ISO = "2026-11-23T23:30:00.000Z";
 const originalTz = process.env.TZ;
 afterEach(() => {
   process.env.TZ = originalTz;
+  vi.restoreAllMocks();
 });
 
 describe("LocalDate", () => {
@@ -32,6 +33,12 @@ describe("LocalDate", () => {
 
   it("renders UTC, labelled, on the server", () => {
     process.env.TZ = "Asia/Kolkata";
+    expect(renderToString(<LocalDate iso={ISO} withTime />)).toContain("Nov 23, 2026, 11:30 PM UTC");
+    expect(renderToString(<LocalDate iso={ISO} />)).toContain("Nov 23, 2026<");
+  });
+
+  it("builds the server text without Intl, so WebKit hydrates the same text", () => {
+    vi.spyOn(Date.prototype, "toLocaleString").mockReturnValue("Nov 23, 2026 at 11:30 PM");
     expect(renderToString(<LocalDate iso={ISO} withTime />)).toContain("Nov 23, 2026, 11:30 PM UTC");
     expect(renderToString(<LocalDate iso={ISO} />)).toContain("Nov 23, 2026<");
   });

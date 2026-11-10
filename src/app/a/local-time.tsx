@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { formatUtc } from "@/lib/format-date";
 
 const subscribe = () => () => {};
 
@@ -9,7 +10,8 @@ export function LocalTime({ iso }: { iso: string }) {
   const local = useSyncExternalStore(
     subscribe,
     () => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
-    () => `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`,
+    // Not Intl: this text is rendered again in the browser during hydration and must match exactly.
+    () => `${formatUtc(iso)} UTC`,
   );
   return <time dateTime={iso}>{local}</time>;
 }

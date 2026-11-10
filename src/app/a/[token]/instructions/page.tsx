@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getIntro } from "@/lib/candidate/attempt";
 import { requireSessionPage } from "@/lib/candidate/pages";
 import { CandidateCard, Facts, primaryButton } from "../../ui";
+import { SubmitButton } from "../submit-button";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
@@ -48,9 +49,9 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
       ) : (
         <form action="/api/candidate/start" method="post">
           <input type="hidden" name="token" value={token} />
-          <button type="submit" className={primaryButton}>
+          <SubmitButton className={primaryButton} pendingText="Starting…">
             Start the {minutes}-minute timer
-          </button>
+          </SubmitButton>
         </form>
       )}
     </CandidateCard>

@@ -41,14 +41,6 @@ const ABORTED = /abort|cancel|NS_BINDING_ABORTED|ERR_ABORTED|interrupted/i;
 // Text Next.js shows on its error pages; a finished page change must not show any of it.
 const ERROR_PAGE = /Application error|This page couldn.t load|Internal Server Error|Something went wrong/i;
 
-/**
- * App bug (reported): LocalTime/LocalDate render their server text with the
- * browser's Intl, and WebKit formats "Nov 9, 2026 at 10:50 PM" where Node writes
- * "Nov 9, 2026, 10:50 PM", so hydration fails (React #418) in Safari. React
- * recovers by rendering on the client. Tolerated in WebKit only; tracked in
- * e2e/known-issues.spec.ts.
- */
-const WEBKIT_HYDRATION = /Minified React error #418/;
 // WebKit's wording when navigation cancels an in-flight RSC fetch (a prefetch); the same abort as ABORTED above.
 const WEBKIT_ABORTED_RSC = /_rsc=.*due to access control checks/;
 
@@ -148,7 +140,7 @@ export const test = base.extend<Options & Fixtures>({
         problems.push(`console error: ${text}`);
       });
       page.on("pageerror", (err) => {
-        if (browserName === "webkit" && (WEBKIT_HYDRATION.test(err.message) || WEBKIT_ABORTED_RSC.test(err.message))) return;
+        if (browserName === "webkit" && WEBKIT_ABORTED_RSC.test(err.message)) return;
         if (allowConsole.some((re) => re.test(err.message))) return;
         problems.push(`page error: ${err.message}`);
       });

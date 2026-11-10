@@ -137,6 +137,15 @@ describe("opening messages", () => {
     ]);
   });
 
+  it("starts with messages opened earlier in the attempt marked read, and doesn't log them again", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<Workspace token="tok" initial={view()} openedIds={["m1"]} />);
+    expect(screen.getByRole("heading", { name: "Inbox · 2 unread" })).toBeVisible();
+    expect(within(messageButton("Bank rec for October")).queryByLabelText("unread")).not.toBeInTheDocument();
+    await user.click(messageButton("Bank rec for October"));
+    expect(bodiesTo("/api/candidate/event")).toEqual([{ kind: "started_step", stepId: "rec" }]);
+  });
+
   it("keeps working if logging an event fails", async () => {
     replies["/api/candidate/event"] = [new Error("offline")];
     const user = setup();
