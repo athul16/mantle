@@ -69,8 +69,15 @@ export function describeStep(step: Step, variant: Variant | null, answer: unknow
       const c = config as NumericConfig;
       const k = key as NumericKey | null;
       const value = obj(answer).value;
-      const fmt = (n: number) => n.toFixed(c.decimals) + (c.unit ? ` ${c.unit}` : "");
-      const expected = k ? fmt(k.value) + (k.tolerance > 0 ? ` (± ${plain(k.tolerance)})` : "") : "—";
+      const fmt = (n: number) => {
+        const text = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: c.decimals, maximumFractionDigits: c.decimals });
+        const sign = n < 0 ? "-" : "";
+        if (!c.unit) return sign + text;
+        return c.unit === "$" ? `${sign}$${text}` : `${sign}${text} ${c.unit}`;
+      };
+      // A tolerance below the last shown decimal only absorbs rounding; don't show it.
+      const showTolerance = !!k && k.tolerance >= 10 ** -c.decimals;
+      const expected = k ? fmt(k.value) + (showTolerance ? ` (± ${plain(k.tolerance)})` : "") : "—";
       return {
         ...base,
         answerText: null,
