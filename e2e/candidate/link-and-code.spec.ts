@@ -85,7 +85,7 @@ test("an unknown link, an expired invite and a revoked invite each explain thems
   await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
 });
 
-test("a revoked invite can't be verified even with a code already sent", async ({ page, hiring, candidate, land }) => {
+test("a revoked invite can't be verified even with a code already sent", async ({ hiring, candidate, land }) => {
   const code = await candidate.requestCode(hiring.invite);
   await db().from("invites").update({ status: "revoked" }).eq("id", hiring.invite.inviteId);
   await candidate.submitCode(code);
