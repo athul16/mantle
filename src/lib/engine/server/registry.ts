@@ -1,6 +1,8 @@
 import "server-only";
 
+import { documentReviewServer } from "../step-types/document_review/server";
 import { inboxReplyServer } from "../step-types/inbox_reply/server";
+import { journalEntryServer } from "../step-types/journal_entry/server";
 import { numericServer } from "../step-types/numeric/server";
 import { spreadsheetServer } from "../step-types/spreadsheet/server";
 import type { AnyServerStepType } from "./step-type";
@@ -14,6 +16,8 @@ const serverStepTypes: Record<string, AnyServerStepType> = {
   [numericServer.type]: numericServer,
   [inboxReplyServer.type]: inboxReplyServer,
   [spreadsheetServer.type]: spreadsheetServer,
+  [journalEntryServer.type]: journalEntryServer,
+  [documentReviewServer.type]: documentReviewServer,
 };
 
 export function getServerStepType(type: string): AnyServerStepType {
