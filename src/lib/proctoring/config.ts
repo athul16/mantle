@@ -1,3 +1,5 @@
+import { DEFAULT_RETENTION_DAYS } from "@/lib/retention/policy";
+
 /**
  * Proctoring constants shared by the browser, the server and tests. Nothing
  * secret lives here. See docs/02-security-and-integrity.md.
@@ -50,13 +52,17 @@ export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", 
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
 
 /** Version of the monitoring notice, stored with each consent. Change it when the text changes. */
-export const MONITORING_CONSENT_VERSION = "2026-11-10";
+export const MONITORING_CONSENT_VERSION = "2026-11-10.retention";
+
+/** What the notice needs: what is captured, plus the org's retention (organizations.settings.retention_days). */
+export type MonitoringSettings = Proctoring & { retentionDays?: number };
 
 /**
  * The monitoring notice on the system check: what is captured, why, who sees
  * it and for how long (docs/02 Compliance). Shown before any device prompt.
  */
-export function monitoringNotice(settings: Proctoring, companyName: string): string[] {
+export function monitoringNotice(settings: MonitoringSettings, companyName: string): string[] {
+  const days = settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const captured: string[] = [];
   if (settings.camera) captured.push("a camera photo every 30 to 60 seconds and when you leave the test window");
   if (settings.screen) captured.push("a screenshot of your entire screen at the same times");
@@ -65,7 +71,7 @@ export function monitoringNotice(settings: Proctoring, companyName: string): str
     `While you take this test we record ${joinList(captured)}.`,
     `Why: so ${companyName} can trust that the work is yours. Only ${companyName}'s hiring team can see the photos and screenshots.`,
     "Unusual moments are marked for a person to check, with the matching photos. No one is rejected automatically.",
-    `How long: kept with your application and deleted when ${companyName} deletes your candidate data. We don't use the photos to identify you.`,
+    `How long: kept for ${days} days after your assessment ends, then deleted. ${companyName} can delete it sooner on request. We don't use the photos to identify you.`,
   ];
 }
 

@@ -5,6 +5,7 @@ import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
 import type { AttemptRow } from "@/lib/candidate/invite";
 import type { CandidateSession } from "@/lib/candidate/session";
+import { readRetentionDays } from "@/lib/retention/policy";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   CONSENT_SIGNAL,
@@ -12,6 +13,7 @@ import {
   MONITORING_CONSENT_VERSION,
   PROCTORING_BUCKET,
   readProctoring,
+  type MonitoringSettings,
   type Proctoring,
   type SnapshotSource,
 } from "./config";
@@ -28,15 +30,15 @@ type AttemptKey = Pick<AttemptRow, "id" | "org_id">;
 const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
 
 /** The assessment's camera / screen settings for this candidate. */
-export async function getProctoringSettings(session: CandidateSession): Promise<Proctoring> {
-  const { data, error } = await createServiceClient()
-    .from("assessments")
-    .select("proctoring")
-    .eq("id", session.invite.assessmentId)
-    .eq("org_id", session.invite.orgId)
-    .single();
-  if (error) throw new Error(`proctoring settings lookup failed: ${error.message}`);
-  return readProctoring(data.proctoring);
+export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
+  const db = createServiceClient();
+  const [assessment, org] = await Promise.all([
+    db.from("assessments").select("proctoring").eq("id", session.invite.assessmentId).eq("org_id", session.invite.orgId).single(),
+    db.from("organizations").select("settings").eq("id", session.invite.orgId).single(),
+  ]);
+  if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
+  if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
+  return { ...readProctoring(assessment.data.proctoring), retentionDays: readRetentionDays(org.data.settings) };
 }
 
 // ---------------------------------------------------------------------------
