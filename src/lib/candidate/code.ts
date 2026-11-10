@@ -41,8 +41,11 @@ export async function requestCode(token: string, now = new Date()): Promise<Requ
     if (now.getTime() - issuedAt < CODE_RESEND_SECONDS * 1000) return { ok: false, error: "too_soon" };
   }
 
+  // Conditional on the expiry we just read, so parallel requests (double
+  // click, a script) can't all pass the cooldown check: one wins, the rest
+  // match no row and get too_soon.
   const code = generateCode();
-  const { error: updateError } = await db
+  const update = db
     .from("invite_secrets")
     .update({
       code_hash: hashCode(code, invite.inviteId),
@@ -50,7 +53,12 @@ export async function requestCode(token: string, now = new Date()): Promise<Requ
       code_attempts: 0,
     })
     .eq("invite_id", invite.inviteId);
+  const { data: stored, error: updateError } = await (secret.code_expires_at
+    ? update.eq("code_expires_at", secret.code_expires_at)
+    : update.is("code_expires_at", null)
+  ).select("invite_id");
   if (updateError) throw new Error(`storing code failed: ${updateError.message}`);
+  if (!stored?.length) return { ok: false, error: "too_soon" };
 
   await sendEmail({
     to: invite.email,

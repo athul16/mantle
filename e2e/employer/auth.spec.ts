@@ -1,6 +1,7 @@
 /** Employer sign up, onboarding, log in and out, company URLs and the org switcher. */
 import { hold, isServerAction } from "../support/hold";
 import { db, memberIds, orgIdForSlug } from "../support/db";
+import { completeMfaIfAsked, enterCode } from "../fixtures";
 import { chromiumOnly, expect, test } from "../support/test";
 
 test.describe("core", () => {
@@ -18,6 +19,12 @@ test.describe("core", () => {
     await land(/\/onboarding$/, "Set up your company");
     await page.getByLabel("Company name").fill(companyName);
     await page.getByRole("button", { name: "Create company" }).click();
+
+    // The new company's admin must turn on two-factor authentication first, then lands on the company.
+    await expect(page).toHaveURL(/\/app\/account\/security\?next=/);
+    await page.getByRole("button", { name: "Set up an authenticator app" }).click();
+    const secret = (await page.getByTestId("totp-secret").textContent())!.replace(/\s/g, "");
+    await enterCode(page, secret);
 
     await expect(page).toHaveURL(/\/app\/[a-z0-9-]+$/);
     const slug = new URL(page.url()).pathname.split("/")[2];
@@ -45,6 +52,7 @@ test.describe("chromium", () => {
     await held.arrived;
     await expect(page.getByRole("button", { name: "Please wait…" })).toBeDisabled();
     await held.release();
+    await completeMfaIfAsked(page, admin);
 
     await land(new RegExp(`/app/${company.slug}$`), company.name);
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -56,6 +64,7 @@ test.describe("chromium", () => {
     await page.getByLabel("Work email").fill(admin.email);
     await page.getByLabel("Password").fill(admin.password);
     await page.getByRole("button", { name: "Sign in" }).click();
+    await completeMfaIfAsked(page, admin);
     await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
   });
 

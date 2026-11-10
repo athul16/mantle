@@ -2,6 +2,10 @@
 
 How the app is tested, where each kind of test goes, and how CI runs them.
 
+## Test first
+
+All work is test-driven. Write the tests for the behaviour first (unit, component, pgTAP and E2E as the change needs), run them and see them fail, then write the code that makes them pass. Bug fixes start with a failing test that reproduces the bug. Commit the tests before the implementation, and list them in the PR.
+
 ## The rule: cloud is real, tests are local
 
 The cloud Supabase project is the only real database. **Tests never run against it.** Every test that needs a database uses a throwaway local Supabase started with Docker (`pnpm db:test:start`), with the repo's migrations applied.
