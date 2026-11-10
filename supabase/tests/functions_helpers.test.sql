@@ -41,7 +41,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 select functions_are('private',
-  array['has_org_role', 'is_org_member', 'can_manage_org', 'slugify', 'unique_org_slug', 'reserved_org_slugs'],
+  array['has_org_role', 'is_org_member', 'can_manage_org', 'can_view_media', 'slugify', 'unique_org_slug', 'reserved_org_slugs'],
   'private has exactly the expected functions');
 select functions_are('public',
   array['create_organization', 'prevent_locked_assessment_edits', 'prevent_published_scenario_edits', 'review_rubric_step'],

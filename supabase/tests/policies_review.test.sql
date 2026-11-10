@@ -29,9 +29,8 @@ select is(pg_temp.try_as('a_recruiter', $$update public.flags set org_id = pg_te
 select is(pg_temp.try_as('anon', $$update public.flags set status = 'cleared' where id = pg_temp.fx('flag_a')$$), '0',
           'flags: anonymous visitors cannot review');
 
--- BUG: the review policy has no column limits, so a reviewer can also rewrite
--- the reason and evidence the flag was raised with.
-select todo('flags review policy allows rewriting reason and evidence', 1);
+-- Reviewers may only change status, review_note, reviewed_by and reviewed_at:
+-- the reason and evidence the flag was raised with stay as the rule wrote them.
 select isnt(pg_temp.try_as('a_recruiter', $$update public.flags set evidence = '{}', reason = 'nothing here', reviewed_by = pg_temp.fx('a_recruiter') where id = pg_temp.fx('flag_a')$$), '1',
             'flags: a reviewer cannot rewrite a flag''s reason or evidence');
 
