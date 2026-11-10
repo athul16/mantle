@@ -38,7 +38,7 @@ type Fixtures = {
 
 // Navigation aborts in-flight prefetches and RSC fetches; that's normal, not a failure.
 const ABORTED = /abort|cancel|NS_BINDING_ABORTED|ERR_ABORTED|interrupted/i;
-// Next.js reports its own redirects inside server actions to the console in some browsers; not app errors.
+// Text Next.js shows on its error pages; a finished page change must not show any of it.
 const ERROR_PAGE = /Application error|This page couldn.t load|Internal Server Error|Something went wrong/i;
 
 /**
