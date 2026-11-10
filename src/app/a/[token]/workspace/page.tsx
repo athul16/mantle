@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getWorkspaceView } from "@/lib/candidate/attempt";
+import { getOpenedMessageIds, getWorkspaceView } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
 import { Workspace } from "./workspace";
 
@@ -17,7 +17,7 @@ export const metadata = { title: "Assessment" };
 export default async function WorkspacePage({ params }: PageProps<"/a/[token]/workspace">) {
   const { token } = await params;
   const { session, attempt } = await requireSessionPage(token, ["in_progress"]);
-  const view = await getWorkspaceView(session);
+  const [view, openedIds] = await Promise.all([getWorkspaceView(session), getOpenedMessageIds(attempt)]);
   if (!view) redirect(pageForStatus(token, attempt));
-  return <Workspace token={token} initial={view} />;
+  return <Workspace token={token} initial={view} openedIds={openedIds} />;
 }

@@ -87,6 +87,18 @@ test("a scheduled message arrives while the candidate watches", async ({ page, h
   await expect(page.getByText("Inbox · 2 unread")).toBeVisible();
 });
 
+test("opened messages stay read after a reload", async ({ page, hiring, candidate }) => {
+  await candidate.startTest(hiring.invite);
+  await expect(page.getByText("Inbox · 1 unread")).toBeVisible();
+  const logged = page.waitForResponse((r) => r.url().endsWith("/api/candidate/event") && r.request().postData()?.includes("opened_message") === true);
+  await candidate.message(/At start/).click();
+  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
+  expect((await logged).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("timer")).toBeVisible();
+  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
+});
+
 test("an unanswered task is flagged on review and the candidate can go back", async ({ page, hiring, candidate, land }) => {
   await candidate.startTest(hiring.invite);
   await page.getByRole("link", { name: "Review and submit" }).click();

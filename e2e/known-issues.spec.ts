@@ -13,15 +13,6 @@ test.describe("known app issues", () => {
     await axeSerious(page, testInfo);
   });
 
-  test.fixme("opened messages stay read after a reload", async ({ page, hiring, candidate }) => {
-    // Read state lives only in React state in the workspace; a reload marks everything unread again.
-    await candidate.startTest(hiring.invite);
-    await candidate.message(/At start/).click();
-    await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
-    await page.reload();
-    await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
-  });
-
   test.fixme("another company's URL answers HTTP 404, not 200", async ({ page, hiring, data }) => {
     // The page streams inside Suspense, so notFound() renders the 404 page with status 200 (a soft 404).
     const other = await data.company();
