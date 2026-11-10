@@ -19,6 +19,34 @@ _Last updated: 2026-11-10._
 
 8 of 8 skeleton steps. Stages A to D are built in code: send a link, take a proctored test, review and judge the result, with a real accounting simulation. Stage E (pilot-ready) is next.
 
+## Current implementation
+
+What runs today, from the code on main and the cloud project (2026-11-10).
+
+**Hosting.** Vercel builds and deploys production from `main` (previews per PR). One Supabase cloud project (`fexzsiizgcjuddtoeaui`, Free plan) holds the database, auth and storage. Email goes through Resend when `RESEND_API_KEY` is set; otherwise messages are written to `.dev-outbox/`. Resend is not set in production yet.
+
+**Database.** 16 tables in `public`: `organizations`, `memberships`, `jobs`, `assessments`, `scenarios`, `invites`, `invite_secrets`, `attempts`, `attempt_secrets`, `step_responses`, `action_events`, `integrity_events`, `media`, `flags`, `notes`, `audit_log`. RLS on every table; answer keys and tokens live in the `*_secrets` tables, which only the server reads. Five migrations, all applied in the cloud:
+
+| Migration | Adds |
+| --- | --- |
+| `20261109023434_initial_schema` | Tables, RLS policies, `private` helper functions, triggers |
+| `20261109024040_harden_helpers` | Locked-down helper functions (`search_path`, grants) |
+| `20261109034338_org_slug` | Company URLs (`organizations.slug`), `create_organization` |
+| `20261110120000_review_rubric_step` | `review_rubric_step`: a recruiter scores a rubric step, score and audit log updated |
+| `20261110160000_proctoring` | Private `proctoring` bucket (2 MB images), `private.can_view_media`, `flags.rule` and `flags.review_note`, reviewers may change only review columns |
+
+**Company side** (`/app/<slug>`): dashboard, jobs and job detail with invites (paste or CSV, resend, revoke), assessments, candidates results table, candidate report (answers vs expected, rubric review, flags with snapshots, notes and vote, timeline), team. Plus sign up, log in, onboarding, `/auth/*` callbacks and set password.
+
+**Candidate side** (`/a/<token>`): landing → `verify` (6-digit email code) → `check` (consent, camera, entire-screen share) → `instructions` → `workspace` → `review` → `done`. Server routes under `/api/candidate/*`: `code`, `verify`, `start`, `state`, `answer`, `event`, `submit`, and `proctoring/{consent,signals,upload,media}`.
+
+**Engine.** Five step types: `numeric`, `inbox_reply` (rubric; human review, AI scorer not wired), `spreadsheet`, `journal_entry`, `document_review`. Four scenarios in code: `demo-petty-cash`, `demo-mini-close`, `demo-entries-review`, `harbor-lane-bank-rec`. Only `demo-petty-cash` v1 is published to the cloud; publishing is `pnpm scenarios:publish`. `/dev/engine` previews any scenario.
+
+**Proctoring.** Rules (`src/lib/proctoring/rules.ts`): `left_window`, `paste`, `fullscreen`, `screen_share`, `camera`, `multiple_displays`. Camera and screen snapshots every 45 s and on leaving the window, uploaded with signed URLs. Each attempt gets an integrity label (`clear`, `review`, `suspicious`); nothing auto-rejects.
+
+**Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
+
+**Known gaps before a pilot.** Admin MFA; retention and delete on request; the candidate report returns 200 for another company's invite id; email fails silently in production without Resend; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant. The first three are batch 3 below.
+
 ## The MVP, piece by piece
 
 1. **Foundation** (done): database, tenant isolation, server-only answer keys.
@@ -38,11 +66,13 @@ _Last updated: 2026-11-10._
 | D. Trustworthy results | Step 7 | Companies can believe the scores |
 | E. Pilot-ready | Deploy on Vercel, Resend Pro, Supabase Pro, consent text, accountant review, admin MFA | First pilot company (the phase 1 gate) |
 
+**Stage E, batch 3 (in progress):** `pilot-admin-mfa` (admin MFA, candidate report 404), `pilot-retention` (retention setting, delete on request, daily purge; one migration), `pilot-hardening` (production email guard, env check, `/api/health`, error pages, rate limits, `docs/12-pilot-runbook.md`). Vercel is done; Resend, Supabase Pro, consent wording and the accountant review are on people.
+
 ## Waiting on people, not code
 
 - [ ] Resend: account, verified sending subdomain, SMTP in Supabase (setup guide sent as a PDF). Blocks stage A.
 - [ ] Supabase → Authentication → URL Configuration: Site URL and redirect URLs.
-- [ ] Vercel project from the GitHub repo, with the env vars in `01-architecture-and-hosting.md`.
+- [x] Vercel project from the GitHub repo, with the env vars in `01-architecture-and-hosting.md` (production deploys from main).
 - [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
 - [ ] Stage A provisional decisions in `decisions/2026-11-09-stage-a-open-decisions.md`, including two schema decisions (S1, S2).
 - [x] Apply migration `20261110160000_proctoring.sql` to the cloud project (applied 2026-11-10, with the rubric review migration).
