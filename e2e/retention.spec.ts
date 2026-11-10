@@ -67,6 +67,10 @@ test("a recruiter sees the retention setting read-only", async ({ page, company,
   await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
 });
 
+test.describe("delete", () => {
+  // After the delete, the report URL is a 404 when visited again.
+  test.use({ allowHttp: [/\/candidates\/[0-9a-f-]{36}(\?|$)/] });
+
 test("an admin deletes a candidate's data from the report", async ({ page, data, land }) => {
   const { co, jobId, invite, attemptId, path } = await candidateWithEvidence(data);
   try {
@@ -83,8 +87,20 @@ test("an admin deletes a candidate's data from the report", async ({ page, data,
     await confirm.click();
 
     await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Retention clerk");
-    await expect(page.getByText("No one invited to this job yet.")).toBeVisible();
-    await expect(page.getByText(invite.email)).toBeHidden();
+    // Role queries skip hidden elements, so these check what the user sees. Next keeps the previous
+    // route's tree hidden in the DOM, and the route announcer can still hold the old heading, so a bare
+    // getByText(email) would match those.
+    const main = page.getByRole("main");
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText("Candidates · Retention clerk");
+    await expect(main.getByText("No one invited to this job yet.")).toBeVisible();
+    await expect(main.getByRole("heading", { name: invite.email })).toHaveCount(0);
+
+    // Going back must not bring the deleted candidate's report back from the client cache.
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`/candidates/${invite.inviteId}$`));
+    await expect(page.getByText("This page could not be found.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: invite.email })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Delete candidate data" })).toHaveCount(0);
 
     expect(must(await db().from("invites").select("id").eq("id", invite.inviteId))).toHaveLength(0);
     expect(must(await db().from("attempts").select("id").eq("id", attemptId))).toHaveLength(0);
@@ -96,6 +112,7 @@ test("an admin deletes a candidate's data from the report", async ({ page, data,
   } finally {
     await db().storage.from("proctoring").remove([path]);
   }
+});
 });
 
 test("a recruiter has no delete button on the report", async ({ page, data, land }) => {
