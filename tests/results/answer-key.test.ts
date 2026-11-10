@@ -7,7 +7,7 @@ const { describeStep } = await import("@/lib/results/answer-key");
 const { journalEntryServer } = await import("@/lib/engine/step-types/journal_entry/server");
 const { documentReviewServer } = await import("@/lib/engine/step-types/document_review/server");
 
-const row = (rows: { id: string }[], id: string) => {
+const row = <R extends { id: string }>(rows: R[], id: string): R => {
   const r = rows.find((x) => x.id === id);
   if (!r) throw new Error(`no row "${id}" in ${rows.map((x) => x.id).join(", ")}`);
   return r;
