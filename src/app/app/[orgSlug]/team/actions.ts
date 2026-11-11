@@ -76,6 +76,12 @@ export async function inviteTeammate(_state: FormState, formData: FormData): Pro
   };
 }
 
+// The database refuses removing or demoting an org's last admin (trigger
+// memberships_keep_one_admin, SQLSTATE 23514). The adminCount checks below only
+// give a friendlier message first; two admins demoting each other at once are
+// caught by the trigger.
+const LAST_ADMIN = "23514";
+
 /** Count admins in the org, as seen by the caller (RLS-scoped). */
 async function adminCount(orgId: string) {
   const supabase = await createClient();
@@ -114,6 +120,7 @@ export async function changeRole(_state: FormState, formData: FormData): Promise
 
   const supabase = await createClient();
   const { data, error } = await supabase.from("memberships").update({ role: newRole }).eq("org_id", orgId).eq("user_id", userId).select("user_id");
+  if (error?.code === LAST_ADMIN) return { error: "A company needs at least one admin. Make someone else an admin first." };
   if (error || data.length !== 1) return { error: "Could not change the role." };
 
   revalidatePath("/app/[orgSlug]", "layout");
@@ -139,6 +146,7 @@ export async function removeMember(_state: FormState, formData: FormData): Promi
 
   const supabase = await createClient();
   const { data, error } = await supabase.from("memberships").delete().eq("org_id", orgId).eq("user_id", userId).select("user_id");
+  if (error?.code === LAST_ADMIN) return { error: "You can't remove the last admin. Make someone else an admin first." };
   if (error || data.length !== 1) return { error: "Could not remove them." };
 
   revalidatePath("/app/[orgSlug]", "layout");
