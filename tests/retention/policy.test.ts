@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_RETENTION_DAYS,
-  MAX_RETENTION_DAYS,
-  MIN_RETENTION_DAYS,
+  DEFAULT_MEDIA_RETENTION_DAYS,
+  DEFAULT_RESULTS_RETENTION_DAYS,
+  MAX_MEDIA_RETENTION_DAYS,
+  MAX_RESULTS_RETENTION_DAYS,
+  MEDIA_LONGER_ERROR,
+  MIN_MEDIA_RETENTION_DAYS,
+  MIN_RESULTS_RETENTION_DAYS,
   isPastRetention,
-  parseRetentionDays,
-  readRetentionDays,
+  parseRetention,
+  readRetention,
   retainedUntil,
   retentionAnchor,
 } from "@/lib/retention/policy";
@@ -13,30 +17,55 @@ import {
 const DAY = 86_400_000;
 const at = (iso: string) => new Date(iso);
 
-describe("retention days setting", () => {
-  it("has a 180-day default inside 30..730", () => {
-    expect(DEFAULT_RETENTION_DAYS).toBe(180);
-    expect(MIN_RETENTION_DAYS).toBe(30);
-    expect(MAX_RETENTION_DAYS).toBe(730);
+describe("retention settings", () => {
+  it("has a 90-day media and 365-day results default inside their ranges", () => {
+    expect(DEFAULT_MEDIA_RETENTION_DAYS).toBe(90);
+    expect([MIN_MEDIA_RETENTION_DAYS, MAX_MEDIA_RETENTION_DAYS]).toEqual([30, 365]);
+    expect(DEFAULT_RESULTS_RETENTION_DAYS).toBe(365);
+    expect([MIN_RESULTS_RETENTION_DAYS, MAX_RESULTS_RETENTION_DAYS]).toEqual([30, 730]);
   });
 
-  it("reads the org setting, falling back to the default", () => {
-    expect(readRetentionDays({ retention_days: 90 })).toBe(90);
-    expect(readRetentionDays({})).toBe(180);
-    expect(readRetentionDays(null)).toBe(180);
-    expect(readRetentionDays({ retention_days: "90" })).toBe(180);
-    expect(readRetentionDays({ retention_days: 5 })).toBe(180);
+  it("reads the org settings, falling back to the defaults", () => {
+    expect(readRetention({ media_retention_days: 60, results_retention_days: 200 })).toEqual({ mediaDays: 60, resultsDays: 200 });
+    expect(readRetention({})).toEqual({ mediaDays: 90, resultsDays: 365 });
+    expect(readRetention(null)).toEqual({ mediaDays: 90, resultsDays: 365 });
+    expect(readRetention({ media_retention_days: "60" })).toEqual({ mediaDays: 90, resultsDays: 365 });
+    expect(readRetention({ media_retention_days: 5, results_retention_days: 9000 })).toEqual({ mediaDays: 90, resultsDays: 365 });
+    // The old single setting is ignored (the migration converted it).
+    expect(readRetention({ retention_days: 180 })).toEqual({ mediaDays: 90, resultsDays: 365 });
   });
 
-  it("parses form input and rejects values out of range", () => {
-    expect(parseRetentionDays("90")).toEqual({ ok: true, days: 90 });
-    expect(parseRetentionDays(" 30 ")).toEqual({ ok: true, days: 30 });
-    expect(parseRetentionDays("730")).toEqual({ ok: true, days: 730 });
-    for (const bad of ["29", "731", "", "abc", "90.5", "-1", null]) {
-      const r = parseRetentionDays(bad);
+  it("never reads media as longer than results", () => {
+    expect(readRetention({ results_retention_days: 60 })).toEqual({ mediaDays: 60, resultsDays: 60 });
+  });
+
+  it("parses form input", () => {
+    expect(parseRetention("90", "365")).toEqual({ ok: true, mediaDays: 90, resultsDays: 365 });
+    expect(parseRetention(" 30 ", "30")).toEqual({ ok: true, mediaDays: 30, resultsDays: 30 });
+    expect(parseRetention("365", "730")).toEqual({ ok: true, mediaDays: 365, resultsDays: 730 });
+  });
+
+  it("rejects media out of range", () => {
+    for (const bad of ["29", "366", "", "abc", "90.5", "-1", null]) {
+      const r = parseRetention(bad, "365");
       expect(r.ok, String(bad)).toBe(false);
-      if (!r.ok) expect(r.error).toMatch(/30.*730/);
+      if (!r.ok) {
+        expect(r.fieldErrors.mediaRetentionDays?.[0]).toMatch(/30 to 365/);
+        expect(r.fieldErrors.resultsRetentionDays).toBeUndefined();
+      }
     }
+  });
+
+  it("rejects results out of range", () => {
+    for (const bad of ["29", "731", "", "x", null]) {
+      const r = parseRetention("90", bad);
+      expect(r.ok, String(bad)).toBe(false);
+      if (!r.ok) expect(r.fieldErrors.resultsRetentionDays?.[0]).toMatch(/30 to 730/);
+    }
+  });
+
+  it("rejects media kept longer than results", () => {
+    expect(parseRetention("200", "100")).toEqual({ ok: false, fieldErrors: { mediaRetentionDays: [MEDIA_LONGER_ERROR] } });
   });
 });
 
