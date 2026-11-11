@@ -132,6 +132,7 @@ select set_eq(
        ('submit_reason', 'text', false, '', ''),
        ('status', 'text', true, '''not_started''::text', ''),
        ('score', 'jsonb', false, '', ''),
+       ('auto_score', 'jsonb', false, '', ''),
        ('integrity_label', 'text', false, '', ''),
        ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
   'attempts: columns, types, nullability, defaults'
@@ -170,6 +171,7 @@ select set_eq(
        ('step_id', 'text', true, '', ''),
        ('answer', 'jsonb', true, '', ''),
        ('score', 'jsonb', false, '', ''),
+       ('auto_score', 'jsonb', false, '', ''),
        ('updated_at', 'timestamp with time zone', true, 'now()', '') $$,
   'step_responses: columns, types, nullability, defaults'
 );

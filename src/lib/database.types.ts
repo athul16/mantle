@@ -133,6 +133,7 @@ export type Database = {
       }
       attempts: {
         Row: {
+          auto_score: Json | null
           created_at: string
           deadline_at: string | null
           id: string
@@ -147,6 +148,7 @@ export type Database = {
           submitted_at: string | null
         }
         Insert: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -161,6 +163,7 @@ export type Database = {
           submitted_at?: string | null
         }
         Update: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -623,6 +626,7 @@ export type Database = {
         Row: {
           answer: Json
           attempt_id: string
+          auto_score: Json | null
           org_id: string
           score: Json | null
           step_id: string
@@ -631,6 +635,7 @@ export type Database = {
         Insert: {
           answer: Json
           attempt_id: string
+          auto_score?: Json | null
           org_id: string
           score?: Json | null
           step_id: string
@@ -639,6 +644,7 @@ export type Database = {
         Update: {
           answer?: Json
           attempt_id?: string
+          auto_score?: Json | null
           org_id?: string
           score?: Json | null
           step_id?: string
