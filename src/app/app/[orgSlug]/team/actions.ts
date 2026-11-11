@@ -42,7 +42,7 @@ export async function inviteTeammate(_state: FormState, formData: FormData): Pro
   let userId: string | undefined;
   let emailed = false;
 
-  const invited = await service.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/auth/callback` });
+  const invited = await service.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/auth/confirm` });
   if (invited.data.user) {
     userId = invited.data.user.id;
     emailed = true;
