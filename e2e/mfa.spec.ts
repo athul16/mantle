@@ -69,7 +69,7 @@ test.describe("admin two-factor", () => {
     await expect(page.getByText(/your role in this company requires two-factor/i)).toBeVisible();
   });
 
-  test("a recruiter with a factor enters the code and reaches the page", async ({ page, company, signInAs, land }) => {
+  test("a recruiter with a factor enters the code and reaches the page", async ({ company, signInAs, land }) => {
     await signInAs("recruiter", `/app/${company.slug}/jobs`);
     await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
   });
