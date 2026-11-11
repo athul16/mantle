@@ -1,6 +1,7 @@
 /**
- * Admin two-factor authentication (docs/02-security-and-integrity.md): company
- * admins must be at aal2 to use company pages. The server redirects; these
+ * Two-factor authentication (docs/02-security-and-integrity.md): company
+ * admins and recruiters (and viewers when the company shows them media) must
+ * be at aal2 to use company pages. The server redirects; these
  * tests go through the real pages with codes generated from the secret.
  */
 import { signInViaUi } from "./fixtures";
@@ -10,7 +11,7 @@ import { serviceClient } from "../tests/helpers/supabase";
 
 test.describe("admin two-factor", () => {
   test("an admin without a factor is sent to enrol, enrols with a code and reaches the page", async ({ page, data, land }) => {
-    const co = await data.company({ adminMfa: false });
+    const co = await data.company({ mfa: false });
     await signInViaUi(page, co.users.admin, `/app/${co.slug}/team`);
 
     // Every company page sends them to set up two-factor, remembering where they were going.
@@ -61,15 +62,31 @@ test.describe("admin two-factor", () => {
     await land(new RegExp(`/app/${company.slug}/team$`), "Team");
   });
 
-  test("a recruiter is not forced to set up two-factor", async ({ page, company, signInAs, land }) => {
+  test("a recruiter without a factor is sent to enrol too", async ({ page, data, land }) => {
+    const co = await data.company({ mfa: false });
+    await signInViaUi(page, co.users.recruiter, `/app/${co.slug}/jobs`);
+    await land(/\/app\/account\/security\?next=/, "Two-factor authentication");
+    await expect(page.getByText(/your role in this company requires two-factor/i)).toBeVisible();
+  });
+
+  test("a recruiter with a factor enters the code and reaches the page", async ({ page, company, signInAs, land }) => {
     await signInAs("recruiter", `/app/${company.slug}/jobs`);
     await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
-    await page.goto(`/app/${company.slug}`);
-    await land(new RegExp(`/app/${company.slug}$`), company.name);
-    // They can still turn it on from the security page if they want.
+  });
+
+  test("a viewer is forced only when the company shows viewers candidate media", async ({ page, data, land }) => {
+    const co = await data.company();
+    // Media hidden from viewers (the default): no two-factor needed, but it's offered.
+    await signInViaUi(page, co.users.viewer, `/app/${co.slug}`);
+    await land(new RegExp(`/app/${co.slug}$`), co.name);
     await page.goto("/app/account/security");
     await land(/\/app\/account\/security$/, "Two-factor authentication");
-    await expect(page.getByRole("button", { name: "Set up an authenticator app" })).toBeVisible();
+    await expect(page.getByText(/optional for you/i)).toBeVisible();
+
+    // Turning media on for viewers sends them to set it up.
+    await serviceClient().from("organizations").update({ settings: { viewers_see_media: true } }).eq("id", co.orgId).throwOnError();
+    await page.goto(`/app/${co.slug}`);
+    await expect(page).toHaveURL(new RegExp(`/app/account/security\\?next=${encodeURIComponent(`/app/${co.slug}`)}`));
   });
 
   test("an admin at aal2 can remove a factor, and is then asked to enrol again", async ({ page, company, signInAs, land }) => {
