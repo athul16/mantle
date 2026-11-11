@@ -5,7 +5,7 @@ import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
 import type { AttemptRow } from "@/lib/candidate/invite";
 import type { CandidateSession } from "@/lib/candidate/session";
-import { readRetentionDays } from "@/lib/retention/policy";
+import { readRetention } from "@/lib/retention/policy";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   CONSENT_SIGNAL,
@@ -38,7 +38,8 @@ export async function getProctoringSettings(session: CandidateSession): Promise<
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
-  return { ...readProctoring(assessment.data.proctoring), retentionDays: readRetentionDays(org.data.settings) };
+  const { mediaDays, resultsDays } = readRetention(org.data.settings);
+  return { ...readProctoring(assessment.data.proctoring), mediaRetentionDays: mediaDays, resultsRetentionDays: resultsDays };
 }
 
 // ---------------------------------------------------------------------------
