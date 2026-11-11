@@ -74,6 +74,7 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
                   <th className="px-4 py-2 font-medium">Email</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Invited</th>
+                  <th className="px-4 py-2 font-medium">Last sent</th>
                   <th className="px-4 py-2 font-medium">Expires</th>
                   {canManage ? <th className="px-4 py-2 font-medium"><span className="sr-only">Actions</span></th> : null}
                 </tr>
@@ -89,6 +90,10 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
                       <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_STYLES[i.status]}`}>{i.status}</span>
                     </td>
                     <td className="px-4 py-2"><LocalDate iso={i.sentAt} /></td>
+                    <td className="px-4 py-2">
+                      <LocalDate iso={i.lastSentAt} />
+                      {i.sentCount > 1 ? <span className="ml-1 text-xs text-neutral-500">({i.sentCount} sends)</span> : null}
+                    </td>
                     <td className="px-4 py-2"><LocalDate iso={i.expiresAt} /></td>
                     {canManage ? (
                       <td className="px-4 py-2 text-right">

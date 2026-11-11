@@ -144,6 +144,9 @@ export type InviteRow = {
   candidateName: string | null;
   status: InviteStatus;
   sentAt: string;
+  /** When the link was last emailed (first send or latest resend). */
+  lastSentAt: string;
+  sentCount: number;
   expiresAt: string;
 };
 
@@ -151,7 +154,7 @@ export async function listInvites(orgId: string, jobId: string): Promise<InviteR
   const db = await createClient();
   const { data, error } = await db
     .from("invites")
-    .select("id, email, candidate_name, status, created_at, expires_at")
+    .select("id, email, candidate_name, status, created_at, last_sent_at, sent_count, expires_at")
     .eq("org_id", orgId)
     .eq("job_id", jobId)
     .order("created_at", { ascending: false })
@@ -164,6 +167,8 @@ export async function listInvites(orgId: string, jobId: string): Promise<InviteR
     candidateName: i.candidate_name,
     status: displayStatus(i.status, i.expires_at, now),
     sentAt: i.created_at,
+    lastSentAt: i.last_sent_at,
+    sentCount: i.sent_count,
     expiresAt: i.expires_at,
   }));
 }
