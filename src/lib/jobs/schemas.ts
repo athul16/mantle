@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { EXTRA_TIME_PERCENTS } from "@/lib/accommodations";
 
 // Form schemas for the jobs area. Checkboxes arrive as "on" or not at all.
 
@@ -49,6 +50,15 @@ export const inviteBatchSchema = z.object({
 });
 
 export const inviteActionSchema = z.object({ orgId: z.uuid(), inviteId: z.uuid() });
+
+/** D9: extra time as a percent of the time limit, and monitoring waivers. */
+export const accommodationsSchema = inviteActionSchema.extend({
+  extraTimePercent: z.coerce
+    .number()
+    .refine((n) => (EXTRA_TIME_PERCENTS as readonly number[]).includes(n), { error: "Pick +0%, +25%, +50% or +100%." }),
+  waiveCamera: checkbox,
+  waiveScreen: checkbox,
+});
 
 export type Proctoring = { camera: boolean; screen: boolean };
 

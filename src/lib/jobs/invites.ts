@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Accommodations } from "@/lib/accommodations";
 import type { Database } from "@/lib/database.types";
 import { sendEmail } from "@/lib/email";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -264,6 +265,35 @@ export async function resendInvite(args: { db: Db; orgId: string; orgName: strin
   } catch (err) {
     console.error("invite email failed", { inviteId, message: err instanceof Error ? err.message : String(err) });
     throw new InviteError(`A new link was created but the email to ${invite.email} failed. Try resending again.`);
+  }
+  return { email: invite.email };
+}
+
+/**
+ * Sets an invite's accommodations (D9): extra time and camera / screen
+ * waivers. Goes through set_invite_accommodations(), which checks the caller
+ * manages the invite's company, refuses once the candidate has started, and
+ * writes the audit log; the table has no write policies of its own.
+ */
+export async function setAccommodations(args: {
+  db: Db;
+  orgId: string;
+  inviteId: string;
+  accommodations: Accommodations;
+}): Promise<{ email: string }> {
+  const { db, orgId, inviteId, accommodations: a } = args;
+  const invite = await loadInvite(db, orgId, inviteId);
+  const { error } = await db.rpc("set_invite_accommodations", {
+    p_invite_id: inviteId,
+    p_extra_time_percent: a.extraTimePercent,
+    p_waive_camera: a.waiveCamera,
+    p_waive_screen: a.waiveScreen,
+  });
+  if (error) {
+    if (error.code === "55000") throw new InviteError("The candidate has started, so accommodations can no longer change.");
+    if (error.code === "42501") throw new InviteError("You don't have permission to change accommodations.");
+    if (error.code === "22023") throw new InviteError("Pick +0%, +25%, +50% or +100% extra time.");
+    throw error;
   }
   return { email: invite.email };
 }

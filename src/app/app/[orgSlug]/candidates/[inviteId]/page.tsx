@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import * as z from "zod";
+import { applyWaivers, describeAccommodations, hasAccommodations, type Accommodations } from "@/lib/accommodations";
 import { requireOrgMembership, requireUser } from "@/lib/auth";
+import { getInviteAccommodations } from "@/lib/jobs/queries";
 import type { StepDetail } from "@/lib/results/answer-key";
 import { flagCounts, getFlagsForReport, getInviteProctoring, type FlagsReport } from "@/lib/proctoring/report";
 import { getCandidateReport, type CandidateReport } from "@/lib/results/queries";
@@ -34,10 +36,13 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
   const canReview = role === "admin" || role === "recruiter";
   const score = attempt?.score ?? null;
   const db = await createClient();
-  const [flags, proctoring] = await Promise.all([
+  const [flags, assessmentProctoring, accommodations] = await Promise.all([
     attempt ? getFlagsForReport(db, orgId, attempt.id) : Promise.resolve<FlagsReport>({ flags: [], canSeeMedia: false }),
     getInviteProctoring(db, orgId, inviteId),
+    getInviteAccommodations(orgId, inviteId),
   ]);
+  // What this candidate was actually monitored with (D9 waivers apply per invite).
+  const proctoring = applyWaivers(assessmentProctoring, accommodations);
 
   return (
     <div className="space-y-8">
@@ -54,7 +59,11 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
         </p>
       </div>
 
-      <Summary report={report} flags={attempt && attempt.status !== "not_started" ? flags : null} />
+      <Summary
+        report={report}
+        flags={attempt && attempt.status !== "not_started" ? flags : null}
+        accommodations={accommodations}
+      />
 
       {report.steps.length ? (
         <section className="space-y-4" aria-labelledby="tasks-heading">
@@ -122,7 +131,15 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
   );
 }
 
-function Summary({ report, flags }: { report: CandidateReport; flags: FlagsReport | null }) {
+function Summary({
+  report,
+  flags,
+  accommodations,
+}: {
+  report: CandidateReport;
+  flags: FlagsReport | null;
+  accommodations: Accommodations;
+}) {
   const { attempt } = report;
   const score = attempt?.score ?? null;
   const pass = report.assessment?.passScore ?? null;
@@ -176,6 +193,13 @@ function Summary({ report, flags }: { report: CandidateReport; flags: FlagsRepor
         </div>
       </dl>
       <p className="text-sm" role="status">{state}</p>
+      {hasAccommodations(accommodations) ? (
+        <p className="text-sm" data-testid="report-accommodations">
+          <span className="font-medium">Accommodations:</span>{" "}
+          {describeAccommodations(accommodations, report.assessment?.timeLimitMinutes).join(", ")}. Set by the hiring team before
+          the candidate started; logged in the audit log.
+        </p>
+      ) : null}
     </section>
   );
 }
