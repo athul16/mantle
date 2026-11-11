@@ -362,7 +362,9 @@ export type Database = {
           expires_at: string
           id: string
           job_id: string
+          last_sent_at: string
           org_id: string
+          sent_count: number
           status: string
         }
         Insert: {
@@ -373,7 +375,9 @@ export type Database = {
           expires_at: string
           id?: string
           job_id: string
+          last_sent_at?: string
           org_id: string
+          sent_count?: number
           status?: string
         }
         Update: {
@@ -384,7 +388,9 @@ export type Database = {
           expires_at?: string
           id?: string
           job_id?: string
+          last_sent_at?: string
           org_id?: string
+          sent_count?: number
           status?: string
         }
         Relationships: [

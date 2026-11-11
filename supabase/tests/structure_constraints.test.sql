@@ -86,6 +86,7 @@ select set_eq(
        ('memberships',   'memberships_role_check'),
        ('assessments',   'assessments_time_limit_minutes_check'),
        ('invites',       'invites_status_check'),
+       ('invites',       'invites_sent_count_positive'),
        ('attempts',      'attempts_status_check'),
        ('attempts',      'attempts_submit_reason_check'),
        ('attempts',      'attempts_integrity_label_check'),
@@ -108,6 +109,7 @@ select set_eq(
        ('jobs_org_idx',                 'CREATE INDEX jobs_org_idx ON public.jobs USING btree (org_id)'),
        ('invites_org_job_idx',          'CREATE INDEX invites_org_job_idx ON public.invites USING btree (org_id, job_id)'),
        ('invites_expires_at_idx',       'CREATE INDEX invites_expires_at_idx ON public.invites USING btree (expires_at)'),
+       ('invites_job_email_live_key',   'CREATE UNIQUE INDEX invites_job_email_live_key ON public.invites USING btree (job_id, lower(email)) WHERE (status = ANY (ARRAY[''invited''::text, ''started''::text, ''completed''::text]))'),
        ('attempts_org_idx',             'CREATE INDEX attempts_org_idx ON public.attempts USING btree (org_id)'),
        ('attempts_open_deadline_idx',   'CREATE INDEX attempts_open_deadline_idx ON public.attempts USING btree (deadline_at) WHERE (status = ''in_progress''::text)'),
        ('action_events_attempt_idx',    'CREATE INDEX action_events_attempt_idx ON public.action_events USING btree (attempt_id, at)'),
@@ -119,9 +121,9 @@ select set_eq(
   'secondary indexes (org lookups, per-attempt timelines, open-deadline sweep)'
 );
 
--- Foreign keys whose first column doesn't lead any index. These four are
--- known and covered well enough (invites by (org_id, job_id); the rest are
--- rare parent deletes). A new foreign key without an index shows up here.
+-- Foreign keys whose first column doesn't lead any index. These three are
+-- known and covered well enough (rare parent deletes). invites (job_id, org_id)
+-- is led by invites_job_email_live_key. A new foreign key without an index shows up here.
 select set_eq(
   $$ select c.conname::text
        from pg_constraint c
@@ -130,7 +132,7 @@ select set_eq(
         and not exists (select 1 from pg_index i
                          where i.indrelid = c.conrelid and i.indkey[0] = c.conkey[1]) $$,
   $$ values ('assessments_scenario_id_fkey'), ('attempts_scenario_id_fkey'),
-            ('jobs_assessment_id_org_id_fkey'), ('invites_job_id_org_id_fkey') $$,
+            ('jobs_assessment_id_org_id_fkey') $$,
   'no new foreign key without a leading index'
 );
 
