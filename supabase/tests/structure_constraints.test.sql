@@ -82,7 +82,7 @@ select set_eq(
   $$ values
        ('organizations', 'organizations_name_check'),
        ('organizations', 'organizations_slug_format'),
-       ('organizations', 'organizations_retention_days_range'),
+       ('organizations', 'organizations_retention_range'),
        ('memberships',   'memberships_role_check'),
        ('assessments',   'assessments_time_limit_minutes_check'),
        ('invites',       'invites_status_check'),

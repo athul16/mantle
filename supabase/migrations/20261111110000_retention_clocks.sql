@@ -69,6 +69,8 @@ as $$
     end;
 $$;
 revoke all on function private.retention_settings_valid(jsonb) from public, anon;
+-- The check constraint runs as whoever writes the row.
+grant execute on function private.retention_settings_valid(jsonb) to authenticated, service_role;
 
 alter table public.organizations
   add constraint organizations_retention_range check (private.retention_settings_valid(settings));
