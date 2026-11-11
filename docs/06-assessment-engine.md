@@ -61,7 +61,7 @@ It produces the numbers (bank balance, check amounts, NSF amount) **and** the an
 ## Scoring and labels
 
 1. On submit or timeout, score every step server-side.
-2. Rubric steps get AI scores per criterion with reasoning; marked `needsReview`.
+2. Rubric steps are marked `needsReview` for a person. AI scores per criterion with reasoning are computed after submit in shadow mode only (see "AI rubric scoring" below).
 3. Compute integrity label from events and snapshot analysis (see `02-security-and-integrity.md`).
 4. Store results; notify the company.
 
@@ -94,7 +94,7 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 | Type | Candidate sees | Answer | Scoring |
 | --- | --- | --- | --- |
 | `numeric` | Prompt, unit | `{ value }` | Full within `tolerance`, half within `partialTolerance`, else 0 |
-| `inbox_reply` | Prompt, to, subject, character limit | `{ body }` (≤ 20,000 chars) | Rubric criteria with guidance and per-variant reference notes. No AI scorer wired yet: a written reply scores 0 provisional points with `needsReview`; a blank one is final at 0 |
+| `inbox_reply` | Prompt, to, subject, character limit | `{ body }` (≤ 20,000 chars) | Rubric criteria with guidance and per-variant reference notes. A written reply scores 0 provisional points with `needsReview` and a person marks it; a blank one is final at 0. An AI scorer runs in shadow mode only (below) |
 | `spreadsheet` | Grid of read-only cells and number input cells | `{ cells: { id: number \| null } }` | Each keyed cell full within its tolerance, else 0. Input cells not in the key are scratch |
 | `journal_entry` | Prompt, chart of accounts (code + name), entry and line limits; running totals and a "Balanced / Out of balance by" check per entry | `{ entries: [{ memo, lines: [{ account, debit, credit }] }] }` | See below |
 | `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision | `{ flags: [{ target, reason, note }], decision }`, one flag per item | See below |
@@ -115,6 +115,18 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 - Flags on ids that aren't in the document are ignored.
 
 Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`) are skipped.
+
+### AI rubric scoring, shadow mode (decision D8)
+
+After a submit (candidate or timeout), each non-blank `inbox_reply` is scored by Claude Sonnet 5.5 (`claude-sonnet-5-5`) against the same criteria, guidance and reference facts a reviewer sees. The result is **never shown to anyone and never used in a score**: it goes to `ai_shadow_scores`, which only the service role can read, so AI and human scores can be compared before deciding whether to show AI suggestions (D8 option C).
+
+- Code: `src/lib/engine/step-types/inbox_reply/ai-scorer.ts` (prompt, structured output, clamping through `applyRubricResults`), `src/lib/engine/server/rubric-requests.ts` (rubric requests rebuilt from the seed), `src/lib/candidate/shadow-score.ts` (runs it and stores the rows).
+- When: scheduled with Next's `after()` from the submit path (decision E6), so it runs after the response. It never blocks or fails a submission: every error is caught and logged, without candidate content.
+- Key: `ANTHROPIC_API_KEY` (server only). Without it the scorer logs and skips. Tests remove the key and use a fake client; they never call the API.
+- Each row stores the model id, `prompt_version` (bump `PROMPT_VERSION` whenever the prompt, schema or request settings change), per-criterion `earned` / `max` / `reasoning`, status (`scored` or `failed`, with `stop_reason` and `error`), token usage and duration. One row per attempt, step, model and prompt version; a re-run skips steps already stored.
+- No server-side fallback model is configured: a refusal is stored as `failed` rather than scored by a different model, which would mix models in the agreement data.
+- Comparison, in the Supabase SQL editor: `select * from private.ai_shadow_agreement order by step_id, criterion_id;` gives, per model, prompt version, step and criterion, how many replies were AI-scored and compared with a reviewed human score, the means, the mean absolute difference, the exact-agreement rate and the share within a quarter of the criterion's points. `private.ai_shadow_criterion_scores` has the row-level pairs with the AI's reasoning. Both views are in `private`, which the API doesn't expose, and only the owner and service role can select from them.
+- Retention: rows cascade with the attempt, so candidate deletion and retention purges remove them.
 
 ### Demo scenarios
 
