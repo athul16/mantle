@@ -298,8 +298,11 @@ describe("attempt", () => {
     const row = await attemptRow(c.attemptId);
     expect(row).toMatchObject({ status: "scored", submit_reason: "candidate" });
     expect(row.score).toMatchObject({ points: 2, maxPoints: 4 });
-    const response = must(await service.from("step_responses").select("score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
+    const response = must(await service.from("step_responses").select("score, auto_score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
     expect(response.score).toMatchObject({ points: 2, maxPoints: 2 });
+    // The automatic score is stored next to the final one (D11).
+    expect(response.auto_score).toEqual(response.score);
+    expect(must(await service.from("attempts").select("auto_score").eq("id", c.attemptId).single()).auto_score).toEqual(row.score);
     expect(must(await service.from("invites").select("status").eq("id", c.inviteId).single()).status).toBe("completed");
 
     // Done means done: no more saves, no new code.

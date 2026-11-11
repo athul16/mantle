@@ -283,8 +283,11 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
 
 /**
  * Scores every step on the server and stores per-step scores on
- * step_responses and the total on attempts. Safe to re-run: a crash between
- * "submitted" and "scored" is finished by the next request.
+ * step_responses and the total on attempts, twice: as `score` (the final
+ * score, which reviewers may change later) and as `auto_score` (kept as
+ * computed; a trigger refuses to change it). Safe to re-run: a crash between
+ * "submitted" and "scored" is finished by the next request, and scoring is
+ * deterministic, so auto_score gets the same value again.
  */
 async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
   const { attempt, invite } = session;
@@ -300,7 +303,7 @@ async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
     Object.keys(answers).map((stepId) =>
       db
         .from("step_responses")
-        .update({ score: (score.steps[stepId] ?? null) as unknown as Json })
+        .update({ score: (score.steps[stepId] ?? null) as unknown as Json, auto_score: (score.steps[stepId] ?? null) as unknown as Json })
         .eq("attempt_id", attempt.id)
         .eq("org_id", attempt.org_id)
         .eq("step_id", stepId),
@@ -311,7 +314,7 @@ async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
   const [attemptUpdate, inviteUpdate] = await Promise.all([
     db
       .from("attempts")
-      .update({ score: score as unknown as Json, status: "scored" })
+      .update({ score: score as unknown as Json, auto_score: score as unknown as Json, status: "scored" })
       .eq("id", attempt.id)
       .eq("org_id", attempt.org_id)
       .in("status", ["submitted", "scored"]),

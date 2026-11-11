@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import * as z from "zod";
 import { requireOrgMembership, requireUser } from "@/lib/auth";
-import type { StepDetail } from "@/lib/results/answer-key";
 import { flagCounts, getFlagsForReport, getInviteProctoring, type FlagsReport } from "@/lib/proctoring/report";
 import { getCandidateReport, type CandidateReport } from "@/lib/results/queries";
 import { VOTE_LABELS } from "@/lib/results/schemas";
@@ -125,6 +124,8 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
 function Summary({ report, flags }: { report: CandidateReport; flags: FlagsReport | null }) {
   const { attempt } = report;
   const score = attempt?.score ?? null;
+  const autoScore = attempt?.autoScore ?? null;
+  const showAuto = !!score && !!autoScore && autoScore.points !== score.points;
   const pass = report.assessment?.passScore ?? null;
   const percent = score ? scorePercent(score.points, score.maxPoints) : null;
 
@@ -155,6 +156,11 @@ function Summary({ report, flags }: { report: CandidateReport; flags: FlagsRepor
               {pass !== null ? ` · pass ${pass}%` : ""}
             </dd>
           ) : null}
+          {showAuto && autoScore ? (
+            <dd className={`text-xs tabular-nums ${muted}`} data-testid="auto-score">
+              automatic before review: {autoScore.points} / {autoScore.maxPoints}
+            </dd>
+          ) : null}
         </div>
         <div>
           <dt className={`text-xs uppercase ${muted}`}>Time taken</dt>
@@ -180,8 +186,20 @@ function Summary({ report, flags }: { report: CandidateReport; flags: FlagsRepor
   );
 }
 
-function StepCard({ step, orgId, attemptId, canReview }: { step: StepDetail; orgId: string; attemptId: string; canReview: boolean }) {
+function StepCard({
+  step,
+  orgId,
+  attemptId,
+  canReview,
+}: {
+  step: CandidateReport["steps"][number];
+  orgId: string;
+  attemptId: string;
+  canReview: boolean;
+}) {
   const s = step.score;
+  // The automatic score is worth showing once a reviewer has changed it (D11).
+  const auto = s?.review && step.autoScore ? step.autoScore : null;
   const reviewable = !!s && (s.needsReview === true || !!s.review);
   const hasAnswerColumn = step.rows.some((r) => r.answer !== "");
 
@@ -197,6 +215,11 @@ function StepCard({ step, orgId, attemptId, canReview }: { step: StepDetail; org
           {s?.review ? (
             <span className={`ml-2 text-xs ${muted}`}>
               reviewed <LocalDate iso={s.review.at} />
+            </span>
+          ) : null}
+          {auto ? (
+            <span className={`ml-2 text-xs ${muted}`} data-testid={`auto-score-${step.id}`}>
+              automatic {auto.points} / {auto.maxPoints}
             </span>
           ) : null}
         </span>

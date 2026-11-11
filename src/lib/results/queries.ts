@@ -14,6 +14,7 @@ import {
   stepsNeedingReview,
   type ResultRow,
   type StoredAttemptScore,
+  type StoredStepScore,
   type TimelineEntry,
 } from "./summary";
 
@@ -30,6 +31,7 @@ type AttemptRow = {
   submitted_at: string | null;
   submit_reason: string | null;
   score: unknown;
+  auto_score?: unknown;
 };
 
 // attempts.invite_id is unique, but PostgREST may still embed it as an array.
@@ -94,9 +96,11 @@ export type CandidateReport = {
     submitReason: string | null;
     timeTakenSeconds: number | null;
     score: StoredAttemptScore | null;
+    /** The score as computed at submit, before any reviewer marks (D11). */
+    autoScore: StoredAttemptScore | null;
     needsReview: string[];
   } | null;
-  steps: StepDetail[];
+  steps: (StepDetail & { autoScore: StoredStepScore | null })[];
   timeline: TimelineEntry[];
   notes: ReportNote[];
 };
@@ -106,7 +110,7 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
   const { data: invite, error } = await db
     .from("invites")
     .select(
-      "id, email, candidate_name, status, created_at, expires_at, jobs(id, title, assessments(title, time_limit_minutes, pass_score)), attempts(id, status, started_at, submitted_at, submit_reason, score, scenario_id)",
+      "id, email, candidate_name, status, created_at, expires_at, jobs(id, title, assessments(title, time_limit_minutes, pass_score)), attempts(id, status, started_at, submitted_at, submit_reason, score, auto_score, scenario_id)",
     )
     .eq("org_id", orgId)
     .eq("id", inviteId)
@@ -149,18 +153,20 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
   for (const r of [scenarioRow, responses, events, notes]) if (r.error) throw r.error;
 
   const score = attempt.status === "scored" ? readAttemptScore(attempt.score) : null;
+  const autoScore = attempt.status === "scored" ? readAttemptScore(attempt.auto_score) : null;
   const definition = (scenarioRow.data?.definition ?? null) as ScenarioDefinition | null;
   const answers = Object.fromEntries((responses.data ?? []).map((r) => [r.step_id, r.answer as unknown]));
 
   // Answer keys only for submitted attempts; never while the candidate is still working.
-  let steps: StepDetail[] = [];
+  let steps: CandidateReport["steps"] = [];
   if (scenarioRow.data && (attempt.status === "submitted" || attempt.status === "scored")) {
     const seed = await attemptSeed(orgId, attempt.id);
     const scenario = getScenario(scenarioRow.data.slug, scenarioRow.data.version);
     const variant = seed ? scenario.generate(seed) : null;
-    steps = scenario.definition.steps.map((step) =>
-      describeStep(step, variant, answers[step.id], score?.steps[step.id] ?? null),
-    );
+    steps = scenario.definition.steps.map((step) => ({
+      ...describeStep(step, variant, answers[step.id], score?.steps[step.id] ?? null),
+      autoScore: autoScore?.steps[step.id] ?? null,
+    }));
   }
 
   const stepTitles = Object.fromEntries((definition?.steps ?? []).map((s) => [s.id, s.title]));
@@ -176,6 +182,7 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
       submitReason: attempt.submit_reason,
       timeTakenSeconds: durationSeconds(attempt.started_at, attempt.submitted_at),
       score,
+      autoScore,
       needsReview: stepsNeedingReview(score),
     },
     steps,

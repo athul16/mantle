@@ -141,6 +141,7 @@ Changes from the original draft:
 - `invites.candidate_name`, `invites.created_by`; `attempts.scenario_id`, `attempts.submit_reason`; `assessments.title`, `assessments.pass_score`.
 - Triggers: published scenarios can't be edited; an assessment's time limit, proctoring, and scenario lock once a candidate starts.
 - Role-check helpers live in a `private` schema the API doesn't expose.
+- `attempts.auto_score` and `step_responses.auto_score` (decision D11): the score as the server computed it at submit. `score` is the final score, which a rubric review (`review_rubric_step`) changes; `auto_score` never changes once written (a trigger refuses). Rows from before the change were backfilled: a reviewed rubric step's automatic score is the same step with every criterion back at 0 and `needsReview`, which is what `inbox_reply` always produces. The candidate report shows the automatic score next to the final one once a reviewer has changed it.
 
 Original draft table list (still accurate for the main columns):
 
