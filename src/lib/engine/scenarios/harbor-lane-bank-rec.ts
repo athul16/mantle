@@ -16,7 +16,7 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  * material, so the rec always ties. Derived figures (adjusted balance, the
  * check-error amount) exist only in the keys.
  *
- * Differences from docs/07 forced by the current step types:
+ * Differences from docs/07, accepted for v1 (decision D10, 2026-11-10):
  * - The workbook is one spreadsheet grid, not four tabs: bank statement and GL
  *   are read-only sections above the reconciliation, and journal entries are
  *   their own step. Candidates can't insert rows.
@@ -31,13 +31,17 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  *   "missed update" label.
  * - The reply rubric needs a reviewer (no AI scorer yet), so a perfect attempt
  *   shows 60 automatic points until the reply is marked.
- * - Emails can't greet the candidate by first name; the engine doesn't have it.
  * - Accounts payable is accepted for the check-error entry without the
  *   explanation docs/07 asks for: the journal step can't read the memo.
  * - Process signals (time to open the minute-12 email, rec edits afterwards)
  *   come from attempt events, not the scenario.
- * - docs/07 dates the NSF return (10/20) before the deposit that held the
- *   bakery's check (10/22); here the check was in the 10/12 deposit.
+ *
+ * Fixed under D10 (v1 was never published, so v1 itself changed):
+ * - Dana's first email greets the candidate by first name ({{first_name}},
+ *   from the name they gave when verifying; "Hi there," without one).
+ * - The bakery's check is in the 10/22 deposit as docs/07 says, and the bank
+ *   returns it NSF on 10/24, after that deposit. docs/07 had the return on
+ *   10/20, before the deposit; docs/07 now says 10/24 too.
  */
 
 const ACCOUNTS = [
