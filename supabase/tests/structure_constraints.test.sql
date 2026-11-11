@@ -52,7 +52,10 @@ select set_eq(
        ('notes',            'attempt_id,org_id', 'attempts',        'id,org_id', 'c'),
        ('notes',            'author_id',         'auth.users',      'id',        'a'),
        ('audit_log',        'org_id',            'organizations',   'id',        'c'),
-       ('audit_log',        'actor_id',          'auth.users',      'id',        'a') $$,
+       ('audit_log',        'actor_id',          'auth.users',      'id',        'a'),
+       ('invite_accommodations', 'org_id',           'organizations', 'id',        'c'),
+       ('invite_accommodations', 'invite_id,org_id', 'invites',       'id,org_id', 'c'),
+       ('invite_accommodations', 'set_by',           'auth.users',    'id',        'n') $$,
   'foreign keys: columns, targets and on-delete behaviour'
 );
 
@@ -83,6 +86,8 @@ select set_eq(
        ('organizations', 'organizations_name_check'),
        ('organizations', 'organizations_slug_format'),
        ('organizations', 'organizations_retention_days_range'),
+       ('organizations', 'organizations_contact_email_format'),
+       ('invite_accommodations', 'invite_accommodations_extra_time_percent_check'),
        ('memberships',   'memberships_role_check'),
        ('assessments',   'assessments_time_limit_minutes_check'),
        ('invites',       'invites_status_check'),
@@ -117,7 +122,8 @@ select set_eq(
        ('media_attempt_idx',            'CREATE INDEX media_attempt_idx ON public.media USING btree (attempt_id, at)'),
        ('flags_attempt_idx',            'CREATE INDEX flags_attempt_idx ON public.flags USING btree (attempt_id)'),
        ('notes_attempt_idx',            'CREATE INDEX notes_attempt_idx ON public.notes USING btree (attempt_id)'),
-       ('audit_log_org_idx',            'CREATE INDEX audit_log_org_idx ON public.audit_log USING btree (org_id, at DESC)') $$,
+       ('audit_log_org_idx',            'CREATE INDEX audit_log_org_idx ON public.audit_log USING btree (org_id, at DESC)'),
+       ('invite_accommodations_org_idx', 'CREATE INDEX invite_accommodations_org_idx ON public.invite_accommodations USING btree (org_id)') $$,
   'secondary indexes (org lookups, per-attempt timelines, open-deadline sweep)'
 );
 

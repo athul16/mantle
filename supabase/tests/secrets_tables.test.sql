@@ -71,8 +71,9 @@ select set_eq(
   $$ select p.proname::text from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef $$,
   $$ values ('create_organization'), ('review_rubric_step'), ('set_retention_days'), ('delete_candidate_data'),
-            ('list_candidates_past_retention'), ('purge_candidate_for_retention') $$,
-  'only the known security definer functions are in public (signup, rubric review, retention)'
+            ('list_candidates_past_retention'), ('purge_candidate_for_retention'),
+            ('set_invite_accommodations'), ('set_contact_email') $$,
+  'only the known security definer functions are in public (signup, rubric review, retention, accommodations, contact email)'
 );
 -- private.purge_candidate deletes a candidate's secret rows (retention); it
 -- never reads or returns them.

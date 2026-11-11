@@ -46,7 +46,8 @@ select functions_are('private',
   'private has exactly the expected functions');
 select functions_are('public',
   array['create_organization', 'prevent_locked_assessment_edits', 'prevent_published_scenario_edits', 'review_rubric_step',
-        'set_retention_days', 'delete_candidate_data', 'list_candidates_past_retention', 'purge_candidate_for_retention'],
+        'set_retention_days', 'delete_candidate_data', 'list_candidates_past_retention', 'purge_candidate_for_retention',
+        'set_invite_accommodations', 'set_contact_email'],
   'public has exactly the expected functions (role helpers are not in the API schema)');
 
 select is(

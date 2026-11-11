@@ -24,7 +24,7 @@ $$;
 
 select tables_are(
   'public',
-  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log'],
+  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'invite_accommodations'],
   'public has exactly the expected tables'
 );
 

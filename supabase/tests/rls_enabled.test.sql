@@ -49,6 +49,7 @@ select set_eq(
        ('flags',            'members read flags',                'SELECT', 'PERMISSIVE'),
        ('flags',            'managers review flags',             'UPDATE', 'PERMISSIVE'),
        ('notes',            'members read notes',                'SELECT', 'PERMISSIVE'),
+       ('invite_accommodations', 'members read accommodations',  'SELECT', 'PERMISSIVE'),
        ('notes',            'members add own notes',             'INSERT', 'PERMISSIVE'),
        ('notes',            'authors edit own notes',            'UPDATE', 'PERMISSIVE'),
        ('notes',            'authors delete own notes',          'DELETE', 'PERMISSIVE'),
@@ -94,7 +95,7 @@ select set_eq(
                          where p.schemaname = 'public' and p.tablename = c.relname
                            and p.cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')) $$,
   $$ values ('invite_secrets'), ('attempt_secrets'), ('attempts'), ('step_responses'),
-            ('action_events'), ('integrity_events'), ('media') $$,
+            ('action_events'), ('integrity_events'), ('media'), ('invite_accommodations') $$,
   'candidate data has no write policy: only the server (service role) writes it'
 );
 
