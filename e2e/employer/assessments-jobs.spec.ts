@@ -90,7 +90,9 @@ test("a recruiter creates a job and its invites expire at the deadline", async (
   await page.getByRole("button", { name: "Send invites" }).click();
   await expect(page.getByText("Invited 1 candidate.")).toBeVisible();
   const invite = page.getByRole("row").filter({ hasText: email });
-  await expect(invite.getByRole("cell").nth(3)).toHaveText(shortDate(deadline));
+  // Columns: email, status, invited, last sent, expires.
+  await expect(invite.getByRole("cell").nth(3)).toHaveText(shortDate(new Date()));
+  await expect(invite.getByRole("cell").nth(4)).toHaveText(shortDate(deadline));
 });
 
 test("a job whose deadline has passed takes no new invites", async ({ page, data, company, signInAs }) => {
