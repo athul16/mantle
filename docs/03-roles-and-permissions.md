@@ -17,6 +17,8 @@ Roles are per organization, stored as `memberships.role` (`admin` | `recruiter` 
 | Proctoring settings per assessment | ✓ | ✓ | |
 | Create jobs, configure assessments | ✓ | ✓ | |
 | Invite candidates, reminders, extend deadlines | ✓ | ✓ | |
+| Per-invite accommodations (extra time, camera / screen waiver) | ✓ | ✓ | |
+| Candidate contact email (shown to candidates) | ✓ | | |
 | Advance or reject candidates | ✓ | ✓ | |
 | Confirm or clear suspicious flags | ✓ | ✓ | |
 | Export results (CSV, PDF) | ✓ | ✓ | |
