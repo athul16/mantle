@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { CLIENT_EVENT_KINDS, type ClientEventKind } from "./config";
 import { ATTEMPT_COLUMNS, type AttemptRow } from "./invite";
 import { loadScenario } from "./scenario";
+import { scheduleShadowScoring } from "./shadow-score";
 import type { CandidateSession } from "./session";
 
 /**
@@ -279,6 +280,8 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
 
   await addEvent(attempt, "submitted_attempt", { reason });
   await scoreAndStore(session);
+  // D8 shadow mode: AI rubric scores, stored server-side only, after the response.
+  scheduleShadowScoring(attempt);
 }
 
 /**
