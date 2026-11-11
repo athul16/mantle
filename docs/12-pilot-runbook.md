@@ -21,8 +21,9 @@ Check: Resend → Emails shows a delivered message after the smoke test in step 
 1. Upgrade the organization to **Pro** (Billing). Pro removes the 7-day inactivity pause and gives daily backups.
 2. Authentication → URL Configuration:
    - **Site URL**: `APP`
-   - **Redirect URLs**: `APP/auth/callback`, `APP/auth/confirm`, `APP/auth/set-password`. Add `http://localhost:3000/**` only if you still sign in to the cloud project from local dev.
-3. Authentication → Sign In / Providers: email confirmations on. Admin MFA is covered by the admin MFA work; turn it on for every admin before inviting the pilot.
+   - **Redirect URLs**: `APP/auth/confirm`, `APP/auth/set-password`. Add `http://localhost:3000/**` only if you still sign in to the cloud project from local dev.
+3. Authentication → Sign In / Providers: email confirmations on. Authentication → Multi-Factor: TOTP (authenticator app) enabled. Admins and recruiters are asked to set it up on first sign-in (viewers too if `viewers_see_media` is on).
+   - Authentication → Emails → Templates: paste `supabase/templates/invite.html` into **Invite user** and `supabase/templates/confirmation.html` into **Confirm signup** (subjects "You have been invited" and "Confirm your email"). Without them, links go through Supabase's own verify page, which link scanners can use up.
 4. Storage: the `proctoring` bucket must exist and be **private** (created by the migrations). `/api/health` reports `storage: false` if it is missing.
 5. Migrations: every file in `supabase/migrations/` is applied (`supabase migration list --linked` shows local and remote in step).
 
