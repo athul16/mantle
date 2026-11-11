@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { applyWaivers } from "@/lib/accommodations";
 import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
 import type { AttemptRow } from "@/lib/candidate/invite";
@@ -29,7 +30,11 @@ import { evaluateRules, integrityLabel, parseSignalBatch, type MediaRef, type Si
 type AttemptKey = Pick<AttemptRow, "id" | "org_id">;
 const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
 
-/** The assessment's camera / screen settings for this candidate. */
+/**
+ * The camera / screen settings for this candidate: the assessment's, minus any
+ * waiver set on the invite (D9; the assessment itself stays locked), plus what
+ * the monitoring notice shows (retention, company contact).
+ */
 export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
   const db = createServiceClient();
   const [assessment, org] = await Promise.all([
@@ -38,7 +43,11 @@ export async function getProctoringSettings(session: CandidateSession): Promise<
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
-  return { ...readProctoring(assessment.data.proctoring), retentionDays: readRetentionDays(org.data.settings) };
+  return {
+    ...applyWaivers(readProctoring(assessment.data.proctoring), session.invite.accommodations),
+    retentionDays: readRetentionDays(org.data.settings),
+    contactEmail: session.invite.contactEmail,
+  };
 }
 
 // ---------------------------------------------------------------------------

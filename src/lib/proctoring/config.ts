@@ -52,10 +52,14 @@ export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", 
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
 
 /** Version of the monitoring notice, stored with each consent. Change it when the text changes. */
-export const MONITORING_CONSENT_VERSION = "2026-11-10.retention";
+export const MONITORING_CONSENT_VERSION = "2026-11-11.contact";
 
-/** What the notice needs: what is captured, plus the org's retention (organizations.settings.retention_days). */
-export type MonitoringSettings = Proctoring & { retentionDays?: number };
+/**
+ * What the notice needs: what is captured (after any waiver for this
+ * candidate), the org's retention (organizations.settings.retention_days) and
+ * whom to ask about accommodations (organizations.settings.contact_email).
+ */
+export type MonitoringSettings = Proctoring & { retentionDays?: number; contactEmail?: string | null };
 
 /**
  * The monitoring notice on the system check: what is captured, why, who sees
@@ -72,7 +76,14 @@ export function monitoringNotice(settings: MonitoringSettings, companyName: stri
     `Why: so ${companyName} can trust that the work is yours. Only ${companyName}'s hiring team can see the photos and screenshots.`,
     "Unusual moments are marked for a person to check, with the matching photos. No one is rejected automatically.",
     `How long: kept for ${days} days after your assessment ends, then deleted. ${companyName} can delete it sooner on request. We don't use the photos to identify you.`,
+    accommodationLine(companyName, settings.contactEmail),
   ];
+}
+
+/** Whom to ask for extra time or to take the test without a camera or screen share (D9). */
+export function accommodationLine(companyName: string, contactEmail?: string | null): string {
+  const who = contactEmail ? `${companyName} at ${contactEmail}` : `${companyName}'s hiring team`;
+  return `Need extra time, or can't use a camera or share your screen? Contact ${who} before you start; they can adjust this for you.`;
 }
 
 function joinList(items: string[]): string {
