@@ -1,4 +1,4 @@
-/** Candidate report client forms: rubric review, add note, delete note. */
+/** Candidate report client forms: rubric review, votes, add note, delete note. */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ vi.mock("@/app/app/[orgSlug]/candidates/actions", () => ({
 }));
 
 const actions = await import("@/app/app/[orgSlug]/candidates/actions");
-const { RubricReviewForm, AddNoteForm, DeleteNoteButton } = await import("@/app/app/[orgSlug]/candidates/[inviteId]/report-forms");
+const { RubricReviewForm, AddNoteForm, DeleteNoteButton, VoteButtons } = await import("@/app/app/[orgSlug]/candidates/[inviteId]/report-forms");
 const reviewRubricStep = vi.mocked(actions.reviewRubricStep);
 const addNote = vi.mocked(actions.addNote);
 const deleteNote = vi.mocked(actions.deleteNote);
@@ -19,15 +19,16 @@ const deleteNote = vi.mocked(actions.deleteNote);
 beforeEach(() => vi.clearAllMocks());
 
 const criteria = [
-  { id: "timing", label: "Explains timing", max: 3, earned: 0 },
-  { id: "tone", label: "Tone", max: 2, earned: 0 },
+  { id: "timing", label: "Explains timing", lookFor: "Deposits in transit clear soon", max: 3, earned: 0, scored: false },
+  { id: "tone", label: "Tone", lookFor: "Plain language", max: 2, earned: 0, scored: false },
 ];
 
 describe("RubricReviewForm", () => {
   it("asks for points per criterion within each range", () => {
     render(<RubricReviewForm orgId="o" attemptId="a" stepId="reply" stepTitle="Reply to Marcus" criteria={criteria} reviewed={false} />);
     expect(screen.getByRole("form", { name: "Review Reply to Marcus" })).toBeVisible();
-    expect(screen.getByText("Enter rubric scores")).toBeVisible();
+    expect(screen.getByText("Look for: Deposits in transit clear soon")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save review" })).toBeVisible();
     const timing = screen.getByRole("spinbutton", { name: /Explains timing \(0–3\)/ });
     expect(timing).toHaveAttribute("min", "0");
     expect(timing).toHaveAttribute("max", "3");
@@ -46,7 +47,7 @@ describe("RubricReviewForm", () => {
         reviewed
       />,
     );
-    expect(screen.getByText("Change the rubric scores")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Update review" })).toBeVisible();
     expect(screen.getByRole("spinbutton", { name: /Explains timing/ })).toHaveValue(2.5);
   });
 
@@ -82,26 +83,37 @@ describe("RubricReviewForm", () => {
   });
 });
 
+describe("VoteButtons", () => {
+  it("saves a vote on its own and marks the current one", async () => {
+    const user = userEvent.setup();
+    addNote.mockResolvedValueOnce({ message: "Note added." });
+    render(<VoteButtons orgId="org-1" attemptId="att-1" myVote="unsure" />);
+    expect(screen.getByRole("button", { name: "Unsure" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Hire" })).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(screen.getByRole("button", { name: "Hire" }));
+    await waitFor(() => expect(formDataOf(addNote)).toEqual({ orgId: "org-1", attemptId: "att-1", body: "", vote: "hire" }));
+  });
+});
+
 describe("AddNoteForm", () => {
-  it("sends the note and vote", async () => {
+  it("sends the note", async () => {
     const user = userEvent.setup();
     addNote.mockResolvedValueOnce({ message: "Note added." });
     render(<AddNoteForm orgId="org-1" attemptId="att-1" />);
-    expect(screen.getByRole("radio", { name: "No vote" })).toBeChecked();
 
     await user.type(screen.getByRole("textbox", { name: "Add a note" }), "Strong reconciliation");
-    await user.click(screen.getByRole("radio", { name: "Hire" }));
-    await user.click(screen.getByRole("button", { name: "Add note" }));
+    await user.click(screen.getByRole("button", { name: "Post note" }));
 
     expect(await screen.findByText("Note added.")).toBeVisible();
-    expect(formDataOf(addNote)).toEqual({ orgId: "org-1", attemptId: "att-1", body: "Strong reconciliation", vote: "hire" });
+    expect(formDataOf(addNote)).toEqual({ orgId: "org-1", attemptId: "att-1", body: "Strong reconciliation" });
   });
 
   it("shows a validation error from the server", async () => {
     const user = userEvent.setup();
     addNote.mockResolvedValueOnce({ fieldErrors: { body: ["Write a note or pick a vote."] } });
     render(<AddNoteForm orgId="o" attemptId="a" />);
-    await user.click(screen.getByRole("button", { name: "Add note" }));
+    await user.click(screen.getByRole("button", { name: "Post note" }));
     expect(await screen.findByText("Write a note or pick a vote.")).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Add a note" })).toHaveAttribute("aria-invalid", "true");
   });

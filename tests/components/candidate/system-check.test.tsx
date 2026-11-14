@@ -1,5 +1,5 @@
-/** Candidate system check: desktop browser and screen size (camera and screen share: system-check-proctoring.test.tsx). */
-import { act, render, screen } from "@testing-library/react";
+/** Candidate system check: browser, screen size and connection (camera and screen share: system-check-proctoring.test.tsx). */
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,67 +23,80 @@ function setUserAgent(ua: string) {
   Object.defineProperty(navigator, "userAgent", { value: ua, configurable: true });
 }
 
+const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
+
 beforeEach(() => {
   setScreen(1440, 900);
   setMobile(undefined);
   setUserAgent(originalUa);
+  fetchMock.mockClear();
+  vi.stubGlobal("fetch", fetchMock);
 });
 afterEach(() => {
   setMobile(undefined);
   setUserAgent(originalUa);
+  vi.unstubAllGlobals();
 });
 
-const row = (label: string) => screen.getByText(label).closest("li")!;
+const row = (label: string) => screen.getAllByRole("listitem").find((li) => li.querySelector(".strong")?.textContent === label)!;
+const status = (label: string) => row(label).querySelector("[role=img]")!.getAttribute("aria-label");
+const continueLink = () => screen.queryByRole("link", { name: "Continue" });
 
 describe("SystemCheck", () => {
-  it("passes on a desktop with a big enough screen and links to the instructions", async () => {
+  it("passes on a desktop with a big enough screen and a connection, and links to the instructions", async () => {
+    setUserAgent("Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
     const SystemCheck = await load();
     render(<SystemCheck token="tok123" />);
-    expect(row("Desktop or laptop browser")).toHaveTextContent("OK");
-    expect(row("Screen at least 1024×600")).toHaveTextContent("OK");
-    expect(row("Screen at least 1024×600")).toHaveTextContent("Your screen: 1440×900");
-    expect(screen.getByRole("link", { name: "Continue to instructions" })).toHaveAttribute("href", "/a/tok123/instructions");
+    expect(status("Browser")).toBe("Passed");
+    expect(row("Browser")).toHaveTextContent("Chrome 130");
+    expect(status("Screen")).toBe("Passed");
+    expect(row("Screen")).toHaveTextContent("1440 × 900 · at least 1024 × 600 needed");
+    await waitFor(() => expect(status("Connection")).toBe("Passed"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.anything());
+    expect(screen.getByText("All set. You can continue.")).toBeVisible();
+    expect(continueLink()).toHaveAttribute("href", "/a/tok123/instructions");
   });
 
-  it("shows camera and screen share as not used when the assessment has no proctoring", async () => {
+  it("lists no camera, screen share or start photo when the assessment has no proctoring", async () => {
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Camera")).toHaveTextContent("Not used");
-    expect(row("Camera")).toHaveTextContent("Not used in this test.");
-    expect(row("Screen share")).toHaveTextContent("Not used in this test.");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.queryByText("Camera")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
   it("blocks a small screen", async () => {
     setScreen(800, 600);
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Screen at least 1024×600")).toHaveTextContent("Problem");
-    expect(row("Screen at least 1024×600")).toHaveTextContent("Your screen: 800×600");
-    expect(screen.queryByRole("link", { name: "Continue to instructions" })).not.toBeInTheDocument();
-    expect(screen.getByText("Fix the items above to continue.")).toBeVisible();
+    expect(status("Screen")).toBe("Problem");
+    expect(row("Screen")).toHaveTextContent("800 × 600");
+    await waitFor(() => expect(screen.getByText("Finish the remaining checks to continue")).toBeVisible());
+    expect(continueLink()).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
   it("blocks a screen that is too short", async () => {
     setScreen(1280, 599);
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Screen at least 1024×600")).toHaveTextContent("Problem");
+    expect(status("Screen")).toBe("Problem");
   });
 
   it("blocks a phone reported by userAgentData", async () => {
     setMobile(true);
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Desktop or laptop browser")).toHaveTextContent("Problem");
-    expect(screen.getByText("This test needs a computer. Please reopen the link on a desktop or laptop.")).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Continue to instructions" })).not.toBeInTheDocument();
+    expect(status("Browser")).toBe("Problem");
+    expect(row("Browser")).toHaveTextContent("Phones and tablets can't run the simulation. Reopen the link on a computer.");
+    expect(continueLink()).not.toBeInTheDocument();
   });
 
   it("falls back to the user agent string when userAgentData is missing", async () => {
     setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148");
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Desktop or laptop browser")).toHaveTextContent("Problem");
+    expect(status("Browser")).toBe("Problem");
   });
 
   it("trusts userAgentData over a mobile-looking user agent", async () => {
@@ -91,26 +104,35 @@ describe("SystemCheck", () => {
     setUserAgent("Mozilla/5.0 (Linux; Android 14) Mobile");
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(row("Desktop or laptop browser")).toHaveTextContent("OK");
+    expect(status("Browser")).toBe("Passed");
+  });
+
+  it("fails the connection check when our server can't be reached", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const SystemCheck = await load();
+    render(<SystemCheck token="t" />);
+    await waitFor(() => expect(status("Connection")).toBe("Problem"));
+    expect(continueLink()).not.toBeInTheDocument();
   });
 
   it("re-checks when the window is resized", async () => {
     setScreen(800, 600);
     const SystemCheck = await load();
     render(<SystemCheck token="t" />);
-    expect(screen.queryByRole("link", { name: "Continue to instructions" })).not.toBeInTheDocument();
+    await waitFor(() => expect(status("Connection")).toBe("Passed"));
+    expect(continueLink()).not.toBeInTheDocument();
     setScreen(1920, 1080);
     act(() => {
       window.dispatchEvent(new Event("resize"));
     });
-    expect(row("Screen at least 1024×600")).toHaveTextContent("Your screen: 1920×1080");
-    expect(screen.getByRole("link", { name: "Continue to instructions" })).toBeVisible();
+    expect(row("Screen")).toHaveTextContent("1920 × 1080");
+    expect(continueLink()).toBeVisible();
   });
 
   it("shows Checking… before the browser has run the checks (server render)", async () => {
     const SystemCheck = await load();
     const html = renderToString(<SystemCheck token="t" />);
     expect(html).toContain("Checking…");
-    expect(html).not.toContain("Continue to instructions");
+    expect(html).not.toContain("/instructions");
   });
 });

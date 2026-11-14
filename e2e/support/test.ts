@@ -109,6 +109,16 @@ export async function axeSerious(page: Page, testInfo: TestInfo, options: A11yOp
   expect(await page.title(), `page title on ${page.url()}`).not.toBe("");
   expect(await page.getAttribute("html", "lang"), "html lang").toBeTruthy();
   await expect(page.getByRole("main"), `one main landmark on ${page.url()}`).toHaveCount(1);
+  // Dialogs, menus and banners fade in (the prototype's "rise" animation); let finite animations
+  // finish so contrast is measured on the settled page. Spinners loop forever and are skipped.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const results = await builder.analyze();
   const blocking = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   await testInfo.attach(`axe ${new URL(page.url()).pathname}`, {

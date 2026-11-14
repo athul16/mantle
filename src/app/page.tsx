@@ -1,26 +1,31 @@
 import Link from "next/link";
+import { MantleMark } from "@/components/brand";
 
+// Public home. Not in the prototype; kept as a short pitch with the sign-in
+// and sign-up entry points, styled with the design system.
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8 px-6 py-24">
-      <div className="space-y-4">
-        <p className="text-sm font-medium uppercase tracking-wide text-neutral-500">Assessment Platform</p>
-        <h1 className="text-4xl font-semibold tracking-tight">See who can do the job before the interview.</h1>
-        <p className="text-lg text-neutral-600 dark:text-neutral-400">
-          Candidates spend 30 to 45 minutes on a realistic slice of the work: an inbox of requests, a reconciliation
-          that doesn&apos;t tie, a client asking a hard question. You get a ranked list with scores, evidence, and
-          integrity labels.
-        </p>
-        <p className="text-neutral-600 dark:text-neutral-400">Starting with accounting and pharmaceutical interns.</p>
-      </div>
-      <div className="flex gap-3">
-        <Link href="/signup" className="rounded-md bg-neutral-900 px-4 py-2 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900">
-          Create a company account
-        </Link>
-        <Link href="/login" className="rounded-md border border-neutral-300 px-4 py-2 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
-          Sign in
-        </Link>
-      </div>
-    </main>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
+      <header style={{ height: 56, display: "flex", alignItems: "center", gap: 16, padding: "0 24px", background: "#fff", borderBottom: "1px solid var(--line)" }}>
+        <MantleMark />
+        <span style={{ flex: 1 }} />
+        <Link href="/login" className="btn btn-ghost">Sign in</Link>
+      </header>
+      <main style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: "96px 24px", display: "flex", flexDirection: "column", gap: 28 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <span className="eyebrow">Work simulations for hiring</span>
+          <h1 style={{ fontSize: 44, lineHeight: 1.1 }}>See who can do the job before the interview.</h1>
+          <p className="ink2" style={{ fontSize: 17, lineHeight: 1.55 }}>
+            Candidates spend 30 to 45 minutes on a realistic slice of the work: an inbox of requests, a reconciliation that doesn&apos;t tie, a client asking a
+            hard question. You get a ranked list with scores, evidence, and integrity labels.
+          </p>
+          <p className="ink2">Starting with accounting and pharmaceutical interns.</p>
+        </div>
+        <div className="row g10">
+          <Link href="/signup" className="btn btn-primary btn-lg">Create a company account</Link>
+          <Link href="/login" className="btn btn-lg">Sign in</Link>
+        </div>
+      </main>
+    </div>
   );
 }

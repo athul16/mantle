@@ -56,4 +56,7 @@ Open and decided questions with research: `decisions/`. Build status: `10-progre
 | `08-roadmap-and-open-questions.md` | Phases, gates, open questions |
 | `09-go-to-market.md` | Accounting target firms, how they hire, pitch, outreach, contacts |
 | `10-progress.md` | What's built, what's left, stages to the MVP |
+| `11-testing.md` | How the app is tested, where each kind of test goes |
+| `12-pilot-runbook.md` | Running a pilot |
+| `13-design-system.md` | Mantle look and feel: the prototype, tokens, components, screen map |
 | `decisions/` | Decision briefs: background, options, recommendation, what was decided |

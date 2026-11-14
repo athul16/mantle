@@ -37,7 +37,8 @@ export async function completeMfaIfAsked(page: Page, user: SignInUser) {
 
 /** Types the current authenticator code into the form on the page and submits it. */
 export async function enterCode(page: Page, secret: string, button: string | RegExp = /^(Verify|Turn on two-factor)/) {
-  await page.getByLabel("6-digit code").fill(totpCode(secret));
+  // "Code" on the sign-in code page, "Enter the 6-digit code the app shows." when setting up.
+  await page.getByRole("textbox", { name: /code/i }).fill(totpCode(secret));
   await page.getByRole("button", { name: button }).click();
 }
 

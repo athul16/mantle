@@ -43,3 +43,16 @@ describe("LocalDate", () => {
     expect(renderToString(<LocalDate iso={ISO} />)).toContain("Nov 23, 2026<");
   });
 });
+
+describe("LocalDate short", () => {
+  it("shows month and day in the browser's zone", () => {
+    process.env.TZ = "Asia/Kolkata";
+    render(<LocalDate iso={ISO} short />);
+    expect(screen.getByText("Nov 24")).toHaveAttribute("datetime", ISO);
+  });
+
+  it("shows the UTC month and day on the server", () => {
+    process.env.TZ = "Asia/Kolkata";
+    expect(renderToString(<LocalDate iso={ISO} short />)).toContain(">Nov 23<");
+  });
+});

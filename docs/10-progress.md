@@ -2,7 +2,7 @@
 
 Where the phase 1 build stands. Update this file whenever a build step lands.
 
-_Last updated: 2026-11-10._
+_Last updated: 2026-11-12._
 
 ## Skeleton build order (from `08-roadmap-and-open-questions.md`)
 
@@ -35,7 +35,9 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 | `20261110120000_review_rubric_step` | `review_rubric_step`: a recruiter scores a rubric step, score and audit log updated |
 | `20261110160000_proctoring` | Private `proctoring` bucket (2 MB images), `private.can_view_media`, `flags.rule` and `flags.review_note`, reviewers may change only review columns |
 
-**Company side** (`/app/<slug>`): dashboard, jobs and job detail with invites (paste or CSV, resend, revoke), assessments, candidates results table, candidate report (answers vs expected, rubric review, flags with snapshots, notes and vote, timeline), team. Plus sign up, log in, onboarding, `/auth/*` callbacks and set password.
+**Look and feel.** Every screen follows the Mantle prototype (`docs/design/prototype.html`, see `13-design-system.md`). Prototype features the backend doesn't support yet are listed below under "Prototype features not built yet".
+
+**Company side** (`/app/<slug>`, opens on Jobs): jobs (create job dialog), job page with the candidates list, invite page (`/jobs/<id>/invite`: paste or CSV), resend and revoke, assessments library and configure screen, candidates results table, candidate report (answers vs expected, rubric review, flags with snapshots, notes and vote, timeline), team. Plus sign up, log in, onboarding, `/auth/*` callbacks and set password.
 
 **Candidate side** (`/a/<token>`): landing → `verify` (6-digit email code) → `check` (consent, camera, entire-screen share) → `instructions` → `workspace` → `review` → `done`. Server routes under `/api/candidate/*`: `code`, `verify`, `start`, `state`, `answer`, `event`, `submit`, and `proctoring/{consent,signals,upload,media}`.
 
@@ -46,6 +48,30 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
 **Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
+
+## Prototype features not built yet
+
+The prototype (`design/prototype.html`) shows these, but the backend doesn't support them, so the app leaves them out (no dead buttons, no made-up data). To build later:
+
+**Recruiter side**
+- Hiring stages: stage column and filter, stage select and Reject on the report, Board view, bulk Advance / Reject.
+- Messaging candidates (bulk, per row, from the report); reminders (manual, and "2 days before invites close"); extend one candidate's invite; "Invite again" after a revoke; who revoked and when.
+- Accommodations: the recruiter drawer (extra time %, no camera, no screen sharing, note) and the "+N min" badges everywhere.
+- Company profile: logo upload, a named candidate contact (shown on emails, landing, done and error pages), teammate display names, inviter name on set-password, resending a teammate invite, a Team step in onboarding.
+- Settings: "Let viewers see proctoring snapshots"; per-assessment "Who can see snapshots", extra-time toggle, phone side camera.
+- Assessments: preview as candidate, Build your own, pharmacy library, "New" badges and recruiter-facing descriptions.
+- Jobs: archived jobs, last activity, row actions menu, job owner.
+- Invite page: public link, editing the invite message, full email preview.
+- Export: PDF reports, snapshots, stage and notes columns, a server-side export logged with the user's name (CSV is built in the browser today); More filters; pagination.
+- Report: AI-suggested rubric scores with reasoning and "Accept AI", the one-line summary, score distribution curve (a strip of real scores is shown), PDF download, the submitted spreadsheet viewer, all-snapshots and full activity log pages, extra time / monitoring downtime / one device and IP rows. Analytics tab.
+
+**Candidate side**
+- Accommodation requests (links in the invite email, landing and verify; the request dialog), the no-webcam path and the approved no-camera option.
+- Pausing the clock while camera or screen sharing is down (open decision; today the clock keeps running).
+- Saving offline on the device; a Send button and sent state for replies, "Write a follow-up".
+- A materials list with separate read-only source tabs (bank statement, cash ledger).
+- Task-complete detection (green task pills; review statuses such as "Entry 2 out of balance" and last change time).
+- The done-page survey and a "[X business days]" promise; "Email me the link" on the phone page; a privacy page for the email footer link; a per-company sender name on emails.
 
 ## The MVP, piece by piece
 
@@ -88,6 +114,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-12 | Mantle UI from the prototype (`docs/design/prototype.html`, `13-design-system.md`): design tokens and components ported (`src/app/mantle.css`, `src/components/`), every company and candidate screen and both emails restyled. Behaviour changes: `/app/<slug>` opens Jobs (no dashboard); invite form moved to `/jobs/<id>/invite`; assessment configure screens at `/jobs/assessments/new` and `/jobs/assessments/<id>`; monitoring consent moved to the verify page (consent version `2026-11-11.verify-table`); explicit start photo and a connection check on the system check; task-centred workspace with calculator, new-mail toast and one-minute warning; report shows percentile, votes and integrity signal counts |
 | 2026-11-10 | Batch 3 (stage E): PR #24 launch hardening and pilot runbook; PR #25 retention and delete on request (migration `20261110200000_retention`); PR #27 admin MFA and candidate report 404; PR #26 pilot decisions brief. All test-first |
 | 2026-11-10 | Batch 2: PR #21 report rows for journal entries and document review, contrast, real 404 for foreign job ids; PR #22 `harbor-lane-bank-rec` (docs/07 Example 4); PR #23 proctoring with migration `20261110160000_proctoring`. All test-first |
 | 2026-11-10 | Batch 1: PR #17 fixes 5 app bugs (Safari hydration, candidate button pending state, revoke confirmation, read state on reload, cross-company 404); PR #18 `journal_entry` + `document_review` and `demo-entries-review`; PR #19 results table, candidate report, rubric review migration. All work test-driven from here on (`11-testing.md`) |

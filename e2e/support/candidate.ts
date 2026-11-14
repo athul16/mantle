@@ -11,7 +11,8 @@ export function candidateHelpers(page: Page) {
   async function requestCode(invite: InviteRef): Promise<string> {
     const before = new Date().toISOString();
     await page.goto(invite.link);
-    const button = page.getByRole("button", { name: "Continue" });
+    // "Continue" on a fresh link; "Email me a new code" when the test was started on another device.
+    const button = page.getByRole("button", { name: /^(Continue|Email me a new code)$/ });
     await button.click();
     await expect(page).toHaveURL(/\/verify\?sent=1/);
     await expect(page.getByText(/We sent a 6-digit code to/)).toBeVisible();
@@ -20,10 +21,10 @@ export function candidateHelpers(page: Page) {
 
   /** Fills the verify form and submits it. */
   async function submitCode(code: string, { name = CANDIDATE_NAME, consent = true } = {}) {
-    await page.getByLabel("Your full name").fill(name);
-    await page.getByLabel("6-digit code").fill(code);
+    await page.getByLabel("Full name").fill(name);
+    await page.getByLabel("Code from your email").fill(code);
     if (consent) await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
 
   /** From the invite link to the system check page. */
@@ -31,26 +32,40 @@ export function candidateHelpers(page: Page) {
     const code = await requestCode(invite);
     await submitCode(code, { name });
     await expect(page).toHaveURL(/\/check$/);
-    await expect(page.getByRole("heading", { level: 1, name: "System check" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
   }
 
   /** From the invite link into the running workspace. */
   async function startTest(invite: InviteRef) {
     await verify(invite);
-    await page.getByRole("link", { name: "Continue to instructions" }).click();
+    await page.getByRole("link", { name: "Continue", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
-    await page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click();
+    await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
     await expect(page).toHaveURL(/\/workspace$/);
     await expect(page.getByRole("timer")).toBeVisible();
   }
 
-  /** The inbox button for a message, by subject. */
-  const message = (subject: string | RegExp) =>
-    page.getByRole("complementary").getByRole("button", { name: subject });
+  /** The header's Inbox button; its name carries the unread count ("Inbox 2 unread", or just "Inbox"). */
+  const inboxButton = () => page.getByRole("banner").getByRole("button", { name: /^Inbox/ });
 
-  /** Waits for the autosave indicator to settle on saved. */
+  /** Opens the inbox drawer (no-op when it's already open on the message list). */
+  async function openInbox() {
+    if (await page.getByRole("list", { name: "Messages" }).isVisible()) return;
+    const back = page.getByRole("dialog", { name: "Inbox" }).getByRole("button", { name: "Inbox", exact: true });
+    if (await back.isVisible()) return back.click();
+    await inboxButton().click();
+  }
+
+  /** A message row in the inbox drawer, by subject (open the drawer first with openInbox()). */
+  const message = (subject: string | RegExp) =>
+    page.getByRole("list", { name: "Messages" }).getByRole("button", { name: subject });
+
+  /** A task in the workspace header's task navigation. */
+  const task = (name: string | RegExp) => page.getByRole("navigation", { name: "Tasks" }).getByRole("button", { name });
+
+  /** Waits for the autosave indicator to settle on saved (it says "Saving…" while a save is pending). */
   async function saved() {
-    await expect(page.getByText("All changes saved")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("save-status")).toHaveText("Saved", { timeout: 15_000 });
   }
 
   /** Seconds left on the workspace timer. */
@@ -60,7 +75,7 @@ export function candidateHelpers(page: Page) {
     return parts.reduce((acc, n) => acc * 60 + n, 0);
   }
 
-  return { requestCode, submitCode, verify, startTest, message, saved, secondsLeft };
+  return { requestCode, submitCode, verify, startTest, inboxButton, openInbox, message, task, saved, secondsLeft };
 }
 
 export type CandidateHelpers = ReturnType<typeof candidateHelpers>;

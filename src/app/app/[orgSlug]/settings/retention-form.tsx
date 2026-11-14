@@ -1,33 +1,50 @@
 "use client";
 
 import { useActionState } from "react";
-import { Button, Field, FormMessage } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import { Button, FormMessage } from "@/components/ui";
 import { MAX_RETENTION_DAYS, MIN_RETENTION_DAYS } from "@/lib/retention/policy";
 import { updateRetention } from "./actions";
 
 export function RetentionForm({ orgId, days }: { orgId: string; days: number }) {
   const [state, action, pending] = useActionState(updateRetention, undefined);
+  const error = state?.fieldErrors?.retentionDays?.[0];
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <input type="hidden" name="orgId" value={orgId} />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-64">
-          <Field
-            label="Keep candidate data for (days)"
-            name="retentionDays"
-            inputMode="numeric"
-            defaultValue={String(days)}
-            required
-            aria-describedby="retention-help"
-            error={state?.fieldErrors?.retentionDays?.[0]}
-          />
-        </div>
-        <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save"}</Button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <label htmlFor="ret-days" className="small">Keep candidate data for</label>
+        <input
+          id="ret-days"
+          name="retentionDays"
+          className={error ? "input tnum invalid" : "input tnum"}
+          style={{ width: 90 }}
+          inputMode="numeric"
+          defaultValue={String(days)}
+          required
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "ret-help ret-error" : "ret-help"}
+        />
+        <span id="ret-help" className="small muted">
+          days after the assessment ends ({MIN_RETENTION_DAYS}–{MAX_RETENTION_DAYS})
+        </span>
       </div>
-      <p id="retention-help" className="text-xs text-neutral-600 dark:text-neutral-400">
-        {MIN_RETENTION_DAYS} to {MAX_RETENTION_DAYS} days.
+      {error ? (
+        <p id="ret-error" className="co-err" style={{ marginTop: 0 }}>
+          <Icon name="alert" className="i-sm" />
+          {error}
+        </p>
+      ) : null}
+      <p className="small ink2">
+        Covers answers, scores, notes, integrity events and proctoring snapshots. Candidates see this period in the monitoring notice before they agree. You
+        can also delete one candidate&apos;s data from their report at any time.
       </p>
       <FormMessage error={state?.error} message={state?.message} />
+      <div>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </form>
   );
 }

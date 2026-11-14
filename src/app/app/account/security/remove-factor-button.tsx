@@ -24,12 +24,7 @@ export function RemoveFactorButton({ factorId, name, last, isAdmin }: { factorId
 function SubmitButton({ name }: { name: string }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      aria-label={`Remove ${name}`}
-      className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-    >
+    <button type="submit" disabled={pending} aria-label={`Remove ${name}`} className="btn btn-sm btn-danger">
       {pending ? "Removing…" : "Remove"}
     </button>
   );

@@ -3,6 +3,7 @@ import "server-only";
 import { sendEmail } from "@/lib/email";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateCode, generateToken, hashCode, hashToken, safeEqual } from "@/lib/tokens";
+import { codeEmailHtml } from "@/lib/email/templates";
 import { CODE_RESEND_SECONDS, CODE_TTL_MINUTES, CONSENT_VERSION, MAX_CODE_ATTEMPTS } from "./config";
 import { findAttemptForInvite, findInviteByToken, inviteBlockReason, type InviteContext } from "./invite";
 
@@ -62,13 +63,14 @@ export async function requestCode(token: string, now = new Date()): Promise<Requ
 
   await sendEmail({
     to: invite.email,
-    subject: `Your code for the ${invite.companyName} assessment: ${code}`,
+    subject: `${code} is your code for the ${invite.jobTitle} assessment`,
     text: [
       `Your verification code is ${code}.`,
       "",
       `Enter it on the page where you clicked Continue to open the ${invite.jobTitle} assessment from ${invite.companyName}.`,
-      `It expires in ${CODE_TTL_MINUTES} minutes. If you didn't ask for it, you can ignore this email.`,
+      `It expires in ${CODE_TTL_MINUTES} minutes and works once. If you didn't ask for it, you can ignore this email: nothing starts without the code.`,
     ].join("\n"),
+    html: codeEmailHtml({ orgName: invite.companyName, code, ttlMinutes: CODE_TTL_MINUTES }),
   });
 
   return { ok: true, email: maskEmail(invite.email) };

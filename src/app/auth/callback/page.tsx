@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AuthCard } from "@/components/ui";
+import { AuthCard, Notice } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 const EXPIRED = "This link is invalid or has expired. Ask your admin to invite you again.";
@@ -37,7 +37,14 @@ export default function AuthCallbackPage() {
 
   return (
     <AuthCard title={error ? "Link problem" : "Signing you in…"}>
-      {error ? <p className="text-sm text-red-700">{error}</p> : <p className="text-sm text-neutral-600">One moment.</p>}
+      {error ? (
+        <Notice tone="bad">{error}</Notice>
+      ) : (
+        <p className="row g8 small ink2">
+          <span className="spin" aria-hidden="true" />
+          One moment.
+        </p>
+      )}
     </AuthCard>
   );
 }

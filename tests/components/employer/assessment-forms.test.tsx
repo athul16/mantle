@@ -1,10 +1,12 @@
-/** Assessments page client forms: create, edit settings, clone. */
+/** Configure assessment screen (create from the library, edit, locked, read-only) and the clone button. */
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssessmentSummary } from "@/lib/jobs/queries";
 import { deferred, formDataOf } from "../helpers";
 
+const router = { push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/app/app/[orgSlug]/jobs/actions", () => ({
   createAssessment: vi.fn(),
   updateAssessment: vi.fn(),
@@ -13,17 +15,10 @@ vi.mock("@/app/app/[orgSlug]/jobs/actions", () => ({
 }));
 
 const actions = await import("@/app/app/[orgSlug]/jobs/actions");
-const { CloneAssessmentButton, CreateAssessmentForm, EditAssessmentForm } = await import(
-  "@/app/app/[orgSlug]/jobs/assessments/assessment-forms"
-);
+const { CloneAssessmentButton, ConfigureAssessmentForm } = await import("@/app/app/[orgSlug]/jobs/assessments/assessment-forms");
 const createAssessment = vi.mocked(actions.createAssessment);
 const updateAssessment = vi.mocked(actions.updateAssessment);
 const cloneAssessment = vi.mocked(actions.cloneAssessment);
-
-const scenarios = [
-  { id: "sc-1", label: "Petty cash count (v1)", minutes: 30 },
-  { id: "sc-2", label: "Mini month-end close (v1)", minutes: 60 },
-];
 
 const assessment: AssessmentSummary = {
   id: "as-1",
@@ -37,55 +32,49 @@ const assessment: AssessmentSummary = {
   createdAt: "2026-11-01T10:00:00Z",
 };
 
+const base = { orgId: "org-1", cancelHref: "/app/acme/jobs/assessments", jobsBase: "/app/acme/jobs" };
+const create = { kind: "create" as const, scenarioId: "sc-1", recommendedMinutes: 30, defaultTitle: "Petty cash count" };
+const edit = (a: AssessmentSummary = assessment) => ({ kind: "edit" as const, assessment: a, recommendedMinutes: 20 });
+
+const name = () => screen.getByRole("textbox", { name: "Assessment name" });
+const timeLimit = () => screen.getByRole("combobox", { name: "Time limit" });
+const passScore = () => screen.getByRole("spinbutton", { name: "Pass score" });
+const toggle = (label: string) => screen.getByRole("switch", { name: label });
+
 beforeEach(() => vi.clearAllMocks());
 
-describe("CreateAssessmentForm", () => {
-  it("picks the first simulation and suggests its time limit", () => {
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
-    expect(screen.getByRole("combobox", { name: "Simulation" })).toHaveValue("sc-1");
-    expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(30);
-    expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveValue(null);
-    expect(screen.getByRole("textbox", { name: "Title" })).toBeRequired();
-    expect(screen.getByRole("checkbox", { name: "Camera snapshots" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Screen share" })).toBeChecked();
+describe("ConfigureAssessmentForm: from the library", () => {
+  it("starts from the simulation's name and recommended length, with monitoring on", () => {
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    expect(name()).toHaveValue("Petty cash count");
+    expect(name()).toBeRequired();
+    expect(timeLimit()).toHaveValue("30");
+    expect(screen.getByRole("option", { name: "30 minutes (recommended)" })).toBeInTheDocument();
+    expect(screen.getByText("Designed for 30 minutes")).toBeVisible();
+    expect(passScore()).toHaveValue(null);
+    expect(passScore()).toHaveAttribute("min", "0");
+    expect(passScore()).toHaveAttribute("max", "100");
+    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "true");
+    expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "true");
+    // The activity log is always recorded.
+    expect(toggle("Activity log (always on)")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "/app/acme/jobs/assessments");
   });
 
-  it("updates the suggested time limit when the simulation changes", async () => {
+  it("saves, shows Saving… while it runs, then opens Create job with the new assessment", async () => {
     const user = userEvent.setup();
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
-    await user.selectOptions(screen.getByRole("combobox", { name: "Simulation" }), "Mini month-end close (v1)");
-    expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(60);
-  });
-
-  it("limits the time and pass score inputs", () => {
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
-    const minutes = screen.getByRole("spinbutton", { name: "Time limit (minutes)" });
-    expect(minutes).toHaveAttribute("min", "1");
-    expect(minutes).toHaveAttribute("max", "240");
-    const pass = screen.getByRole("spinbutton", { name: "Pass score (%)" });
-    expect(pass).toHaveAttribute("min", "0");
-    expect(pass).toHaveAttribute("max", "100");
-  });
-
-  it("falls back to 45 minutes with no simulations", () => {
-    render(<CreateAssessmentForm orgId="org-1" scenarios={[]} />);
-    expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(45);
-  });
-
-  it("submits the settings and shows Creating… while it runs", async () => {
-    const user = userEvent.setup();
-    const pending = deferred<{ message: string }>();
+    const pending = deferred<{ message: string; id: string }>();
     createAssessment.mockReturnValueOnce(pending.promise);
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.clear(name());
+    await user.type(name(), "Junior AP screen");
+    await user.selectOptions(timeLimit(), "40");
+    await user.type(passScore(), "65");
+    await user.click(toggle("Camera snapshots"));
+    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "false");
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
 
-    await user.type(screen.getByRole("textbox", { name: "Title" }), "Junior AP screen");
-    await user.clear(screen.getByRole("spinbutton", { name: "Time limit (minutes)" }));
-    await user.type(screen.getByRole("spinbutton", { name: "Time limit (minutes)" }), "40");
-    await user.type(screen.getByRole("spinbutton", { name: "Pass score (%)" }), "65");
-    await user.click(screen.getByRole("checkbox", { name: "Camera snapshots" }));
-    await user.click(screen.getByRole("button", { name: "Create assessment" }));
-
-    expect(await screen.findByRole("button", { name: "Creating…" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
     expect(formDataOf(createAssessment)).toEqual({
       orgId: "org-1",
       scenarioId: "sc-1",
@@ -94,8 +83,8 @@ describe("CreateAssessmentForm", () => {
       passScore: "65",
       screen: "on",
     });
-    await act(async () => pending.resolve({ message: 'Created "Junior AP screen".' }));
-    expect(await screen.findByText('Created "Junior AP screen".')).toBeVisible();
+    await act(async () => pending.resolve({ message: 'Created "Junior AP screen".', id: "as-9" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/app/acme/jobs?create=1&assessment=as-9"));
   });
 
   it("shows each field's validation message on that field", async () => {
@@ -103,67 +92,51 @@ describe("CreateAssessmentForm", () => {
     createAssessment.mockResolvedValueOnce({
       fieldErrors: {
         title: ["Give the assessment a title."],
-        timeLimitMinutes: ["Between 1 and 240 minutes."],
+        timeLimitMinutes: ["At most 240 minutes."],
         passScore: ["Between 0 and 100."],
-        scenarioId: ["Pick a simulation."],
       },
     });
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
-    await user.type(screen.getByRole("textbox", { name: "Title" }), "x");
-    await user.click(screen.getByRole("button", { name: "Create assessment" }));
-
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Title" })).toHaveAccessibleDescription("Give the assessment a title."));
-    expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveAccessibleDescription("Between 1 and 240 minutes.");
-    expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveAccessibleDescription("Between 0 and 100.");
-    expect(screen.getByText("Pick a simulation.")).toBeVisible();
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
+    await waitFor(() => expect(name()).toHaveAccessibleDescription("Give the assessment a title."));
+    expect(timeLimit()).toHaveAccessibleDescription("At most 240 minutes.");
+    expect(passScore()).toHaveAccessibleDescription(/Between 0 and 100\.$/);
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("shows a form-level error", async () => {
     const user = userEvent.setup();
     createAssessment.mockResolvedValueOnce({ error: "Viewers can't create assessments." });
-    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
-    await user.type(screen.getByRole("textbox", { name: "Title" }), "x");
-    await user.click(screen.getByRole("button", { name: "Create assessment" }));
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
     expect(await screen.findByText("Viewers can't create assessments.")).toBeVisible();
   });
 });
 
-describe("EditAssessmentForm", () => {
-  it("starts closed behind an Edit settings button", () => {
-    render(<EditAssessmentForm orgId="org-1" assessment={assessment} />);
-    expect(screen.getByRole("button", { name: "Edit settings" })).toBeVisible();
-    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+describe("ConfigureAssessmentForm: an existing assessment", () => {
+  it("fills in the saved settings, keeping an unusual length in the menu", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit()} />);
+    expect(name()).toHaveValue("Staff accountant screen");
+    expect(timeLimit()).toHaveValue("50");
+    expect(screen.getByRole("option", { name: "20 minutes (recommended)" })).toBeInTheDocument();
+    expect(passScore()).toHaveValue(70);
+    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "false");
+    expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "Clone" })).toBeEnabled();
   });
 
-  it("opens with the saved settings filled in, and closes again", async () => {
-    const user = userEvent.setup();
-    render(<EditAssessmentForm orgId="org-1" assessment={assessment} />);
-    await user.click(screen.getByRole("button", { name: "Edit settings" }));
-    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Staff accountant screen");
-    expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(50);
-    expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveValue(70);
-    expect(screen.getByRole("checkbox", { name: "Camera snapshots" })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Screen share" })).toBeChecked();
-
-    await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByRole("button", { name: "Edit settings" })).toBeVisible();
-  });
-
-  it("leaves the pass score empty when there is none", async () => {
-    const user = userEvent.setup();
-    render(<EditAssessmentForm orgId="org-1" assessment={{ ...assessment, passScore: null }} />);
-    await user.click(screen.getByRole("button", { name: "Edit settings" }));
-    expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveValue(null);
+  it("leaves the pass score empty when there is none", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, passScore: null })} />);
+    expect(passScore()).toHaveValue(null);
   });
 
   it("saves the changed settings for this assessment", async () => {
     const user = userEvent.setup();
     const pending = deferred<{ message: string }>();
     updateAssessment.mockReturnValueOnce(pending.promise);
-    render(<EditAssessmentForm orgId="org-1" assessment={assessment} />);
-    await user.click(screen.getByRole("button", { name: "Edit settings" }));
-    await user.clear(screen.getByRole("textbox", { name: "Title" }));
-    await user.type(screen.getByRole("textbox", { name: "Title" }), "Senior screen");
+    render(<ConfigureAssessmentForm {...base} mode={edit()} />);
+    await user.clear(name());
+    await user.type(name(), "Senior screen");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
@@ -177,29 +150,47 @@ describe("EditAssessmentForm", () => {
     });
     await act(async () => pending.resolve({ message: "Saved." }));
     expect(await screen.findByText("Saved.")).toBeVisible();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("shows the locked error the server returns", async () => {
     const user = userEvent.setup();
-    updateAssessment.mockResolvedValueOnce({ error: "This assessment is locked because a candidate started. Clone it to change settings." });
-    render(<EditAssessmentForm orgId="org-1" assessment={assessment} />);
-    await user.click(screen.getByRole("button", { name: "Edit settings" }));
+    updateAssessment.mockResolvedValueOnce({ error: "A candidate has started this assessment, so its settings are locked. Clone it to change them." });
+    render(<ConfigureAssessmentForm {...base} mode={edit()} />);
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText(/locked because a candidate started/)).toBeVisible();
+    expect(await screen.findByText(/its settings are locked/)).toBeVisible();
+  });
+
+  it("shows a locked assessment read-only, with Clone as the way forward", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, lockedAt: "2026-11-05T10:00:00Z" })} />);
+    expect(name()).toBeDisabled();
+    expect(timeLimit()).toBeDisabled();
+    expect(toggle("Camera snapshots")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clone" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("link", { name: "Back" })).toBeVisible();
+  });
+
+  it("is read-only for a viewer: no save and no clone", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit()} readOnly />);
+    expect(name()).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clone" })).not.toBeInTheDocument();
   });
 });
 
 describe("CloneAssessmentButton", () => {
   it("clones the assessment, showing Cloning… while it runs", async () => {
     const user = userEvent.setup();
-    const pending = deferred<undefined>();
+    const pending = deferred<{ message: string }>();
     cloneAssessment.mockReturnValueOnce(pending.promise);
     render(<CloneAssessmentButton orgId="org-1" assessmentId="as-1" />);
     await user.click(screen.getByRole("button", { name: "Clone" }));
     expect(await screen.findByRole("button", { name: "Cloning…" })).toBeDisabled();
     expect(formDataOf(cloneAssessment)).toEqual({ orgId: "org-1", assessmentId: "as-1" });
-    await act(async () => pending.resolve(undefined));
+    await act(async () => pending.resolve({ message: 'Created "Staff accountant screen (copy)". Edit it before linking it to a job.' }));
     expect(await screen.findByRole("button", { name: "Clone" })).toBeEnabled();
+    expect(screen.getByText(/\(copy\)/)).toBeVisible();
   });
 
   it("shows an error when cloning fails", async () => {

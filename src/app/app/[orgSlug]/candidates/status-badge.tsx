@@ -1,20 +1,52 @@
+import type { CSSProperties } from "react";
+import { Icon, type IconName } from "@/components/icons";
 import type { InviteStatus } from "@/lib/jobs/status";
+import type { IntegrityLabel } from "@/lib/results/candidate-table";
 
-const STATUS_STYLES: Record<InviteStatus, string> = {
-  invited: "bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200",
-  started: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
-  completed: "bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200",
-  expired: "bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200",
-  revoked: "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200",
+// Status language from the prototype: colour + icon + label, never colour alone.
+
+const STATUS: Record<InviteStatus, { label: string; icon: IconName; className: string; style?: CSSProperties }> = {
+  completed: { label: "Completed", icon: "check", className: "badge" },
+  started: { label: "In progress", icon: "clock", className: "badge b-accent" },
+  invited: { label: "Invited", icon: "mail", className: "badge b-plain" },
+  expired: { label: "Expired", icon: "xc", className: "badge b-plain", style: { color: "var(--ink-3)" } },
+  revoked: { label: "Revoked", icon: "ban", className: "badge b-plain", style: { color: "var(--ink-3)", borderStyle: "dashed" } },
 };
 
-export function StatusBadge({ status, needsReview = false }: { status: InviteStatus; needsReview?: boolean }) {
+export function StatusBadge({ status, needsReview = false, replyToScore = false }: { status: InviteStatus; needsReview?: boolean; replyToScore?: boolean }) {
+  const s = STATUS[status];
+  const badge = (
+    <span className={s.className} style={s.style}>
+      <Icon name={s.icon} />
+      {s.label}
+    </span>
+  );
+  if (!needsReview) return badge;
   return (
-    <span className="inline-flex flex-wrap gap-1">
-      <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_STYLES[status]}`}>{status}</span>
-      {needsReview ? (
-        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-900 dark:bg-purple-950 dark:text-purple-200">needs review</span>
-      ) : null}
+    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+      {badge}
+      <span className="badge b-accent" title="A task waits for a recruiter or admin to score it; the score is provisional">
+        <Icon name="reply" />
+        {replyToScore ? "Reply to score" : "Needs review"}
+      </span>
+    </span>
+  );
+}
+
+const INTEGRITY: Record<IntegrityLabel, { label: string; icon: IconName; className: string }> = {
+  clear: { label: "Clear", icon: "checkc", className: "badge b-ok" },
+  review: { label: "Review", icon: "eye", className: "badge b-warn" },
+  suspicious: { label: "Suspicious", icon: "alert", className: "badge b-bad" },
+};
+
+/** The attempt's integrity label with its flag count. A label for a person to judge; it never rejects anyone. */
+export function IntegrityBadge({ label, flags }: { label: IntegrityLabel; flags: number }) {
+  const i = INTEGRITY[label];
+  return (
+    <span className={i.className}>
+      <Icon name={i.icon} />
+      {i.label}
+      {label !== "clear" && flags > 0 ? ` · ${flags}` : ""}
     </span>
   );
 }

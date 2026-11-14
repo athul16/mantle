@@ -32,9 +32,10 @@ function Harness({ cfg = config, initial, onChange, disabled }: { cfg?: InboxRep
 const counter = () => screen.getByText(/words ·/);
 
 describe("InboxReplyStep", () => {
-  it("shows the prompt, recipient and subject", () => {
+  it("shows the recipient and subject, and leaves the prompt to the page", () => {
     render(<Harness />);
-    expect(screen.getByText(config.prompt)).toBeVisible();
+    // The workspace shows the prompt in its brief column (stepBrief).
+    expect(screen.queryByText(config.prompt)).not.toBeInTheDocument();
     expect(screen.getByText("To")).toBeVisible();
     expect(screen.getByText(config.to!)).toBeVisible();
     expect(screen.getByText("Subject")).toBeVisible();
@@ -56,7 +57,7 @@ describe("InboxReplyStep", () => {
   it("has a labelled reply box with a placeholder and the character limit", () => {
     render(<Harness />);
     const box = screen.getByRole("textbox", { name: "Reply" });
-    expect(box).toHaveAttribute("placeholder", "Write your reply…");
+    expect(box).toHaveAttribute("placeholder", "Write your reply");
     expect(box).toHaveAttribute("maxlength", "2000");
     expect(counter()).toHaveTextContent("0 words · 0 / 2,000 characters");
   });

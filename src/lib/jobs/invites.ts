@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { sendEmail } from "@/lib/email";
+import { inviteEmailHtml } from "@/lib/email/templates";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { MAX_INVITES_PER_BATCH, type ParsedRecipient } from "./emails";
@@ -31,34 +32,44 @@ export function inviteLink(token: string) {
   return `${appUrl()}/a/${token}`;
 }
 
-export function buildInviteEmail(args: { orgName: string; jobTitle: string; link: string; expiresAt: Date }) {
+export function buildInviteEmail(args: {
+  orgName: string;
+  jobTitle: string;
+  link: string;
+  expiresAt: Date;
+  minutes?: number;
+  needsWebcam?: boolean;
+  candidateName?: string | null;
+}) {
   const deadline = args.expiresAt.toLocaleString("en-US", {
     dateStyle: "long",
     timeStyle: "short",
     timeZone: "UTC",
   });
-  const subject = `${args.orgName}: your assessment for ${args.jobTitle}`;
+  const completeBy = args.expiresAt.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const firstName = args.candidateName?.trim().split(/\s+/)[0] || null;
+  const subject = `${args.orgName}: your work simulation for ${args.jobTitle}`;
   const text = [
-    `Hi,`,
+    firstName ? `Hi ${firstName},` : `Hi,`,
     ``,
-    `${args.orgName} has invited you to complete a short job simulation for the ${args.jobTitle} role.`,
+    `${args.orgName} has invited you to a short work simulation for the ${args.jobTitle} role.${args.minutes ? ` It takes ${args.minutes} minutes, timed.` : ""}`,
     ``,
     `Start here: ${args.link}`,
     ``,
-    `The link is personal to you. Please finish by ${deadline} UTC. Once you begin, the timer runs until you submit, so set aside uninterrupted time.`,
+    `The link is personal to you. Please finish by ${deadline} UTC. No account or download is needed; you can open the link now to check your setup and start later. Once you begin, the timer runs until you submit, so set aside uninterrupted time.`,
     ``,
     `If you weren't expecting this email, you can ignore it.`,
   ].join("\n");
-  const html = `<p>Hi,</p>
-<p>${escapeHtml(args.orgName)} has invited you to complete a short job simulation for the <strong>${escapeHtml(args.jobTitle)}</strong> role.</p>
-<p><a href="${escapeHtml(args.link)}">Start the assessment</a></p>
-<p>The link is personal to you. Please finish by ${escapeHtml(deadline)} UTC. Once you begin, the timer runs until you submit, so set aside uninterrupted time.</p>
-<p>If you weren't expecting this email, you can ignore it.</p>`;
+  const html = inviteEmailHtml({
+    orgName: args.orgName,
+    jobTitle: args.jobTitle,
+    link: args.link,
+    completeBy,
+    minutes: args.minutes,
+    needsWebcam: args.needsWebcam,
+    firstName,
+  });
   return { subject, text, html };
-}
-
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
 /** Sends one email, retrying once after a short pause (provider rate limits). */
@@ -72,10 +83,22 @@ async function sendWithRetry(message: Parameters<typeof sendEmail>[0]) {
 }
 
 async function loadJob(db: Db, orgId: string, jobId: string) {
-  const { data, error } = await db.from("jobs").select("id, title, deadline").eq("id", jobId).eq("org_id", orgId).maybeSingle();
+  const { data, error } = await db
+    .from("jobs")
+    .select("id, title, deadline, assessments(time_limit_minutes, proctoring)")
+    .eq("id", jobId)
+    .eq("org_id", orgId)
+    .maybeSingle();
   if (error) throw error;
   if (!data) throw new InviteError("That job doesn't exist.");
-  return data;
+  const assessment = Array.isArray(data.assessments) ? data.assessments[0] : data.assessments;
+  const proctoring = (assessment?.proctoring ?? {}) as { camera?: unknown };
+  return {
+    id: data.id,
+    title: data.title,
+    deadline: data.deadline,
+    emailDetails: { minutes: assessment?.time_limit_minutes ?? undefined, needsWebcam: proctoring.camera === true },
+  };
 }
 
 export type InviteBatchResult = {
@@ -132,8 +155,9 @@ export async function createInvites(args: {
         created_by: createdBy,
       })),
     )
-    .select("id, email");
+    .select("id, email, candidate_name");
   if (insertError) throw insertError;
+  const names = new Map(rows.map((row) => [row.id, row.candidate_name]));
 
   const tokens = new Map(rows.map((row) => [row.id, generateToken()]));
   const service = createServiceClient();
@@ -148,7 +172,7 @@ export async function createInvites(args: {
 
   const failedToSend: string[] = [];
   for (const row of rows) {
-    const email = buildInviteEmail({ orgName, jobTitle: job.title, link: inviteLink(tokens.get(row.id)!), expiresAt });
+    const email = buildInviteEmail({ orgName, jobTitle: job.title, link: inviteLink(tokens.get(row.id)!), expiresAt, ...job.emailDetails, candidateName: names.get(row.id) });
     try {
       await sendWithRetry({ to: row.email, ...email });
     } catch (err) {
@@ -164,7 +188,7 @@ export async function createInvites(args: {
 async function loadInvite(db: Db, orgId: string, inviteId: string) {
   const { data, error } = await db
     .from("invites")
-    .select("id, email, status, expires_at, job_id")
+    .select("id, email, status, expires_at, job_id, candidate_name")
     .eq("id", inviteId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -212,7 +236,7 @@ export async function resendInvite(args: { db: Db; orgId: string; orgName: strin
   if (secretError) throw secretError;
 
   try {
-    await sendWithRetry({ to: invite.email, ...buildInviteEmail({ orgName, jobTitle: job.title, link: inviteLink(token), expiresAt }) });
+    await sendWithRetry({ to: invite.email, ...buildInviteEmail({ orgName, jobTitle: job.title, link: inviteLink(token), expiresAt, ...job.emailDetails, candidateName: invite.candidate_name }) });
   } catch (err) {
     console.error("invite email failed", { inviteId, message: err instanceof Error ? err.message : String(err) });
     throw new InviteError(`A new link was created but the email to ${invite.email} failed. Try resending again.`);

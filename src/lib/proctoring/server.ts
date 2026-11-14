@@ -31,10 +31,18 @@ const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
 
 /** The assessment's camera / screen settings for this candidate. */
 export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
+  return getInviteProctoringSettings(session.invite);
+}
+
+/**
+ * The same settings for an invite before the candidate has a session (the
+ * verify page shows what will be recorded before they agree).
+ */
+export async function getInviteProctoringSettings(invite: { assessmentId: string; orgId: string }): Promise<MonitoringSettings> {
   const db = createServiceClient();
   const [assessment, org] = await Promise.all([
-    db.from("assessments").select("proctoring").eq("id", session.invite.assessmentId).eq("org_id", session.invite.orgId).single(),
-    db.from("organizations").select("settings").eq("id", session.invite.orgId).single(),
+    db.from("assessments").select("proctoring").eq("id", invite.assessmentId).eq("org_id", invite.orgId).single(),
+    db.from("organizations").select("settings").eq("id", invite.orgId).single(),
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);

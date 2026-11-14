@@ -160,6 +160,8 @@ describe("assessments and jobs", () => {
     expect(created).toMatchObject({ message: expect.stringContaining("Created") });
 
     const { data: assessment } = await service.from("assessments").select("*").eq("org_id", orgA).single();
+    // The new id comes back so the UI can go on to create a job with it.
+    expect(created?.id).toBe(assessment!.id);
     expect(assessment).toMatchObject({ time_limit_minutes: 20, pass_score: 70, proctoring: { camera: true, screen: false } });
 
     const deadline = new Date(Date.now() + 7 * 864e5).toISOString();
@@ -167,6 +169,7 @@ describe("assessments and jobs", () => {
     expect(job).toMatchObject({ message: expect.stringContaining("Created") });
     const { data: jobRow } = await service.from("jobs").select("id").eq("org_id", orgA).single();
     jobId = jobRow!.id;
+    expect(job?.id).toBe(jobId);
   });
 
   it("viewer can't create assessments or jobs", async () => {

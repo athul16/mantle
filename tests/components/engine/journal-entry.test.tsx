@@ -50,12 +50,13 @@ const entryBox = (n: number) => screen.getByRole("group", { name: `Entry ${n}` }
 describe("JournalEntryStep", () => {
   it("starts with one entry of two blank lines and lists the chart of accounts", () => {
     render(<Harness />);
-    expect(screen.getByText(config.prompt)).toBeVisible();
+    // The workspace shows the prompt in its brief column (stepBrief).
+    expect(screen.queryByText(config.prompt)).not.toBeInTheDocument();
     expect(screen.getAllByRole("group")).toHaveLength(1);
     expect(screen.getAllByRole("combobox")).toHaveLength(2);
     const options = within(account(1, 1)).getAllByRole("option").map((o) => o.textContent);
     expect(options).toEqual(["Choose account…", "1010 Cash", "1200 Accounts Receivable", "6200 Bank Service Charges"]);
-    expect(within(entryBox(1)).getByRole("status")).toHaveTextContent("No amounts yet.");
+    expect(within(entryBox(1)).getByRole("status")).toHaveTextContent("Empty");
   });
 
   it("emits every line with parsed amounts as the candidate types", async () => {
@@ -84,13 +85,14 @@ describe("JournalEntryStep", () => {
     render(<Harness />);
     await user.type(debit(1, 1), "1,200.50");
     const status = within(entryBox(1)).getByRole("status");
-    expect(status).toHaveTextContent("Out of balance by 1,200.50.");
+    expect(status).toHaveTextContent("Off by 1,200.50");
     await user.type(credit(1, 2), "1200");
-    expect(status).toHaveTextContent("Out of balance by 0.50.");
+    expect(status).toHaveTextContent("Off by 0.50");
     await user.type(credit(1, 2), ".5");
-    expect(status).toHaveTextContent("Balanced.");
-    const totals = within(entryBox(1)).getByRole("row", { name: /Total/ });
-    expect(within(totals).getAllByRole("cell").map((c) => c.textContent)).toEqual(["1,200.50", "1,200.50", ""]);
+    expect(status).toHaveTextContent("Balanced");
+    // Totals across all entries run along the bottom of the sheet.
+    expect(screen.getByTestId("total-debit")).toHaveTextContent("1,200.50");
+    expect(screen.getByTestId("total-credit")).toHaveTextContent("1,200.50");
   });
 
   it("keeps junk text on screen but saves null for it", async () => {
@@ -106,11 +108,11 @@ describe("JournalEntryStep", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    const removeFirst = screen.getByRole("button", { name: "Remove entry 1, line 1" });
-    expect(removeFirst).toBeDisabled(); // an entry keeps at least two lines
-    const add = screen.getByRole("button", { name: "Add line to entry 1" });
-    await user.click(add);
-    expect(add).toBeDisabled(); // maxLines = 3
+    // An entry keeps at least two lines, so there's nothing to remove yet.
+    expect(screen.queryByRole("button", { name: "Remove entry 1, line 1" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add line to entry 1" }));
+    // The button moves to the new last line; it's disabled there at maxLines = 3.
+    expect(screen.getByRole("button", { name: "Add line to entry 1" })).toBeDisabled();
     await user.type(debit(1, 3), "9");
     await user.click(screen.getByRole("button", { name: "Remove entry 1, line 1" }));
     expect(screen.getAllByRole("combobox")).toHaveLength(2);
@@ -122,7 +124,8 @@ describe("JournalEntryStep", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    expect(screen.getByRole("button", { name: "Delete entry 1" })).toBeDisabled();
+    // The only entry can't be deleted.
+    expect(screen.queryByRole("button", { name: "Delete entry 1" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add entry" }));
     expect(screen.getByRole("button", { name: "Add entry" })).toBeDisabled(); // maxEntries = 2
     await user.type(debit(2, 1), "480");
@@ -136,7 +139,7 @@ describe("JournalEntryStep", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    await user.type(screen.getByRole("textbox", { name: "Description (optional)" }), "NSF");
+    await user.type(screen.getByRole("textbox", { name: "Description (optional), entry 1" }), "NSF");
     expect(onChange.mock.lastCall?.[0].entries[0].memo).toBe("NSF");
   });
 
@@ -155,7 +158,7 @@ describe("JournalEntryStep", () => {
     expect(account(1, 1)).toHaveValue("6200");
     expect(debit(1, 1)).toHaveValue("35");
     expect(credit(1, 2)).toHaveValue("35");
-    expect(within(entryBox(1)).getByRole("status")).toHaveTextContent("Balanced.");
+    expect(within(entryBox(1)).getByRole("status")).toHaveTextContent("Balanced");
     expect(screen.getByDisplayValue("fee")).toBeVisible();
   });
 

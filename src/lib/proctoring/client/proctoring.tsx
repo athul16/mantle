@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Icon } from "@/components/icons";
 import { SNAPSHOT_INTERVAL_MS, isMonitored, type Proctoring as Settings, type SnapshotSource } from "../config";
 import { CAMERA_MESSAGES, SCREEN_MESSAGES, openCamera, openScreen } from "./media";
 import { dropMedia, heldMedia, holdMedia } from "./media-store";
@@ -25,10 +26,11 @@ const STOPPED = {
   screen: "Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.",
 };
 
-const button =
-  "inline-flex items-center rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200";
-
-export function Proctoring({ settings, children }: { settings: Settings; children: ReactNode }) {
+/**
+ * `inlineIndicators`: the page shows <ProctoringIndicators /> itself (the
+ * workspace header does); otherwise a small floating status card is shown.
+ */
+export function Proctoring({ settings, children, inlineIndicators = false }: { settings: Settings; children: ReactNode; inlineIndicators?: boolean }) {
   const monitored = isMonitored(settings);
   const streams = useRef<Partial<Record<SnapshotSource, MediaStream>>>({});
   const [camera, setCamera] = useState<DeviceState>(() => ({ on: !!(settings.camera && heldMedia("camera")) }));
@@ -144,89 +146,160 @@ export function Proctoring({ settings, children }: { settings: Settings; childre
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
-  if (!monitored) return <>{children}</>;
+  const value: ProctoringState = { settings, monitored, active, cameraOn: camera.on, screenOn: screen.on, previewStream, fullscreen };
+
+  if (!monitored) return <ProctoringContext.Provider value={value}>{children}</ProctoringContext.Provider>;
+
+  const cameraLost = settings.camera && !camera.on && !!camera.message;
+  const screenLost = settings.screen && !screen.on && !!screen.message;
+  const heading = cameraLost && !screenLost
+    ? "We can't see your camera"
+    : screenLost && !cameraLost
+      ? "Screen sharing stopped"
+      : "Turn on monitoring to continue";
+  const need = settings.camera && settings.screen ? "your camera and your entire screen" : settings.camera ? "your camera" : "your entire screen";
 
   return (
-    <>
+    <ProctoringContext.Provider value={value}>
       <div data-testid="proctored-content" inert={!active} className="contents">
         {children}
       </div>
 
-      <div
-        role="status"
-        aria-label="Monitoring"
-        className="fixed right-4 bottom-4 z-40 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white/95 p-2 text-xs shadow-sm dark:border-neutral-800 dark:bg-neutral-950/95"
-      >
-        {settings.camera ? (
-          <>
-            {previewStream ? <CameraPreview stream={previewStream} /> : null}
-            <Chip on={camera.on} on-text="Camera on" off-text="Camera off" />
-          </>
-        ) : null}
-        {settings.screen ? <Chip on={screen.on} on-text="Screen shared" off-text="Screen not shared" /> : null}
-        {settings.screen && active && !fullscreen && typeof document !== "undefined" && document.fullscreenEnabled ? (
-          <button
-            type="button"
-            onClick={() => void document.documentElement.requestFullscreen?.().catch(() => {})}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-          >
-            Go full screen
-          </button>
-        ) : null}
-      </div>
+      {inlineIndicators ? null : (
+        <div
+          role="status"
+          aria-label="Monitoring"
+          className="row g8 card raised"
+          style={{ position: "fixed", right: 16, bottom: 16, zIndex: 40, padding: 8 }}
+        >
+          <ProctoringIndicators bare />
+          <FullscreenButton />
+        </div>
+      )}
 
       {active ? null : (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-6">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="monitoring-heading"
-            className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 shadow-lg dark:bg-neutral-900"
-          >
-            <h2 id="monitoring-heading" className="text-lg font-semibold">
-              Turn on monitoring to continue
-            </h2>
-            <p className="text-sm text-neutral-700 dark:text-neutral-300">
-              This test needs {settings.camera && settings.screen ? "your camera and your entire screen" : settings.camera ? "your camera" : "your entire screen"}.
-              The timer is running on our server while this message is open.
-            </p>
+        <div className="wsov">
+          <div role="dialog" aria-modal="true" aria-labelledby="monitoring-heading" className="ovbox">
+            {cameraLost && !screenLost ? (
+              <div className="campanel" style={{ aspectRatio: "16/8" }}>
+                <span className="row g8 small" style={{ color: "#FFB4AC" }}>
+                  <Icon name="videoOff" />
+                  No camera signal
+                </span>
+              </div>
+            ) : (
+              <span className="ovicon" style={screenLost ? { background: "var(--bad-bg)", color: "var(--bad)" } : { background: "var(--subtle)", color: "var(--ink-2)" }}>
+                <Icon name={screenLost ? "monitor" : "shield"} className="i-lg" />
+              </span>
+            )}
+            <div className="col g6">
+              <h2 id="monitoring-heading" style={{ fontSize: 22 }}>
+                {heading}
+              </h2>
+              <p className="ink2">
+                This simulation needs {need}. Your work is saved. The timer is running on our server while this message is open.
+              </p>
+            </div>
             {[camera.message, screen.message].filter(Boolean).map((m) => (
-              <p key={m} className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-                {m}
+              <p key={m} className="row g8 small" style={{ alignItems: "flex-start", padding: "10px 12px", borderRadius: 8, background: "var(--bad-bg)", color: "var(--bad)" }}>
+                <Icon name="alert" />
+                <span style={{ color: "var(--ink)" }}>{m}</span>
               </p>
             ))}
-            <div className="flex flex-wrap gap-3">
+            <div className="row g10 wrap">
               {settings.camera && !camera.on ? (
-                <button type="button" className={button} onClick={() => void startCamera()} disabled={camera.starting}>
+                <button type="button" className="btn btn-dark btn-lg" onClick={() => void startCamera()} disabled={camera.starting}>
+                  <Icon name="refresh" />
                   Turn on camera
                 </button>
               ) : null}
               {settings.screen && !screen.on ? (
-                <button type="button" className={button} onClick={() => void startScreen()} disabled={screen.starting}>
+                <button type="button" className="btn btn-dark btn-lg" onClick={() => void startScreen()} disabled={screen.starting}>
+                  <Icon name="monitor" />
                   Share entire screen
                 </button>
               ) : null}
             </div>
+            <p className="xs muted">
+              Monitoring confirms the work is your own. Each time it stops is noted in your activity log.
+            </p>
           </div>
         </div>
       )}
-    </>
+    </ProctoringContext.Provider>
   );
 }
 
-function Chip({ on, "on-text": onText, "off-text": offText }: { on: boolean; "on-text": string; "off-text": string }) {
+type ProctoringState = {
+  settings: Settings;
+  monitored: boolean;
+  active: boolean;
+  cameraOn: boolean;
+  screenOn: boolean;
+  previewStream: MediaStream | null;
+  fullscreen: boolean;
+};
+
+const ProctoringContext = createContext<ProctoringState | null>(null);
+
+/**
+ * Camera thumbnail and screen-share chip for the workspace header (prototype
+ * .camthumb / .scr). Renders nothing when the assessment isn't monitored.
+ * `bare` drops the status role (the floating card already has it).
+ */
+export function ProctoringIndicators({ bare = false }: { bare?: boolean }) {
+  const p = useContext(ProctoringContext);
+  if (!p || !p.monitored) return null;
+  const { settings, cameraOn, screenOn, previewStream } = p;
+  const items = (
+    <>
+      {settings.camera ? (
+        <span className={cameraOn ? "camthumb" : "camthumb off"} role="img" aria-label={cameraOn ? "Your camera preview" : "Camera off"} style={{ overflow: "hidden" }}>
+          {previewStream && cameraOn ? <CameraPreview stream={previewStream} /> : null}
+          <span className="sr">{cameraOn ? "Camera on" : "Camera off"}</span>
+        </span>
+      ) : null}
+      {settings.screen ? (
+        <span className={screenOn ? "scr" : "scr off"} role="img" aria-label={screenOn ? "Entire screen shared" : "Screen sharing stopped"}>
+          <Icon name="monitor" />
+          <span className="sr">{screenOn ? "Screen shared" : "Screen not shared"}</span>
+        </span>
+      ) : null}
+    </>
+  );
+  if (bare) return items;
   return (
-    <span className="flex items-center gap-1.5">
-      <span aria-hidden="true" className={`size-2 rounded-full ${on ? "bg-green-600" : "bg-red-600"}`} />
-      <span className={on ? "text-neutral-700 dark:text-neutral-300" : "font-medium text-red-700 dark:text-red-400"}>{on ? onText : offText}</span>
+    <span role="status" aria-label="Monitoring" className="row g6">
+      {items}
     </span>
   );
 }
 
-export function CameraPreview({ stream, className = "h-12 w-16" }: { stream: MediaStream; className?: string }) {
+/** "Go full screen", shown while the screen is shared and the page isn't full screen yet. */
+export function FullscreenButton() {
+  const p = useContext(ProctoringContext);
+  if (!p || !p.settings.screen || !p.active || p.fullscreen) return null;
+  if (typeof document === "undefined" || !document.fullscreenEnabled) return null;
+  return (
+    <button type="button" className="btn btn-sm" onClick={() => void document.documentElement.requestFullscreen?.().catch(() => {})}>
+      <Icon name="maximize" />
+      Go full screen
+    </button>
+  );
+}
+
+export function CameraPreview({ stream, className, style }: { stream: MediaStream; className?: string; style?: CSSProperties }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
-  return <video ref={ref} aria-label="Camera preview" autoPlay muted playsInline className={`rounded bg-neutral-200 object-cover dark:bg-neutral-800 ${className}`} />;
+  return <video
+      ref={ref}
+      aria-label="Camera preview"
+      autoPlay
+      muted
+      playsInline
+      className={className}
+      style={style ?? (className ? undefined : { display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 })}
+    />;
 }

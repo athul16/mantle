@@ -2,8 +2,11 @@
 // the session cookie at request time.
 export default function Loading() {
   return (
-    <main className="flex-1">
-      <p className="px-6 py-16 text-center text-sm text-neutral-500">Loading…</p>
+    <main style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span className="row g8 small muted" role="status">
+        <span className="spin" />
+        Loading…
+      </span>
     </main>
   );
 }

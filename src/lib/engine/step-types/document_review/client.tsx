@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/components/icons";
 import type { StepComponentProps } from "../../types";
 import type { DocumentFlag, DocumentReviewAnswer, DocumentReviewPublicConfig } from "./public";
 
+const FLAGGED = { background: "var(--bad)", borderColor: "var(--bad)", color: "#fff" } as const;
+const BAD_BG = "var(--bad-bg)";
+
 /**
- * Browser half of the `document_review` step type: the document with a Flag
- * toggle on every header field, line and total. A flagged item asks for a
- * reason (and an optional note). Optional final decision below the document.
+ * Browser half of the `document_review` step type: the document (read-only)
+ * with a Flag toggle on every header field, line and total. A flagged item
+ * asks for a reason and an optional note. Optional final decision below the
+ * document. The prompt is shown by the page (the workspace's brief column).
  */
 export function DocumentReviewStep({
   config,
@@ -38,13 +43,12 @@ export function DocumentReviewStep({
     return (
       <button
         type="button"
+        className="btn btn-sm"
         aria-pressed={on}
         aria-label={`Flag ${name}`}
         disabled={disabled || (!on && full)}
         onClick={() => toggle(id)}
-        className={`rounded border px-2 py-0.5 text-xs whitespace-nowrap disabled:opacity-40 ${
-          on ? "border-red-600 bg-red-600 text-white" : "border-neutral-300 dark:border-neutral-700"
-        }`}
+        style={on ? FLAGGED : undefined}
       >
         {on ? "Flagged" : "Flag"}
       </button>
@@ -55,15 +59,16 @@ export function DocumentReviewStep({
     const f = flagOf(id);
     if (!f) return null;
     return (
-      <div className="flex flex-wrap items-end gap-2 bg-red-50 px-2 py-2 text-xs dark:bg-red-950/30">
-        <label className="flex flex-col gap-1">
+      <div className="row g10 wrap" style={{ alignItems: "flex-end" }}>
+        <label className="col xs ink2" style={{ gap: 4 }}>
           Reason
           <select
             aria-label={`Reason for ${name}`}
             disabled={disabled}
             value={f.reason}
             onChange={(e) => patch(id, { reason: e.target.value })}
-            className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="select"
+            style={{ height: 30, fontSize: 13, width: 220 }}
           >
             <option value="">Choose a reason…</option>
             {config.reasons.map((r) => (
@@ -73,7 +78,7 @@ export function DocumentReviewStep({
             ))}
           </select>
         </label>
-        <label className="flex min-w-48 flex-1 flex-col gap-1">
+        <label className="col xs ink2" style={{ gap: 4, flex: "1 1 240px" }}>
           Note (optional)
           <input
             type="text"
@@ -81,53 +86,72 @@ export function DocumentReviewStep({
             maxLength={500}
             disabled={disabled}
             value={f.note}
+            placeholder="Add a short note"
             onChange={(e) => patch(id, { note: e.target.value })}
-            className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="input"
+            style={{ height: 30, fontSize: 13 }}
           />
         </label>
       </div>
     );
   };
 
-  const fieldList = (fields: typeof doc.fields, align: "left" | "right") => (
-    <dl className={`space-y-1 text-sm ${align === "right" ? "ml-auto max-w-md" : ""}`}>
-      {fields.map((f) => (
+  const fieldRows = (fields: typeof doc.fields, align: "left" | "right") =>
+    fields.map((f, i) => {
+      const on = !!flagOf(f.id);
+      const lastRow = i === fields.length - 1;
+      const band = on ? { background: BAD_BG, margin: "0 -20px", paddingLeft: 20, paddingRight: 20 } : {};
+      return (
         <div key={f.id}>
-          <div className="flex items-center gap-2">
-            <dt className="w-36 shrink-0 text-neutral-500">{f.label}</dt>
-            <dd className={`flex-1 font-mono ${align === "right" ? "text-right" : ""}`}>{f.value}</dd>
+          <div
+            className="row g12"
+            style={{ padding: "8px 0", borderBottom: lastRow && !on ? 0 : "1px solid var(--line)", ...band }}
+          >
+            {align === "right" ? <span className="grow" /> : null}
+            <dt className={align === "right" ? "strong" : "muted"} style={{ width: 140, flex: "none", textAlign: align }}>
+              {f.label}
+            </dt>
+            <dd className="tnum" style={{ margin: 0, flex: align === "right" ? "none" : 1, minWidth: align === "right" ? 120 : undefined, textAlign: align, fontWeight: on ? 600 : undefined }}>
+              {f.value}
+            </dd>
             {flagButton(f.id, f.label)}
           </div>
-          {flagDetails(f.id, f.label)}
+          {on ? (
+            <div style={{ padding: "10px 0 12px", borderBottom: "1px solid var(--line)", ...band }}>{flagDetails(f.id, f.label)}</div>
+          ) : null}
         </div>
-      ))}
-    </dl>
-  );
+      );
+    });
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm leading-6 whitespace-pre-line">{config.prompt}</p>
+    <div className="sheet-step" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div className="roband">
+        <Icon name="file" className="i-sm" />
+        <span>{doc.title} · document is read-only; use the Flag buttons</span>
+        <span className="grow" />
+        <span className="badge" role="status">
+          {flags.length} of {config.maxFlags} flags used
+        </span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 16, background: "var(--bg)" }}>
+        <article className="card" aria-label={doc.title} style={{ maxWidth: 860, overflow: "hidden", flex: "none" }}>
+          <div className="row g12" style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
+            <h2 style={{ fontSize: 18 }}>{doc.title}</h2>
+          </div>
 
-      <article aria-label={doc.title} className="space-y-4 rounded border border-neutral-300 p-4 dark:border-neutral-700">
-        <h4 className="text-base font-semibold">{doc.title}</h4>
-        {doc.fields.length > 0 && fieldList(doc.fields, "left")}
+          {doc.fields.length > 0 ? <dl style={{ margin: 0, padding: "8px 20px", fontSize: 13 }}>{fieldRows(doc.fields, "left")}</dl> : null}
 
-        {doc.rows.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+          {doc.rows.length > 0 ? (
+            <table className="tbl" style={{ borderTop: "1px solid var(--line)" }}>
               <thead>
                 <tr>
                   {doc.columns.map((c, i) => (
-                    <th
-                      key={i}
-                      scope="col"
-                      className="border-b border-neutral-300 px-2 py-1 text-left font-medium dark:border-neutral-700"
-                    >
+                    <th key={i} scope="col" className={i > 0 ? "r" : undefined}>
                       {c}
                     </th>
                   ))}
-                  <th scope="col" className="border-b border-neutral-300 px-2 py-1 dark:border-neutral-700">
-                    <span className="sr-only">Flag</span>
+                  <th scope="col" style={{ width: 100 }}>
+                    <span className="sr">Flag</span>
                   </th>
                 </tr>
               </thead>
@@ -135,57 +159,80 @@ export function DocumentReviewStep({
                 {doc.rows.map((r) => {
                   const name = r.cells[0] ?? r.id;
                   const on = !!flagOf(r.id);
+                  const bg = on ? { background: BAD_BG } : undefined;
                   return [
-                    <tr key={r.id} className={on ? "bg-red-50 dark:bg-red-950/30" : ""}>
+                    <tr key={r.id}>
                       {r.cells.map((cell, i) => (
-                        <td key={i} className={`px-2 py-1 ${i > 0 && /^[-$(\d]/.test(cell) ? "text-right font-mono" : ""}`}>
+                        <td key={i} className={i > 0 ? "r tnum" : undefined} style={bg}>
                           {cell}
                         </td>
                       ))}
-                      <td className="px-2 py-1 text-right">
+                      <td className="r" style={bg}>
                         {flagButton(r.id, name)}
                       </td>
                     </tr>,
-                    on && (
+                    on ? (
                       <tr key={`${r.id}-flag`}>
-                        <td colSpan={doc.columns.length + 1} className="p-0">
+                        <td colSpan={doc.columns.length + 1} style={{ ...bg, paddingTop: 0 }}>
                           {flagDetails(r.id, name)}
                         </td>
                       </tr>
-                    ),
+                    ) : null,
                   ];
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          ) : null}
 
-        {doc.totals.length > 0 && fieldList(doc.totals, "right")}
-        {doc.footnote && <p className="text-xs whitespace-pre-line text-neutral-500">{doc.footnote}</p>}
-      </article>
+          {doc.totals.length > 0 ? (
+            <dl style={{ margin: 0, padding: "8px 20px", fontSize: 13, borderTop: "1px solid var(--line)" }}>{fieldRows(doc.totals, "right")}</dl>
+          ) : null}
+          {doc.footnote ? (
+            <p className="xs muted pre" style={{ padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
+              {doc.footnote}
+            </p>
+          ) : null}
+        </article>
 
-      <p className="text-xs text-neutral-500">
-        {flags.length} of {config.maxFlags} flags used. Flag only real issues: flags on items that are fine cost points.
-      </p>
-
-      {config.decision && (
-        <fieldset className="space-y-1 text-sm">
-          <legend className="font-medium">{config.decision.prompt}</legend>
-          {config.decision.options.map((o) => (
-            <label key={o.id} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="document-review-decision"
-                value={o.id}
-                disabled={disabled}
-                checked={decision === o.id}
-                onChange={() => emit(flags, o.id)}
-              />
-              {o.label}
-            </label>
-          ))}
-        </fieldset>
-      )}
+        {config.decision ? (
+          <fieldset className="card" style={{ maxWidth: 860, padding: "20px 20px", margin: 0, display: "flex", flexDirection: "column", gap: 12, flex: "none" }}>
+            <legend className="strong" style={{ float: "left", padding: 0, marginBottom: 12 }}>
+              {config.decision.prompt}
+            </legend>
+            <div className="row g10 wrap" style={{ clear: "both" }}>
+              {config.decision.options.map((o) => {
+                const on = decision === o.id;
+                return (
+                  <label
+                    key={o.id}
+                    className="row g8"
+                    style={{
+                      height: 36,
+                      padding: "0 14px",
+                      borderRadius: 7,
+                      border: `1px solid ${on ? "var(--accent-line)" : "var(--line-2)"}`,
+                      background: on ? "var(--accent-soft)" : "#fff",
+                      color: on ? "var(--accent-ink)" : "var(--ink)",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="document-review-decision"
+                      value={o.id}
+                      disabled={disabled}
+                      checked={on}
+                      onChange={() => emit(flags, o.id)}
+                      style={{ accentColor: "var(--accent)", margin: 0 }}
+                    />
+                    {o.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : null}
+      </div>
     </div>
   );
 }

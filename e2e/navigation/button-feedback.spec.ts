@@ -40,16 +40,23 @@ test("Create company shows Creating… then opens the company", async ({ page, d
 test("Create job, Save, Clone and Revoke each show a pending state", async ({ page, hiring }) => {
   const { company, jobId, invite } = hiring;
   await signInViaUi(page, company.users.recruiter, `/app/${company.slug}/jobs`);
-  await page.getByLabel("Job title").fill("Feedback job");
-  await expectPending(page, () => page.getByRole("button", { name: "Create job" }).click(), "Creating…");
+  await page.getByRole("button", { name: "Create job" }).click();
+  await page.getByLabel("Role name").fill("Feedback job");
+  // Create job stays on "Creating…" until the invite page opens, so its end state is that page.
+  const held = await hold(page, isServerAction);
+  await page.getByRole("button", { name: "Create and invite candidates" }).click();
+  await held.arrived;
+  await expect(page.getByRole("button", { name: "Creating…" })).toBeDisabled();
+  await held.release();
+  await expect(page).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/invite$/);
   await expect(page.getByRole("link", { name: "Feedback job" })).toBeVisible();
 
-  await page.goto(`/app/${company.slug}/jobs/assessments`);
-  await page.getByRole("button", { name: "Edit settings" }).click();
+  await page.goto(`/app/${company.slug}/jobs/assessments?tab=yours`);
+  await page.getByRole("link", { name: /^Edit settings/ }).click();
   await expectPending(page, () => page.getByRole("button", { name: "Save" }).click(), "Saving…");
   await expect(page.getByText("Saved.")).toBeVisible();
   await expectPending(page, () => page.getByRole("button", { name: "Clone" }).click(), "Cloning…");
-  await expect(page.getByText("Petty cash (copy)")).toBeVisible();
+  await expect(page.getByText('Created "Petty cash (copy)". Edit it before linking it to a job.')).toBeVisible();
 
   await page.goto(`/app/${company.slug}/jobs/${jobId}`);
   page.once("dialog", (d) => void d.accept());
@@ -58,7 +65,7 @@ test("Create job, Save, Clone and Revoke each show a pending state", async ({ pa
     () => page.getByRole("row").filter({ hasText: invite.email }).getByRole("button", { name: "Revoke" }).click(),
     "Revoking…",
   );
-  await expect(page.getByRole("row").filter({ hasText: invite.email }).getByText("revoked", { exact: true })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: invite.email }).getByText("Revoked", { exact: true })).toBeVisible();
 });
 
 /**
@@ -80,23 +87,26 @@ test("the candidate's Continue, Verify, Start and Submit each show a pending sta
   await expectCandidatePending(page, page.getByRole("button", { name: "Continue" }), "Sending code…");
   const code = await candidate.requestCode(invite);
 
-  await page.getByLabel("Your full name").fill("Jamie Rivera");
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("Full name").fill("Jamie Rivera");
+  await page.getByLabel("Code from your email").fill(code);
   await page.getByRole("checkbox").check();
-  await expectCandidatePending(page, page.getByRole("button", { name: "Verify and continue" }), "Verifying…");
+  await expectCandidatePending(page, page.getByRole("button", { name: "Continue", exact: true }), "Verifying…");
   await candidate.submitCode(code);
   await expect(page).toHaveURL(/\/check$/);
 
-  await page.getByRole("link", { name: "Continue to instructions" }).click();
-  const start = page.getByRole("button", { name: /^Start the \d+-minute timer$/ });
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  const start = page.getByRole("button", { name: /^Start the \d+-minute simulation$/ });
   await expectCandidatePending(page, start, "Starting…");
   await start.click();
   await expect(page).toHaveURL(/\/workspace$/);
 
-  await page.getByRole("link", { name: "Review and submit" }).click();
+  await page.getByRole("link", { name: "Submit", exact: true }).click();
   await expect(page).toHaveURL(/\/review$/);
-  const submit = page.getByRole("button", { name: "Submit my answers" });
+  await page.getByRole("checkbox", { name: "I understand I can't make changes after submitting." }).check();
+  const submit = page.getByRole("button", { name: "Submit final answers" });
   await expectCandidatePending(page, submit, "Submitting…");
+  // The helper reloads the page, which clears the tick.
+  await page.getByRole("checkbox", { name: "I understand I can't make changes after submitting." }).check();
   await submit.click();
   await expect(page).toHaveURL(/\/done$/);
 });
