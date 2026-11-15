@@ -138,7 +138,7 @@ test("a recruiter sees why the label is suspicious, the Copies counter and the s
   const at = (s: number) => new Date(startedAt.getTime() + s * 1000).toISOString();
   const paths: string[] = [];
   try {
-    const insert = async (kind: string, when: string, payload: object = {}) =>
+    const insert = async (kind: string, when: string, payload: Record<string, number> = {}) =>
       must(await db().from("integrity_events").insert({ attempt_id: attemptId, org_id: co.orgId, kind, at: when, payload }).select("id").single()).id;
     const leftId = await insert("left_window", at(600));
     await insert("returned_to_window", at(615), { awayMs: 15_000 });
