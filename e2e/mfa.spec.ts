@@ -15,7 +15,7 @@ test.describe("admin two-factor", () => {
     await signInViaUi(page, co.users.admin, `/app/${co.slug}/team`);
 
     // Every company page sends them to set up two-factor, remembering where they were going.
-    await land(/\/app\/account\/security\?next=/, "Two-factor authentication");
+    await land(/\/app\/account\/security\?next=/, "Turn on two-factor authentication");
     await page.goto(`/app/${co.slug}/jobs`);
     await expect(page).toHaveURL(new RegExp(`/app/account/security\\?next=${encodeURIComponent(`/app/${co.slug}/jobs`)}`));
     await expect(page.getByText(/keep .*authenticator/i).first()).toBeVisible();
@@ -26,7 +26,7 @@ test.describe("admin two-factor", () => {
     expect(secret).toMatch(/^[A-Z2-7]{16,}$/);
 
     // A wrong code is refused and nothing changes.
-    await page.getByLabel("6-digit code").fill("000000");
+    await page.getByLabel("Enter the 6-digit code the app shows.").fill("000000");
     await page.getByRole("button", { name: "Turn on two-factor authentication" }).click();
     await expect(page.getByRole("alert").filter({ hasText: /code didn.t work/ })).toBeVisible();
 
@@ -54,7 +54,7 @@ test.describe("admin two-factor", () => {
     await expect(page).toHaveURL(/\/app\/account\/verify/);
 
     await page.goto(`/app/account/verify?next=${encodeURIComponent(`/app/${company.slug}/team`)}`);
-    await page.getByLabel("6-digit code").fill("000000");
+    await page.getByLabel("Code", { exact: true }).fill("000000");
     await page.getByRole("button", { name: "Verify" }).click();
     await expect(page.getByRole("alert").filter({ hasText: /code didn.t work/ })).toBeVisible();
 
@@ -77,21 +77,21 @@ test.describe("admin two-factor", () => {
   test("a viewer is forced only when the company shows viewers candidate media", async ({ page, data, land }) => {
     const co = await data.company();
     // Media hidden from viewers (the default): no two-factor needed, but it's offered.
-    await signInViaUi(page, co.users.viewer, `/app/${co.slug}`);
-    await land(new RegExp(`/app/${co.slug}$`), co.name);
+    await signInViaUi(page, co.users.viewer, `/app/${co.slug}/jobs`);
+    await land(new RegExp(`/app/${co.slug}/jobs$`), "Jobs");
     await page.goto("/app/account/security");
     await land(/\/app\/account\/security$/, "Two-factor authentication");
     await expect(page.getByText(/optional for you/i)).toBeVisible();
 
     // Turning media on for viewers sends them to set it up.
     await serviceClient().from("organizations").update({ settings: { viewers_see_media: true } }).eq("id", co.orgId).throwOnError();
-    await page.goto(`/app/${co.slug}`);
-    await expect(page).toHaveURL(new RegExp(`/app/account/security\\?next=${encodeURIComponent(`/app/${co.slug}`)}`));
+    await page.goto(`/app/${co.slug}/jobs`);
+    await expect(page).toHaveURL(new RegExp(`/app/account/security\\?next=${encodeURIComponent(`/app/${co.slug}/jobs`)}`));
   });
 
   test("an admin at aal2 can remove a factor, and is then asked to enrol again", async ({ page, company, signInAs, land }) => {
-    await signInAs("admin", `/app/${company.slug}`);
-    await land(new RegExp(`/app/${company.slug}$`), company.name);
+    await signInAs("admin", `/app/${company.slug}/jobs`);
+    await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
 
     await page.goto("/app/account/security");
     await land(/\/app\/account\/security$/, "Two-factor authentication");

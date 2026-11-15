@@ -59,7 +59,7 @@ export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", 
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
 
 /** Version of the monitoring notice, stored with each consent. Change it when the text changes. */
-export const MONITORING_CONSENT_VERSION = "2026-11-14.retention-clocks.contact";
+export const MONITORING_CONSENT_VERSION = "2026-11-15.verify-table.contact";
 
 /**
  * What the notice needs: what is captured (after any waiver for this
@@ -73,8 +73,10 @@ export type MonitoringSettings = Proctoring & {
 };
 
 /**
- * The monitoring notice on the system check: what is captured, why, who sees
- * it and for how long (docs/02 Compliance). Shown before any device prompt.
+ * The monitoring notice as paragraphs: what is captured, why, who sees it and
+ * for how long (docs/02 Compliance). The verify page shows the same facts as a
+ * table; the system check shows these paragraphs only if consent wasn't
+ * recorded at verify (e.g. a session from before the change).
  */
 export function monitoringNotice(settings: MonitoringSettings, companyName: string): string[] {
   const mediaDays = settings.mediaRetentionDays ?? DEFAULT_MEDIA_RETENTION_DAYS;

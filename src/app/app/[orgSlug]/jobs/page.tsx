@@ -1,77 +1,83 @@
 import Link from "next/link";
 import { requireOrgMembership } from "@/lib/auth";
 import { listAssessments, listJobs } from "@/lib/jobs/queries";
-import { CreateJobForm } from "./job-forms";
-import { LocalDate } from "./local-date";
+import { isPast } from "@/lib/jobs/status";
+import { simulationName } from "./format";
+import { CreateJobDialog } from "./job-forms";
+import { JobsTable, type JobRow } from "./jobs-table";
 
-export const metadata = { title: "Jobs · Assessment Platform" };
+export const metadata = { title: "Jobs · Mantle" };
 
-export default async function JobsPage({ params }: PageProps<"/app/[orgSlug]/jobs">) {
+export default async function JobsPage({ params, searchParams }: PageProps<"/app/[orgSlug]/jobs">) {
   const { orgSlug } = await params;
+  const query = await searchParams;
   const { orgId, role } = await requireOrgMembership(orgSlug);
   const canManage = role !== "viewer";
   const [jobs, assessments] = await Promise.all([listJobs(orgId), listAssessments(orgId)]);
   const base = `/app/${orgSlug}/jobs`;
+  const libraryHref = `${base}/assessments`;
+  const byId = new Map(assessments.map((a) => [a.id, a]));
+
+  const rows: JobRow[] = jobs.map((j) => {
+    const a = byId.get(j.assessmentId);
+    const c = j.inviteCounts;
+    return {
+      id: j.id,
+      title: j.title,
+      simulation: a ? `${simulationName(a.scenarioTitle)} · ${a.timeLimitMinutes} min` : j.assessmentTitle,
+      deadline: j.deadline,
+      closed: isPast(j.deadline),
+      done: c.completed,
+      inProgress: c.started,
+      // Expired invites were never started; revoked ones aren't candidates any more.
+      notStarted: c.invited + c.expired,
+    };
+  });
+
+  const options = assessments.map((a) => ({
+    id: a.id,
+    title: a.title,
+    label: `${a.title} (${simulationName(a.scenarioTitle)}, ${a.timeLimitMinutes} min)`,
+  }));
+  const wanted = typeof query.assessment === "string" && byId.has(query.assessment) ? query.assessment : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Each job is a hiring round with one assessment and an invite deadline.
-            {canManage ? "" : " You have read-only access."}
-          </p>
-        </div>
-        <Link href={`${base}/assessments`} className="text-sm underline">
-          Assessments ({assessments.length})
-        </Link>
+    <main style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <h1 style={{ fontSize: 28 }}>Jobs</h1>
+        <span style={{ flex: 1 }} />
+        {canManage && assessments.length > 0 ? (
+          <CreateJobDialog
+            orgId={orgId}
+            assessments={options}
+            jobsBase={base}
+            libraryHref={libraryHref}
+            defaultOpen={query.create === "1"}
+            defaultAssessmentId={wanted}
+          />
+        ) : null}
       </div>
 
-      {canManage ? (
-        assessments.length > 0 ? (
-          <CreateJobForm orgId={orgId} assessments={assessments.map((a) => ({ id: a.id, title: a.title }))} />
-        ) : (
-          <p className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm dark:border-neutral-700">
-            Create an <Link href={`${base}/assessments`} className="underline">assessment</Link> first, then a job that uses it.
-          </p>
-        )
+      {canManage && assessments.length === 0 ? (
+        <div className="co-banner">
+          <span className="small">
+            Create an assessment first: pick a simulation in the <Link style={{ textDecoration: "underline", textUnderlineOffset: 2 }} href={libraryHref}>assessment</Link> library, then create a job that uses it.
+          </span>
+        </div>
+      ) : null}
+      {!canManage ? (
+        <div className="co-banner">
+          <span className="small">You have read-only access to jobs.</span>
+        </div>
       ) : null}
 
       {jobs.length === 0 ? (
-        <p className="text-sm text-neutral-500">No jobs yet.</p>
+        <section className="card" style={{ padding: "28px 24px" }}>
+          <p className="small muted">No jobs yet.</p>
+        </section>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800">
-              <tr>
-                <th className="px-4 py-2 font-medium">Job</th>
-                <th className="px-4 py-2 font-medium">Assessment</th>
-                <th className="px-4 py-2 font-medium">Invite deadline</th>
-                <th className="px-4 py-2 font-medium">Invited</th>
-                <th className="px-4 py-2 font-medium">Started</th>
-                <th className="px-4 py-2 font-medium">Completed</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-              {jobs.map((j) => (
-                <tr key={j.id}>
-                  <td className="px-4 py-2">
-                    <Link href={`${base}/${j.id}`} className="font-medium underline-offset-2 hover:underline">
-                      {j.title}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{j.assessmentTitle}</td>
-                  <td className="px-4 py-2"><LocalDate iso={j.deadline} /></td>
-                  <td className="px-4 py-2">{j.inviteCounts.invited}</td>
-                  <td className="px-4 py-2">{j.inviteCounts.started}</td>
-                  <td className="px-4 py-2">{j.inviteCounts.completed}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <JobsTable jobs={rows} base={base} canManage={canManage} />
       )}
-    </div>
+    </main>
   );
 }

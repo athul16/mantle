@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 /**
  * Last-resort boundary when the root layout itself fails. Renders its own
- * document (no global CSS is loaded here, so styles are inline). Never shows
+ * document (no global CSS is loaded here, so styles are inline, using the design tokens' values). Never shows
  * the error; the digest matches the server log line.
  */
 export default function GlobalError({ error, retry }: { error: unknown; retry: () => void; reset: () => void }) {
@@ -15,21 +15,21 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
 
   return (
     <html lang="en">
-      <body style={{ fontFamily: "system-ui, sans-serif", margin: 0, padding: "4rem 1.5rem", color: "#171717", background: "#fff" }}>
+      <body style={{ fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: 14, lineHeight: 1.45, margin: 0, padding: "4rem 1.5rem", color: "#15181C", background: "#F5F6F7" }}>
         <title>Something went wrong</title>
         <main style={{ maxWidth: "28rem", margin: "0 auto" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Something went wrong</h1>
-          <p style={{ fontSize: "0.875rem", lineHeight: 1.5 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-.015em", margin: "0 0 12px" }}>Something went wrong</h1>
+          <p style={{ color: "#434B55", margin: "0 0 12px" }}>
             Please try again. If you were taking an assessment, your progress is saved. If it keeps happening, quote this
             reference when you get in touch:
           </p>
-          <p style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.875rem" }} data-testid="error-ref">
+          <p style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", margin: "0 0 16px" }} data-testid="error-ref">
             {ref}
           </p>
           <button
             type="button"
             onClick={() => retry()}
-            style={{ padding: "0.5rem 1rem", borderRadius: "0.375rem", border: 0, background: "#171717", color: "#fff", cursor: "pointer" }}
+            style={{ height: 36, padding: "0 14px", borderRadius: 7, border: "1px solid #1B45CA", background: "#1B45CA", color: "#fff", font: "500 14px/1 Inter, system-ui, sans-serif", cursor: "pointer" }}
           >
             Try again
           </button>

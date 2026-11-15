@@ -1,6 +1,7 @@
 /**
- * The timed workspace: every step type in both demo scenarios, scheduled
- * messages, autosave and resume, timeout, and a second device taking over.
+ * The timed workspace: every step type in both demo scenarios, task
+ * navigation, scheduled messages, autosave and resume, timeout, and a second
+ * device taking over.
  * Time passes by moving `started_at` / `deadline_at` back in the database and,
  * for the browser's own timers, with Playwright's clock; nothing sleeps.
  */
@@ -22,11 +23,11 @@ test("mini close: spreadsheet, numeric and email reply, saved and submitted", as
   const invite = await data.invite({ orgId: co.orgId, jobId });
 
   await candidate.startTest(invite);
-  await expect(page.getByRole("heading", { level: 1, name: "Demo: mini month-end close" })).toBeVisible();
-  await expect(page.getByText("Inbox · 1 unread")).toBeVisible();
+  await expect(page.getByText("Demo: mini month-end close")).toBeVisible();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox 1 unread");
 
-  await candidate.message(/At start/).click();
-  await expect(page.getByRole("heading", { name: "October bank reconciliation" })).toBeVisible();
+  // The first task opens straight away.
+  await expect(page.getByRole("heading", { level: 1, name: "October bank reconciliation" })).toBeVisible();
   const dit = page.getByLabel("Add: deposits in transit, Amount ($)");
   await dit.fill("1200.50");
   // Enter moves down to the next input in the column.
@@ -36,17 +37,20 @@ test("mini close: spreadsheet, numeric and email reply, saved and submitted", as
   await page.getByLabel("Adjusted bank balance, Amount ($)").fill("20000");
   await candidate.saved();
   await a11y(KNOWN_FAINT_TEXT);
+  await candidate.openInbox();
+  await candidate.message(/Harbor Lane: October bank rec/).click();
 
   // Minutes 5 and 10 bring the next two messages.
   await backdateAttempt(invite.inviteId, 11, { keepDeadline: true });
   await page.reload();
   // The opened message stays read after the reload; the two new ones are unread.
-  await expect(page.getByText("Inbox · 2 unread")).toBeVisible();
-  await candidate.message(/5 min in/).click();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox 2 unread");
+  await candidate.task(/Quick question from Dana/).click();
   await page.getByLabel(/reconciled \(adjusted\) cash balance/).fill("19,850.50");
   await candidate.saved();
 
-  await candidate.message(/10 min in/).click();
+  await candidate.task(/Reply to Marcus/).click();
+  await expect(page.getByText("Reply to Marcus Lee")).toBeVisible();
   await expect(page.getByText("Marcus Lee, Owner, Harbor Lane Coffee Co.").first()).toBeVisible();
   const reply = page.getByRole("textbox", { name: "Reply" });
   const text = "Hi Marcus, neither figure is wrong: a deposit and two checks haven't cleared yet.";
@@ -57,16 +61,16 @@ test("mini close: spreadsheet, numeric and email reply, saved and submitted", as
 
   // Everything typed survives a reload.
   await page.reload();
-  await candidate.message(/At start/).click();
   await expect(page.getByLabel("Add: deposits in transit, Amount ($)")).toHaveValue("1200.5");
-  await candidate.message(/10 min in/).click();
+  await candidate.task(/Reply to Marcus/).click();
   await expect(reply).toHaveValue(/neither figure is wrong/);
 
-  await page.getByRole("link", { name: "Review and submit" }).click();
-  await land(/\/review$/, "Review and submit");
+  await page.getByRole("link", { name: "Submit", exact: true }).click();
+  await land(/\/review$/, "Review before you submit");
   await expect(page.getByText("Answered", { exact: true })).toHaveCount(3);
-  await page.getByRole("button", { name: "Submit my answers" }).click();
-  await land(/\/done$/, "Thanks, you're done");
+  await page.getByRole("checkbox", { name: "I understand I can't make changes after submitting." }).check();
+  await page.getByRole("button", { name: "Submit final answers" }).click();
+  await land(/\/done$/, /^Submitted\. Thanks/);
 
   const attempt = await attemptFor(invite.inviteId);
   expect(attempt?.status).toBe("scored");
@@ -77,35 +81,42 @@ test("mini close: spreadsheet, numeric and email reply, saved and submitted", as
 test("a scheduled message arrives while the candidate watches", async ({ page, hiring, candidate }) => {
   await page.clock.install();
   await candidate.startTest(hiring.invite);
-  await expect(page.getByText("Inbox · 1 unread")).toBeVisible();
-  await expect(candidate.message(/5 min in/)).toHaveCount(0);
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox 1 unread");
+  await candidate.openInbox();
+  await expect(candidate.message(/^Re: Petty cash check/)).toHaveCount(0);
+  await expect(candidate.task(/Cash shortage/)).toHaveCount(0);
 
   await backdateAttempt(hiring.invite.inviteId, 6, { keepDeadline: true });
-  // The workspace polls every 20 seconds.
+  // The workspace polls every 20 seconds; the new email is announced and its task appears.
   await page.clock.fastForward(21_000);
-  await expect(candidate.message(/5 min in/)).toBeVisible();
-  await expect(page.getByText("Inbox · 2 unread")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Read now" })).toBeVisible();
+  await expect(candidate.message(/Re: Petty cash check/)).toBeVisible();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox 2 unread");
+  await expect(candidate.task(/Cash shortage/)).toBeVisible();
 });
 
 test("opened messages stay read after a reload", async ({ page, hiring, candidate }) => {
   await candidate.startTest(hiring.invite);
-  await expect(page.getByText("Inbox · 1 unread")).toBeVisible();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox 1 unread");
   const logged = page.waitForResponse((r) => r.url().endsWith("/api/candidate/event") && r.request().postData()?.includes("opened_message") === true);
-  await candidate.message(/At start/).click();
-  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
+  await candidate.openInbox();
+  await candidate.message(/Petty cash check for Hartwell/).click();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox");
   expect((await logged).ok()).toBe(true);
   await page.reload();
   await expect(page.getByRole("timer")).toBeVisible();
-  await expect(page.getByText("Inbox · 0 unread")).toBeVisible();
+  await expect(candidate.inboxButton()).toHaveAccessibleName("Inbox");
 });
 
 test("an unanswered task is flagged on review and the candidate can go back", async ({ page, hiring, candidate, land }) => {
   await candidate.startTest(hiring.invite);
-  await page.getByRole("link", { name: "Review and submit" }).click();
-  await land(/\/review$/, "Review and submit");
-  await expect(page.getByText("Not answered")).toHaveCount(1);
-  await expect(page.getByText("1 task has no answer.")).toBeVisible();
-  await page.getByRole("link", { name: "Back to the test" }).click();
+  await page.getByRole("link", { name: "Submit", exact: true }).click();
+  await land(/\/review$/, "Review before you submit");
+  await expect(page.getByText("Not started", { exact: true })).toHaveCount(1);
+  await expect(page.getByText(/One task looks unfinished\./)).toBeVisible();
+  // Submitting needs the confirmation first.
+  await expect(page.getByRole("button", { name: "Submit final answers" })).toBeDisabled();
+  await page.getByRole("link", { name: "Back to workspace" }).click();
   await expect(page).toHaveURL(/\/workspace$/);
   await expect(page.getByRole("timer")).toBeVisible();
 });
@@ -113,19 +124,17 @@ test("an unanswered task is flagged on review and the candidate can go back", as
 test("closing the tab and reopening the link resumes with the time that's left", async ({ page, hiring, candidate, land }) => {
   const { invite } = hiring;
   await candidate.startTest(invite);
-  await candidate.message(/At start/).click();
   await page.getByLabel(/how much cash should be in the petty cash box/).fill("88.20");
   await candidate.saved();
 
   // Three minutes pass on the server clock.
   await backdateAttempt(invite.inviteId, 3);
   await page.goto(invite.link);
-  await land(/\/a\/[\w-]+$/, "Your assessment is in progress");
-  await page.getByRole("link", { name: "Resume" }).click();
+  await land(/\/a\/[\w-]+$/, /^Welcome back/);
+  await page.getByRole("link", { name: "Resume simulation" }).click();
   await expect(page).toHaveURL(/\/workspace$/);
   await expect.poll(() => candidate.secondsLeft()).toBeLessThanOrEqual(12 * 60);
   expect(await candidate.secondsLeft()).toBeGreaterThan(11 * 60);
-  await candidate.message(/At start/).click();
   await expect(page.getByLabel(/how much cash should be in the petty cash box/)).toHaveValue("88.2");
 });
 
@@ -133,26 +142,31 @@ test("when time runs out the answers are submitted as a timeout", async ({ page,
   const { invite } = hiring;
   await page.clock.install();
   await candidate.startTest(invite);
-  await candidate.message(/At start/).click();
   await page.getByLabel(/how much cash should be in the petty cash box/).fill("10");
   await candidate.saved();
 
   await expireAttempt(invite.inviteId);
   // The browser countdown reaches zero, asks the server, and the server settles the attempt.
   await page.clock.fastForward("16:00");
-  await land(/\/done$/, "Time's up");
-  await expect(page.getByText("The time limit was reached, so we submitted the answers you had saved.")).toBeVisible();
+  await land(/\/done$/, "Time's up — your work is in.");
+  await expect(page.getByText("The clock reached 0:00, so we submitted everything that was saved. Nothing was lost.")).toBeVisible();
 
   const attempt = await attemptFor(invite.inviteId);
   expect(attempt?.status).toBe("scored");
   expect(attempt?.submit_reason).toBe("timeout");
 });
 
-test("an expired attempt reopened later lands on the time's-up page", async ({ page, hiring, candidate, land }) => {
-  await candidate.startTest(hiring.invite);
-  await expireAttempt(hiring.invite.inviteId);
-  await page.reload();
-  await land(/\/done$/, "Time's up");
+test.describe("expired attempt", () => {
+  // The workspace logs "started_step" when a task is first shown; if that lands
+  // after the attempt was expired, the server refuses it with 400, as it should.
+  test.use({ allowHttp: [/\/api\/candidate\/event$/] });
+
+  test("an expired attempt reopened later lands on the time's-up page", async ({ page, hiring, candidate, land }) => {
+    await candidate.startTest(hiring.invite);
+    await expireAttempt(hiring.invite.inviteId);
+    await page.reload();
+    await land(/\/done$/, "Time's up — your work is in.");
+  });
 });
 
 test.describe("second device", () => {
@@ -162,7 +176,6 @@ test.describe("second device", () => {
 test("verifying on a second device retires the first device's session", async ({ page, hiring, candidate, browser, browserName, land }) => {
   const { invite } = hiring;
   await candidate.startTest(invite);
-  await candidate.message(/At start/).click();
 
   const second = await browser.newContext();
   await relaxSecureCookies(second, browserName);
@@ -171,7 +184,7 @@ test("verifying on a second device retires the first device's session", async ({
   await other.goto(invite.link);
   await expect(other.getByRole("heading", { level: 1, name: "Continue your assessment" })).toBeVisible();
   await otherCandidate.verify(invite);
-  await other.getByRole("link", { name: "Continue to instructions" }).click();
+  await other.getByRole("link", { name: "Continue", exact: true }).click();
   await other.getByRole("link", { name: "Back to your test" }).click();
   await expect(other.getByRole("timer")).toBeVisible();
 

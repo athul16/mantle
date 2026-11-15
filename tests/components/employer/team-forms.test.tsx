@@ -16,6 +16,21 @@ const inviteTeammate = vi.mocked(actions.inviteTeammate);
 const changeRole = vi.mocked(actions.changeRole);
 const removeMember = vi.mocked(actions.removeMember);
 
+type ControlsProps = Parameters<typeof MemberControls>[0];
+/** MemberControls renders the role, two-factor and actions cells of a team table row. */
+function renderControls(props: Omit<ControlsProps, "email" | "pending"> & Partial<ControlsProps>) {
+  return render(
+    <table>
+      <tbody>
+        <tr>
+          <MemberControls email="sam@example.com" pending={false} {...props} />
+        </tr>
+      </tbody>
+    </table>,
+  );
+}
+const ROLE = { name: "Role for sam@example.com" };
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -72,16 +87,16 @@ describe("InviteForm", () => {
 
 describe("MemberControls", () => {
   it("shows the member's current role and a Remove button", () => {
-    render(<MemberControls orgId="org-1" userId="u-2" role="viewer" isSelf={false} />);
-    expect(screen.getByRole("combobox", { name: "Role" })).toHaveValue("viewer");
+    renderControls({ orgId: "org-1", userId: "u-2", role: "viewer", isSelf: false });
+    expect(screen.getByRole("combobox", ROLE)).toHaveValue("viewer");
     expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
   });
 
   it("saves as soon as a new role is picked", async () => {
     const user = userEvent.setup();
     changeRole.mockResolvedValueOnce(undefined);
-    render(<MemberControls orgId="org-1" userId="u-2" role="viewer" isSelf={false} />);
-    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "Admin");
+    renderControls({ orgId: "org-1", userId: "u-2", role: "viewer", isSelf: false });
+    await user.selectOptions(screen.getByRole("combobox", ROLE), "Admin");
     await waitFor(() => expect(changeRole).toHaveBeenCalledTimes(1));
     expect(formDataOf(changeRole)).toEqual({ orgId: "org-1", userId: "u-2", role: "admin" });
   });
@@ -90,27 +105,27 @@ describe("MemberControls", () => {
     const user = userEvent.setup();
     const pending = deferred<undefined>();
     changeRole.mockReturnValueOnce(pending.promise);
-    render(<MemberControls orgId="org-1" userId="u-2" role="viewer" isSelf={false} />);
-    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "Recruiter");
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Role" })).toBeDisabled());
+    renderControls({ orgId: "org-1", userId: "u-2", role: "viewer", isSelf: false });
+    await user.selectOptions(screen.getByRole("combobox", ROLE), "Recruiter");
+    await waitFor(() => expect(screen.getByRole("combobox", ROLE)).toBeDisabled());
     await act(async () => pending.resolve(undefined));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Role" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("combobox", ROLE)).toBeEnabled());
   });
 
   it("snaps back to the saved role and shows why when a change is rejected", async () => {
     const user = userEvent.setup();
     changeRole.mockResolvedValueOnce({ error: "A company needs at least one admin." });
-    render(<MemberControls orgId="org-1" userId="u-1" role="admin" isSelf />);
-    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "Viewer");
+    renderControls({ orgId: "org-1", userId: "u-1", role: "admin", isSelf: true });
+    await user.selectOptions(screen.getByRole("combobox", ROLE), "Viewer");
     expect(await screen.findByText("A company needs at least one admin.")).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Role" })).toHaveValue("admin");
+    expect(screen.getByRole("combobox", ROLE)).toHaveValue("admin");
   });
 
   it("asks before removing someone and does nothing if cancelled", async () => {
     const user = userEvent.setup();
     const confirm = vi.fn(() => false);
     vi.stubGlobal("confirm", confirm);
-    render(<MemberControls orgId="org-1" userId="u-2" role="recruiter" isSelf={false} />);
+    renderControls({ orgId: "org-1", userId: "u-2", role: "recruiter", isSelf: false });
     await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(confirm).toHaveBeenCalledWith("Remove this person from the company?");
     expect(removeMember).not.toHaveBeenCalled();
@@ -120,7 +135,7 @@ describe("MemberControls", () => {
     const user = userEvent.setup();
     vi.stubGlobal("confirm", vi.fn(() => true));
     removeMember.mockResolvedValueOnce({ error: "You can't remove the last admin." });
-    render(<MemberControls orgId="org-1" userId="u-2" role="admin" isSelf={false} />);
+    renderControls({ orgId: "org-1", userId: "u-2", role: "admin", isSelf: false });
     await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(await screen.findByText("You can't remove the last admin.")).toBeVisible();
     expect(formDataOf(removeMember)).toEqual({ orgId: "org-1", userId: "u-2" });
@@ -131,7 +146,7 @@ describe("MemberControls", () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
     const pending = deferred<undefined>();
     removeMember.mockReturnValueOnce(pending.promise);
-    render(<MemberControls orgId="org-1" userId="u-2" role="admin" isSelf={false} />);
+    renderControls({ orgId: "org-1", userId: "u-2", role: "admin", isSelf: false });
     await user.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled());
     await act(async () => pending.resolve(undefined));
@@ -141,9 +156,19 @@ describe("MemberControls", () => {
     const user = userEvent.setup();
     const confirm = vi.fn(() => false);
     vi.stubGlobal("confirm", confirm);
-    render(<MemberControls orgId="org-1" userId="me" role="recruiter" isSelf />);
+    renderControls({ orgId: "org-1", userId: "me", role: "recruiter", isSelf: true });
     await user.click(screen.getByRole("button", { name: "Leave" }));
     expect(confirm).toHaveBeenCalledWith("Remove yourself from this company? You'll lose access.");
+    expect(removeMember).not.toHaveBeenCalled();
+  });
+
+  it("offers Cancel on a pending invite, with its own warning", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    renderControls({ orgId: "org-1", userId: "u-3", role: "viewer", isSelf: false, pending: true });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(confirm).toHaveBeenCalledWith("Cancel the invite to sam@example.com?");
     expect(removeMember).not.toHaveBeenCalled();
   });
 });

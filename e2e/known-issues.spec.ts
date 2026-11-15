@@ -9,7 +9,7 @@ test.describe("colour contrast", () => {
   // Every company page, with no excluded nodes: muted text must be 4.5:1 or better.
   test("company pages pass axe, including colour contrast", async ({ page, hiring }, testInfo) => {
     const { company, jobId } = hiring;
-    await signInViaUi(page, company.users.admin, `/app/${company.slug}`);
+    await signInViaUi(page, company.users.admin, `/app/${company.slug}/jobs`);
     for (const path of [
       `/app/${company.slug}`,
       `/app/${company.slug}/jobs`,
@@ -28,8 +28,8 @@ test.describe("colour contrast", () => {
   test("candidate pages meet colour contrast (system check, inbox times)", async ({ page, hiring, candidate }, testInfo) => {
     await candidate.verify(hiring.invite);
     await axeSerious(page, testInfo);
-    await page.getByRole("link", { name: "Continue to instructions" }).click();
-    await page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click();
+    await page.getByRole("link", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
     await expect(page.getByRole("timer")).toBeVisible();
     await axeSerious(page, testInfo);
   });

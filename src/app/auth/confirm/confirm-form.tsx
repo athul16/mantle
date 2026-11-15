@@ -27,14 +27,14 @@ export function ConfirmForm() {
 
   const copy = type === "invite" ? COPY.invite : COPY.confirm;
   return (
-    <form action={formAction} className="space-y-4">
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">{copy.text}</p>
+    <form action={formAction} className="col g16">
+      <p className="small ink2">{copy.text}</p>
       {tokenHash ? <input type="hidden" name="token_hash" value={tokenHash} /> : null}
       {type ? <input type="hidden" name="type" value={type} /> : null}
       {code ? <input type="hidden" name="code" value={code} /> : null}
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <FormMessage error={state?.error} />
-      <Button type="submit" disabled={pending} className="w-full">
+      <Button type="submit" size="lg" disabled={pending} style={{ width: "100%" }}>
         {pending ? "Please wait…" : copy.button}
       </Button>
     </form>

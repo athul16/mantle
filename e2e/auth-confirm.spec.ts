@@ -28,7 +28,7 @@ test("a scanner opening a teammate invite doesn't use it up; Accept does", async
   await page.getByLabel("Password", { exact: true }).fill("correct-horse-battery");
   await page.getByLabel("Confirm password").fill("correct-horse-battery");
   await page.getByRole("button", { name: "Save and continue" }).click();
-  await land(new RegExp(`/app/${company.slug}$`), company.name);
+  await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
 
   // The link is now used: clicking it again explains, nothing else happens.
   await page.context().clearCookies();

@@ -1,6 +1,6 @@
 /**
- * Integrity flags on the candidate report: the flag count in the summary,
- * evidence with snapshot thumbnails, a recruiter clearing a flag with a note,
+ * Integrity flags on the candidate report: the Integrity card's badge and
+ * signal rows, evidence with snapshot thumbnails, a recruiter clearing a flag with a note,
  * and a viewer who can read the flags but not review them or see snapshots.
  */
 import { signInViaUi } from "../fixtures";
@@ -57,10 +57,9 @@ test("a recruiter sees the flag with its evidence and clears it with a note", as
     await signInViaUi(page, co.users.recruiter, `/app/${co.slug}/candidates/${invite.inviteId}`);
     await land(new RegExp(`/candidates/${invite.inviteId}$`), invite.email);
 
-    await expect(page.getByTestId("flag-count")).toHaveText("1");
-    await expect(page.getByTestId("flag-count-detail")).toHaveText("1 open");
-
-    const section = page.getByRole("region", { name: "Integrity flags (1)" });
+    const section = page.getByRole("region", { name: "Integrity" });
+    await expect(section.getByTestId("integrity-badge")).toHaveText("Review · 1 flag");
+    await expect(section).toContainText("Entire screen sharedStopped 1×");
     const flag = section.getByRole("article").filter({ hasText: "Screen sharing stopped 1 time" });
     await expect(flag.getByRole("list", { name: "Evidence" })).toContainText("12:30 into the test");
     const thumb = flag.getByRole("img", { name: "Screen snapshot at 12:30" });
@@ -69,12 +68,13 @@ test("a recruiter sees the flag with its evidence and clears it with a note", as
     await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
 
     const form = section.getByRole("form", { name: "Review flag: Screen sharing stopped 1 time" });
-    await form.getByRole("textbox", { name: "Note" }).fill("Laptop went to sleep; the candidate emailed us at the time.");
+    await form.getByRole("textbox", { name: "Your note (required)" }).fill("Laptop went to sleep; the candidate emailed us at the time.");
     await form.getByRole("button", { name: "Clear flag" }).click();
-    await expect(form.getByText("Flag cleared.")).toBeVisible();
+    // The reviewed flag replaces the form: who decided, and their note.
     await expect(flag).toContainText("Cleared");
+    await expect(flag).toContainText(co.users.recruiter.email);
     await expect(flag).toContainText("Laptop went to sleep; the candidate emailed us at the time.");
-    await expect(page.getByTestId("flag-count-detail")).toHaveText("1 reviewed");
+    await expect(section.getByTestId("integrity-badge")).toHaveText("Reviewed");
 
     const row = must(await db().from("flags").select("status, review_note, reviewed_by").eq("attempt_id", attemptId).single());
     expect(row).toEqual({ status: "cleared", review_note: "Laptop went to sleep; the candidate emailed us at the time.", reviewed_by: co.users.recruiter.id });
@@ -88,10 +88,10 @@ test("a viewer reads the flags but cannot review them or see snapshots", async (
   try {
     await signInViaUi(page, co.users.viewer, `/app/${co.slug}/candidates/${invite.inviteId}`);
     await land(new RegExp(`/candidates/${invite.inviteId}$`), invite.email);
-    const section = page.getByRole("region", { name: "Integrity flags (1)" });
+    const section = page.getByRole("region", { name: "Integrity" });
     await expect(section).toContainText("Screen sharing stopped 1 time");
     await expect(section.getByRole("img")).toHaveCount(0);
-    await expect(section.getByText("Snapshots are visible to admins and recruiters only.")).toBeVisible();
+    await expect(section.getByText(/Snapshots are visible to admins and recruiters only\./)).toBeVisible();
     await expect(section.getByRole("form")).toHaveCount(0);
     await expect(section.getByRole("button", { name: "Clear flag" })).toHaveCount(0);
   } finally {

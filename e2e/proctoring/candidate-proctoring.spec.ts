@@ -59,20 +59,25 @@ const mediaFor = async (attemptId: string) =>
 test("a candidate consents, passes the camera and screen checks and is monitored in the workspace", async ({ page, data, candidate, a11y }) => {
   await captureScreenStream(page);
   const { co, invite } = await proctoredInvite(data);
-  await candidate.verify(invite);
 
-  // Consent comes before any device prompt.
-  const consent = page.getByRole("region", { name: "Monitoring for this test" });
-  await expect(consent).toContainText("camera photo every 30 to 60 seconds");
-  await expect(page.getByRole("button", { name: "Test camera" })).toBeDisabled();
-  await expect(page.getByRole("link", { name: "Continue to instructions" })).toHaveCount(0);
+  // The verify page shows what is recorded, why and for how long before the one consent box.
+  const code = await candidate.requestCode(invite);
+  const notice = page.getByRole("table");
+  await expect(notice).toContainText("Camera snapshots");
+  await expect(notice).toContainText("Your entire screen");
+  await expect(page.getByText(/Photos and screenshots deleted after \d+ days\. Answers and results deleted after \d+ days\./)).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /agree to camera snapshots, screen sharing and activity recording/ })).toBeVisible();
   await a11y();
-  await page.getByRole("checkbox", { name: /I agree to camera and screen monitoring/ }).check();
+  await candidate.submitCode(code);
+  await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Test camera" }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: "Camera" })).toContainText("OK");
+  // Consent was given on the verify page, so the camera starts by itself; the start photo is explicit.
+  await expect(page.getByRole("listitem").filter({ hasText: "Camera" })).toContainText("Allowed");
+  await expect(page.getByRole("link", { name: "Continue", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Take start photo" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Start photo" })).toContainText("Taken");
   await page.getByRole("button", { name: "Share entire screen" }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: "Screen share" })).toContainText("OK");
+  await expect(page.getByRole("listitem").filter({ hasText: "Screen sharing" })).toContainText("Entire screen shared");
   await a11y();
 
   const attempt = must(await db().from("attempts").select("id").eq("invite_id", invite.inviteId).single());
@@ -82,10 +87,10 @@ test("a candidate consents, passes the camera and screen checks and is monitored
   // The start photo is in the attempt's own folder of the private bucket.
   await expect.poll(async () => (await mediaFor(attempt.id)).map((m) => m.source)).toContain("camera");
 
-  await page.getByRole("link", { name: "Continue to instructions" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
-  await expect(page.getByText("Your camera and entire screen are monitored")).toBeVisible();
-  await page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click();
+  await expect(page.getByText("If either stops, the workspace is covered until it's back.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
   // The streams from the system check carry over: no second prompt, no cover.
@@ -111,8 +116,8 @@ test("a candidate consents, passes the camera and screen checks and is monitored
 
   // Stopping the share covers the workspace (the timer keeps running) until it is shared again.
   await endScreenShare(page);
-  const cover = page.getByRole("dialog", { name: "Turn on monitoring to continue" });
-  await expect(cover).toContainText("Screen sharing stopped.");
+  const cover = page.getByRole("dialog", { name: "Screen sharing stopped" });
+  await expect(cover).toContainText("Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.");
   await expect(cover).toContainText("The timer keeps running while this message is open; it does not pause.");
   await a11y();
   await cover.getByRole("button", { name: "Share entire screen" }).click();
@@ -135,11 +140,11 @@ test("a candidate consents, passes the camera and screen checks and is monitored
 test("after a reload the workspace asks for the screen again before showing the test", async ({ page, data, candidate }) => {
   const { invite } = await proctoredInvite(data);
   await candidate.verify(invite);
-  await page.getByRole("checkbox", { name: /I agree to camera and screen monitoring/ }).check();
-  await page.getByRole("button", { name: "Test camera" }).click();
+  await page.getByRole("button", { name: "Take start photo" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Start photo" })).toContainText("Taken");
   await page.getByRole("button", { name: "Share entire screen" }).click();
-  await page.getByRole("link", { name: "Continue to instructions" }).click();
-  await page.getByRole("button", { name: /^Start the \d+-minute timer$/ }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
   await page.reload();
@@ -159,10 +164,8 @@ test("a candidate who cancels the screen share cannot continue and is told why",
   });
   const { invite } = await proctoredInvite(data);
   await candidate.verify(invite);
-  await page.getByRole("checkbox", { name: /I agree to camera and screen monitoring/ }).check();
   await page.getByRole("button", { name: "Share entire screen" }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: "Screen share" })).toContainText(
-    "Screen sharing was cancelled. You need to share your entire screen to take this test.",
-  );
-  await expect(page.getByRole("link", { name: "Continue to instructions" })).toHaveCount(0);
+  await expect(page.getByText("Screen sharing was cancelled. You need to share your entire screen to take this test.")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Screen sharing" })).toContainText("Not shared yet");
+  await expect(page.getByRole("link", { name: "Continue", exact: true })).toHaveCount(0);
 });

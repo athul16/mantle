@@ -26,15 +26,16 @@ test.describe("core", () => {
     const secret = (await page.getByTestId("totp-secret").textContent())!.replace(/\s/g, "");
     await enterCode(page, secret);
 
-    await expect(page).toHaveURL(/\/app\/[a-z0-9-]+$/);
+    // The company opens on its Jobs list (there is no dashboard).
+    await expect(page).toHaveURL(/\/app\/[a-z0-9-]+\/jobs$/);
     const slug = new URL(page.url()).pathname.split("/")[2];
     const orgId = await orgIdForSlug(slug);
     data.trackOrg(orgId);
     for (const m of await memberIds(orgId)) data.trackUser(m.user_id);
 
-    await land(new RegExp(`/app/${slug}$`), companyName);
-    await expect(page.getByText("You're signed in as admin.")).toBeVisible();
-    await expect(page.getByRole("navigation").getByRole("link", { name: "Jobs" })).toHaveAttribute("href", `/app/${slug}/jobs`);
+    await land(new RegExp(`/app/${slug}/jobs$`), "Jobs");
+    await expect(page.getByRole("button", { name: companyName })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Jobs" })).toHaveAttribute("href", `/app/${slug}/jobs`);
   });
 });
 
@@ -54,8 +55,10 @@ test.describe("chromium", () => {
     await held.release();
     await completeMfaIfAsked(page, admin);
 
-    await land(new RegExp(`/app/${company.slug}$`), company.name);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
+    // Sign out is in the account menu (the avatar button in the header).
+    await page.getByRole("button", { name: company.name }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await land(/\/login$/, "Sign in");
 
     // Signed out, company pages bounce to login and come back after it.
@@ -81,7 +84,7 @@ test.describe("chromium", () => {
   test("a signed-in user visiting login is sent to their company", async ({ page, company, signInAs }) => {
     await signInAs("recruiter");
     await page.goto("/login");
-    await expect(page).toHaveURL(new RegExp(`/app/${company.slug}$`));
+    await expect(page).toHaveURL(new RegExp(`/app/${company.slug}/jobs$`));
   });
 
   test("the org switcher moves between companies and /app remembers the last one", async ({ page, company, data, signInAs, land }) => {
@@ -90,20 +93,24 @@ test.describe("chromium", () => {
     await db().from("memberships").insert({ org_id: second.orgId, user_id: company.users.admin.id, role: "viewer" });
 
     await signInAs("admin");
-    const switcher = page.getByLabel("Company");
-    await expect(switcher).toHaveValue(company.orgId);
+    // /app redirects to the company's Jobs page; the menu closes on navigation, so wait for it first.
+    await expect(page).toHaveURL(new RegExp(`/app/${company.slug}/jobs$`));
+    // The company switcher is in the account menu, which shows the active company.
+    await page.getByRole("button", { name: company.name }).click();
+    await expect(page.getByRole("menuitemradio", { name: company.name })).toHaveAttribute("aria-checked", "true");
 
-    await switcher.selectOption({ label: second.name });
-    await land(new RegExp(`/app/${second.slug}$`), second.name);
-    await expect(page.getByText("You're signed in as viewer.")).toBeVisible();
+    await page.getByRole("menuitemradio", { name: second.name }).click();
+    await land(new RegExp(`/app/${second.slug}/jobs$`), "Jobs");
+    await expect(page.getByRole("button", { name: second.name })).toBeVisible();
 
     await page.goto("/app");
-    await expect(page).toHaveURL(new RegExp(`/app/${second.slug}$`));
+    await expect(page).toHaveURL(new RegExp(`/app/${second.slug}/jobs$`));
 
     // Both companies stay reachable by URL, e.g. in two tabs.
     const other = await page.context().newPage();
     await other.goto(`/app/${company.slug}`);
-    await expect(other.getByRole("heading", { level: 1, name: company.name })).toBeVisible();
+    await expect(other).toHaveURL(new RegExp(`/app/${company.slug}/jobs$`));
+    await expect(other.getByRole("button", { name: company.name })).toBeVisible();
   });
 
   test("a user with no company is sent to onboarding", async ({ page, data, land }) => {

@@ -15,25 +15,26 @@ const CLS_BUDGET = 0.1;
 test("company navigation: back and forward land on the right pages without layout shift", async ({ page, hiring, cls, land }) => {
   const { company, jobId } = hiring;
   await signInViaUi(page, company.users.recruiter);
-  await land(new RegExp(`/app/${company.slug}$`), company.name);
+  // The company opens on its Jobs list (there is no dashboard).
+  await land(new RegExp(`/app/${company.slug}/jobs$`), "Jobs");
 
-  const nav = page.getByRole("navigation");
-  await nav.getByRole("link", { name: "Jobs" }).click();
-  await land(/\/jobs$/, "Jobs");
+  const nav = page.getByRole("navigation", { name: "Main" });
   await page.getByRole("link", { name: "Audit intern" }).click();
   await land(/\/jobs\/[0-9a-f-]{36}$/, "Audit intern");
-  await nav.getByRole("link", { name: "Team" }).click();
+  // Team lives in the account menu (the avatar button in the header).
+  await page.getByRole("button", { name: new RegExp(company.name) }).click();
+  await page.getByRole("menuitem", { name: "Team" }).click();
   await land(/\/team$/, "Team");
   await nav.getByRole("link", { name: "Candidates" }).click();
-  await expect(page).toHaveURL(/\/candidates$/);
-  await nav.getByRole("link", { name: "Dashboard" }).click();
-  await land(new RegExp(`/app/${company.slug}$`), company.name);
+  await expect(page).toHaveURL(/\/candidates(\?.*)?$/);
+  await nav.getByRole("link", { name: "Jobs" }).click();
+  await land(/\/jobs$/, "Jobs");
 
   // All of that was client-side navigation in one document.
   expect(await cls(), "cumulative layout shift across company navigation").toBeLessThan(CLS_BUDGET);
 
   await page.goBack();
-  await expect(page).toHaveURL(/\/candidates$/);
+  await expect(page).toHaveURL(/\/candidates(\?.*)?$/);
   await page.goBack();
   await land(/\/team$/, "Team");
   await page.goBack();
@@ -49,8 +50,9 @@ test("a slow company page shows its loading state, then the page", async ({ page
   const prefetched = page.waitForResponse(
     (res) => new URL(res.url()).pathname.endsWith("/jobs") && "next-router-prefetch" in res.request().headers(),
   );
-  await signInViaUi(page, company.users.recruiter);
-  await expect(page.getByRole("heading", { level: 1, name: company.name })).toBeVisible();
+  // Start on another page, so clicking Jobs is a real navigation.
+  await signInViaUi(page, company.users.recruiter, `/app/${company.slug}/team`);
+  await expect(page.getByRole("heading", { level: 1, name: "Team" })).toBeVisible();
   await prefetched;
 
   // Hold the server render of the jobs page (an RSC request, not a prefetch).
@@ -58,7 +60,7 @@ test("a slow company page shows its loading state, then the page", async ({ page
     page,
     (req) => new URL(req.url()).pathname.endsWith("/jobs") && "rsc" in req.headers() && !("next-router-prefetch" in req.headers()),
   );
-  await page.getByRole("navigation").getByRole("link", { name: "Jobs" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Jobs" }).click();
   await held.arrived;
   await expect(page.getByRole("main").getByText("Loading…")).toBeVisible();
   await held.release();
@@ -74,16 +76,16 @@ test("candidate pages load without layout shift and back returns to the right st
 
   await candidate.verify(invite);
   expect(await cls(), "system check CLS").toBeLessThan(CLS_BUDGET);
-  await page.getByRole("link", { name: "Continue to instructions" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
   expect(await cls(), "instructions CLS").toBeLessThan(CLS_BUDGET);
 
   await page.goBack();
-  await expect(page.getByRole("heading", { level: 1, name: "System check" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
   await page.goForward();
   await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Start the 15-minute timer" }).click();
+  await page.getByRole("button", { name: "Start the 15-minute simulation" }).click();
   await expect(page.getByRole("timer")).toBeVisible();
   expect(await cls(), "workspace CLS").toBeLessThan(CLS_BUDGET);
 

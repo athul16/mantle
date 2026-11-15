@@ -1,7 +1,18 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
+// /app/<slug> has no page of its own (the prototype has no dashboard). Redirect
+// over HTTP so the browser never renders it and then jumps client-side, which
+// can interrupt whatever navigation comes next. Membership is checked on /jobs.
+const ORG_HOME = /^\/app\/([^/]+)\/?$/;
+
 export async function proxy(request: NextRequest) {
+  const home = ORG_HOME.exec(request.nextUrl.pathname);
+  if (home && home[1] !== "account") {
+    const url = request.nextUrl.clone();
+    url.pathname = `/app/${home[1]}/jobs`;
+    return NextResponse.redirect(url);
+  }
   return updateSession(request);
 }
 

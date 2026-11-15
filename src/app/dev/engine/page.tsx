@@ -36,18 +36,14 @@ async function EnginePreview({ searchParams }: { searchParams: SearchParams }) {
   const minutes = [...new Set([0, ...scenario.definition.messages.map((m) => m.arriveAtMinute ?? 0)])].sort((a, b) => a - b);
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 px-4 py-8">
+    <main className="mx-auto max-w-6xl space-y-4 px-4 py-8" style={{ minHeight: "100vh" }}>
       <nav className="flex flex-wrap gap-2 text-sm" aria-label="Scenario">
         {scenarioChoices().map((s) => (
           <Link
             key={s.slug}
             href={{ query: { scenario: s.slug, seed, minute: 0 } }}
             aria-current={s.slug === scenario.slug ? "page" : undefined}
-            className={`rounded border px-3 py-1 ${
-              s.slug === scenario.slug
-                ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                : "border-neutral-300 dark:border-neutral-700"
-            }`}
+            className={s.slug === scenario.slug ? "chip on" : "chip"}
           >
             {s.title} <span className="font-mono text-xs opacity-70">v{s.version}</span>
           </Link>
@@ -55,12 +51,12 @@ async function EnginePreview({ searchParams }: { searchParams: SearchParams }) {
       </nav>
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h1 className="text-lg font-semibold">{scenario.title}</h1>
+          <h1 style={{ fontSize: 22 }}>{scenario.title}</h1>
           <p className="text-sm text-neutral-500">
             Engine preview · seed <span className="font-mono">{seed}</span> · minute {minute}
           </p>
         </div>
-        <nav className="flex flex-wrap gap-3 text-sm underline">
+        <nav className="flex flex-wrap gap-3 text-sm">
           {minutes.map((m) => (
             <Link key={m} href={{ query: { scenario: scenario.slug, seed, minute: m } }}>
               Minute {m}

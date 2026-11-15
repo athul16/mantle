@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { applyWaivers } from "@/lib/accommodations";
 import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
-import type { AttemptRow } from "@/lib/candidate/invite";
+import type { AttemptRow, InviteContext } from "@/lib/candidate/invite";
 import type { CandidateSession } from "@/lib/candidate/session";
 import { readRetention } from "@/lib/retention/policy";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -36,19 +36,29 @@ const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
  * the monitoring notice shows (retention, company contact).
  */
 export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
+  return getInviteProctoringSettings(session.invite);
+}
+
+/**
+ * The same settings for an invite before the candidate has a session (the
+ * verify page shows what will be recorded before they agree).
+ */
+export async function getInviteProctoringSettings(
+  invite: Pick<InviteContext, "assessmentId" | "orgId" | "accommodations" | "contactEmail">,
+): Promise<MonitoringSettings> {
   const db = createServiceClient();
   const [assessment, org] = await Promise.all([
-    db.from("assessments").select("proctoring").eq("id", session.invite.assessmentId).eq("org_id", session.invite.orgId).single(),
-    db.from("organizations").select("settings").eq("id", session.invite.orgId).single(),
+    db.from("assessments").select("proctoring").eq("id", invite.assessmentId).eq("org_id", invite.orgId).single(),
+    db.from("organizations").select("settings").eq("id", invite.orgId).single(),
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
   const { mediaDays, resultsDays } = readRetention(org.data.settings);
   return {
-    ...applyWaivers(readProctoring(assessment.data.proctoring), session.invite.accommodations),
+    ...applyWaivers(readProctoring(assessment.data.proctoring), invite.accommodations),
     mediaRetentionDays: mediaDays,
     resultsRetentionDays: resultsDays,
-    contactEmail: session.invite.contactEmail,
+    contactEmail: invite.contactEmail,
   };
 }
 

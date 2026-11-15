@@ -186,7 +186,7 @@ function startedAt(attempts: { started_at: string | null } | { started_at: strin
 }
 
 /** Accommodations by invite id, for invites that have a row (D9). */
-async function accommodationsFor(orgId: string, inviteIds: string[]): Promise<Map<string, Accommodations>> {
+export async function accommodationsFor(orgId: string, inviteIds: string[]): Promise<Map<string, Accommodations>> {
   const out = new Map<string, Accommodations>();
   if (!inviteIds.length) return out;
   const db = await createClient();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/icons";
 
 /**
  * Error boundary for the company app (/app and every /app/<org> page). Never
@@ -14,21 +15,21 @@ export default function AppError({ error, retry }: { error: unknown; retry: () =
   }, [error, ref]);
 
   return (
-    <main className="mx-auto w-full max-w-md space-y-4 px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">Something went wrong</h1>
-      <p className="text-sm text-neutral-700 dark:text-neutral-300">
-        Nothing you saved before this was lost. Try again; if it keeps happening, send us this reference:
-      </p>
-      <p className="font-mono text-sm" data-testid="error-ref">
+    <main style={{ maxWidth: 480, margin: "0 auto", padding: "64px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", background: "var(--warn-bg)", color: "var(--warn)" }}>
+        <Icon name="alert" className="i-lg" />
+      </span>
+      <h1 style={{ fontSize: 24 }}>Something went wrong</h1>
+      <p className="ink2">Nothing you saved before this was lost. Try again; if it keeps happening, send us this reference:</p>
+      <p className="small tnum strong" data-testid="error-ref">
         {ref}
       </p>
-      <button
-        type="button"
-        onClick={() => retry()}
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-      >
-        Try again
-      </button>
+      <div>
+        <button type="button" onClick={() => retry()} className="btn btn-primary">
+          <Icon name="refresh" />
+          Try again
+        </button>
+      </div>
     </main>
   );
 }

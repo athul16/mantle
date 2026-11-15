@@ -9,7 +9,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * slow server can't collect double clicks. Coming back with the browser's Back
  * button (bfcache) re-enables it.
  */
-export function SubmitButton({ children, pendingText, className }: { children: ReactNode; pendingText: string; className?: string }) {
+export function SubmitButton({
+  children,
+  pendingText,
+  className,
+  disabled = false,
+}: {
+  children: ReactNode;
+  pendingText: string;
+  className?: string;
+  disabled?: boolean;
+}) {
   const ref = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
 
@@ -31,7 +41,7 @@ export function SubmitButton({ children, pendingText, className }: { children: R
   }, []);
 
   return (
-    <button ref={ref} type="submit" disabled={pending} className={className}>
+    <button ref={ref} type="submit" disabled={pending || disabled} className={className}>
       {pending ? pendingText : children}
     </button>
   );

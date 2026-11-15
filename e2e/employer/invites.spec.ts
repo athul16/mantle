@@ -8,34 +8,40 @@ import { chromiumOnly, expect, outbox, test } from "../support/test";
 chromiumOnly();
 
 const inviteRow = (page: Page, email: string) => page.getByRole("row").filter({ hasText: email });
+const emailsBox = (page: Page) => page.getByLabel("Email addresses");
+const sendButton = (page: Page) => page.getByRole("button", { name: /^Send( \d+)? invites?$/ });
 
 test("a recruiter invites by paste and CSV; duplicates and existing invites are skipped", async ({ page, hiring, data, land }) => {
   const { company, jobId } = hiring;
   const a = data.email("paste-a");
   const b = data.email("paste-b");
   const c = data.email("csv-c");
-  await signInViaUi(page, hiring.company.users.recruiter, `/app/${company.slug}/jobs/${jobId}`);
-  await land(/\/jobs\/[0-9a-f-]{36}$/, "Audit intern");
-  await expect(page.getByRole("heading", { name: "Candidates (1)" })).toBeVisible();
+  await signInViaUi(page, hiring.company.users.recruiter, `/app/${company.slug}/jobs/${jobId}/invite`);
+  await land(/\/jobs\/[0-9a-f-]{36}\/invite$/, "Invite candidates");
 
   // a three times (once upper-cased, once in the CSV) counts as one duplicate address.
   // a twice (once upper-cased), b, plus the already-invited fixture email; c and a again in the CSV.
-  await page.getByLabel("Paste emails").fill(`${a}, ${a.toUpperCase()}\n${b}; ${hiring.invite.email}`);
-  await page.getByLabel("or upload a CSV").setInputFiles({
+  await emailsBox(page).fill(`${a}, ${a.toUpperCase()}\n${b}; ${hiring.invite.email} `);
+  await expect(page.getByText("2 ready · 1 already invited, will be skipped")).toBeVisible();
+  await page.getByRole("tab", { name: "Upload CSV" }).click();
+  await page.getByLabel("CSV file").setInputFiles({
     name: "candidates.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(`name,email\nCasey Lin,${c}\nAgain,${a}\n`),
   });
+  await expect(page.getByText("candidates.csv: 1 ready")).toBeVisible();
   const held = await hold(page, isServerAction);
-  await page.getByRole("button", { name: "Send invites" }).click();
+  await page.getByRole("button", { name: "Send 3 invites" }).click();
   await held.arrived;
   await expect(page.getByRole("button", { name: "Sending invites…" })).toBeDisabled();
   await held.release();
 
   await expect(page.getByText("Invited 3 candidates. Skipped 1 already invited. Removed 1 duplicate.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Candidates (4)" })).toBeVisible();
-  for (const email of [a, b, c]) await expect(inviteRow(page, email).getByText("invited", { exact: true })).toBeVisible();
-  await expect(inviteRow(page, c).getByText("Casey Lin")).toBeVisible();
+  await page.getByRole("link", { name: "View candidates" }).click();
+  await land(/\/jobs\/[0-9a-f-]{36}$/, "Audit intern");
+  for (const email of [a, b]) await expect(inviteRow(page, email).getByText("Invited", { exact: true })).toBeVisible();
+  // The CSV gave c a name, and rows show the name when there is one.
+  await expect(inviteRow(page, "Casey Lin").getByText("Invited", { exact: true })).toBeVisible();
 
   // Each new candidate got an email with a working link.
   const mail = await outbox.waitForEmail(c);
@@ -49,26 +55,29 @@ test("a recruiter invites by paste and CSV; duplicates and existing invites are 
 
 test("a batch with an invalid entry is rejected whole and keeps the text", async ({ page, hiring, data }) => {
   const good = data.email("good");
-  await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}`);
+  await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}/invite`);
   const pasted = `${good}\nnot-an-email\nalso@bad`;
-  await page.getByLabel("Paste emails").fill(pasted);
-  await page.getByRole("button", { name: "Send invites" }).click();
+  await emailsBox(page).fill(pasted);
+  // The box flags both before sending.
+  await expect(page.getByText("1 ready · 2 to fix")).toBeVisible();
+  await sendButton(page).click();
   await expect(page.getByText("Fix these 2 entries and try again. Nothing was sent.")).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "not-an-email" })).toBeVisible();
-  await expect(page.getByLabel("Paste emails")).toHaveValue(pasted);
+  // Everything typed is still there, as chips.
+  for (const entry of [good, "not-an-email", "also@bad"]) await expect(page.getByRole("button", { name: `Remove ${entry}` })).toBeVisible();
   expect((await invitesForJob(hiring.jobId)).map((i) => i.email)).not.toContain(good);
   expect(await outbox.emailsTo(good)).toHaveLength(0);
 
-  await page.getByLabel("Paste emails").fill("");
-  await page.getByRole("button", { name: "Send invites" }).click();
+  for (const entry of [good, "not-an-email", "also@bad"]) await page.getByRole("button", { name: `Remove ${entry}` }).click();
+  await sendButton(page).click();
   await expect(page.getByText("Paste at least one email or upload a CSV.")).toBeVisible();
 });
 
 test("more than 200 candidates in one batch are refused", async ({ page, hiring }) => {
-  await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}`);
+  await signInViaUi(page, hiring.company.users.recruiter, `/app/${hiring.company.slug}/jobs/${hiring.jobId}/invite`);
   const many = Array.from({ length: 201 }, (_, i) => `bulk-${hiring.company.orgId.slice(0, 8)}-${i}@example.test`).join("\n");
-  await page.getByLabel("Paste emails").fill(many);
-  await page.getByRole("button", { name: "Send invites" }).click();
+  await emailsBox(page).fill(many);
+  await sendButton(page).click();
   await expect(page.getByText("That's 201 candidates. Invite at most 200 at a time. Nothing was sent.")).toBeVisible();
   expect(await invitesForJob(hiring.jobId)).toHaveLength(1);
 });
@@ -107,16 +116,16 @@ test("revoke withdraws the invite and the candidate sees that", async ({ page, h
   // Cancelling the confirm does nothing.
   page.once("dialog", (d) => void d.dismiss());
   await inviteRow(page, invite.email).getByRole("button", { name: "Revoke" }).click();
-  await expect(inviteRow(page, invite.email).getByText("invited", { exact: true })).toBeVisible();
+  await expect(inviteRow(page, invite.email).getByText("Invited", { exact: true })).toBeVisible();
 
   page.once("dialog", (d) => void d.accept());
   await inviteRow(page, invite.email).getByRole("button", { name: "Revoke" }).click();
-  await expect(inviteRow(page, invite.email).getByText("revoked", { exact: true })).toBeVisible();
+  await expect(inviteRow(page, invite.email).getByText("Revoked", { exact: true })).toBeVisible();
   await expect(inviteRow(page, invite.email).getByText(`Revoked ${invite.email}'s invite.`)).toBeVisible();
   await expect(inviteRow(page, invite.email).getByRole("button", { name: "Revoke" })).toHaveCount(0);
 
   const candidate = await page.context().newPage();
   await candidate.goto(invite.link);
   await expect(candidate.getByRole("heading", { level: 1, name: "Invitation withdrawn" })).toBeVisible();
-  await expect(candidate.getByText("This invitation was withdrawn by the company.")).toBeVisible();
+  await expect(candidate.getByText(/withdrew this invitation, so the link no longer works/)).toBeVisible();
 });

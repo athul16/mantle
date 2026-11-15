@@ -37,8 +37,10 @@ async function candidateWithEvidence(data: TestData) {
 }
 
 test("an admin changes how long photos and results are kept", async ({ page, company, signInAs, land }) => {
-  await signInAs("admin", `/app/${company.slug}`);
-  await page.getByRole("link", { name: "Settings" }).click();
+  await signInAs("admin", `/app/${company.slug}/jobs`);
+  // Settings lives in the account menu (the avatar button in the header).
+  await page.getByRole("button", { name: company.name }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await land(new RegExp(`/app/${company.slug}/settings$`), "Settings");
 
   const media = page.getByLabel("Keep photos and screenshots for (days)");
@@ -92,18 +94,19 @@ test("an admin deletes a candidate's data from the report", async ({ page, data,
     await page.getByRole("button", { name: "Delete candidate data" }).click();
     const confirm = page.getByRole("button", { name: "Delete permanently" });
     await expect(confirm).toBeDisabled();
-    await page.getByLabel('Type "delete" to confirm').fill("delet");
+    const typed = page.getByRole("dialog").getByLabel("Type “delete” to confirm");
+    await typed.fill("delet");
     await expect(confirm).toBeDisabled();
-    await page.getByLabel('Type "delete" to confirm').fill("delete");
+    await typed.fill("delete");
     await expect(confirm).toBeEnabled();
     await confirm.click();
 
-    await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Retention clerk");
+    await land(new RegExp(`/(jobs/${jobId}|candidates\\?job=${jobId})$`), "Retention clerk");
     // Role queries skip hidden elements, so these check what the user sees. Next keeps the previous
     // route's tree hidden in the DOM, and the route announcer can still hold the old heading, so a bare
     // getByText(email) would match those.
     const main = page.getByRole("main");
-    await expect(main.getByRole("heading", { level: 1 })).toHaveText("Candidates · Retention clerk");
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText("Retention clerk");
     await expect(main.getByText("No one invited to this job yet.")).toBeVisible();
     await expect(main.getByRole("heading", { name: invite.email })).toHaveCount(0);
 
@@ -127,12 +130,13 @@ test("an admin deletes a candidate's data from the report", async ({ page, data,
 });
 });
 
-test("a recruiter has no delete button on the report", async ({ page, data, land }) => {
+test("a recruiter can't delete a candidate's data from the report", async ({ page, data, land }) => {
   const { co, invite, path } = await candidateWithEvidence(data);
   try {
     await signInViaUi(page, co.users.recruiter, `/app/${co.slug}/candidates/${invite.inviteId}`);
     await land(new RegExp(`/candidates/${invite.inviteId}$`), invite.email);
-    await expect(page.getByRole("button", { name: "Delete candidate data" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Delete candidate data" })).toBeDisabled();
+    await expect(page.getByText("You're a recruiter. Ask an admin.")).toBeVisible();
   } finally {
     await db().storage.from("proctoring").remove([path]);
   }

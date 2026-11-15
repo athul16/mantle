@@ -29,6 +29,7 @@ const { startAttempt, saveAnswer, submitAttempt, getWorkspaceView, recordClientE
   "@/lib/candidate/attempt"
 );
 const { SESSION_COOKIE, MAX_CODE_ATTEMPTS } = await import("@/lib/candidate/config");
+const { MONITORING_CONSENT_VERSION } = await import("@/lib/proctoring/config");
 const { demoPettyCash } = await import("@/lib/engine/scenarios/demo-petty-cash");
 const codeRoute = await import("@/app/api/candidate/code/route");
 const answerRoute = await import("@/app/api/candidate/answer/route");
@@ -218,6 +219,52 @@ describe("email code", () => {
     const sessionToken = /ap_candidate=([^;]+)/.exec(cookies[0])![1];
     expect(secret.session_token_hash).toBe(hashToken(sessionToken));
     expect(secret.seed.length).toBeGreaterThan(20);
+    // No camera or screen on this assessment, so there is no monitoring consent to record.
+    const consent = must(await service.from("integrity_events").select("id").eq("attempt_id", attempt.id).eq("kind", "consented_to_monitoring"));
+    expect(consent).toEqual([]);
+  });
+
+  it("records monitoring consent with the verify form when the assessment is monitored", async () => {
+    // A monitored assessment of its own: the shared one above is locked once a candidate verifies.
+    const scenario = must(await service.from("assessments").select("scenario_id").eq("id", assessmentId).single());
+    const monitored = must(
+      await service
+        .from("assessments")
+        .insert({ org_id: orgId, scenario_id: scenario.scenario_id, title: "Monitored", time_limit_minutes: 15, proctoring: { camera: true, screen: true } })
+        .select("id")
+        .single(),
+    ).id;
+    const monitoredJob = must(await service.from("jobs").insert({ org_id: orgId, title: "Monitored job", assessment_id: monitored }).select("id").single()).id;
+    const saved = jobId;
+    jobId = monitoredJob;
+    const invite = await makeInvite();
+    jobId = saved;
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+
+    const form = new FormData();
+    form.set("token", invite.token);
+    form.set("code", await readCode(invite.email));
+    form.set("name", "Monitored Candidate");
+    form.set("consent", "on");
+    const res = await verifyRoute.POST(new NextRequest("http://localhost:3102/api/candidate/verify", { method: "POST", body: form }));
+    expect(res.status).toBe(303);
+
+    const attempt = (await findAttemptForInvite(invite.inviteId, orgId))!;
+    const consent = must(await service.from("integrity_events").select("payload").eq("attempt_id", attempt.id).eq("kind", "consented_to_monitoring"));
+    expect(consent).toEqual([{ payload: expect.objectContaining({ camera: true, screen: true, version: MONITORING_CONSENT_VERSION }) }]);
+  });
+
+  it("emails the code as plain text and as the branded HTML card", async () => {
+    const invite = await makeInvite();
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+    const safe = invite.email.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const file = (await readdir(OUTBOX)).filter((f) => f.endsWith(`-${safe}.json`)).sort().at(-1)!;
+    const mail = JSON.parse(await readFile(path.join(OUTBOX, file), "utf8")) as { subject: string; text: string; html: string };
+    const code = await readCode(invite.email);
+    expect(mail.subject).toBe(`${code} is your code for the Audit intern assessment`);
+    expect(mail.html).toContain("Your sign-in code");
+    expect(mail.html).toContain(`${code.slice(0, 3)} ${code.slice(3)}`);
+    expect(mail.html).toContain(`Candidate test ${run}`);
   });
 });
 

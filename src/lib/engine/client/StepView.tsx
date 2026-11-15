@@ -17,6 +17,10 @@ export function StepView({
 }) {
   const element = renderStepElement(step.type, { config: step.config, answer, onChange, disabled });
   return (
-    element ?? <p className="text-sm text-red-600">This task type ({step.type}) can&apos;t be shown. Please contact support.</p>
+    element ?? (
+      <p className="small badc" style={{ padding: 24 }}>
+        This task type ({step.type}) can&apos;t be shown. Please contact support.
+      </p>
+    )
   );
 }

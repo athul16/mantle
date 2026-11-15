@@ -37,11 +37,14 @@ function fields(formData: FormData) {
   return out;
 }
 
+/** A create action's result: the usual form state plus the new row's id on success. */
+export type CreatedState = (NonNullable<FormState> & { id?: string }) | undefined;
+
 function refreshJobs() {
   revalidatePath("/app/[orgSlug]/jobs", "layout");
 }
 
-export async function createAssessment(_state: FormState, formData: FormData): Promise<FormState> {
+export async function createAssessment(_state: CreatedState, formData: FormData): Promise<CreatedState> {
   const parsed = createAssessmentSchema.safeParse(fields(formData));
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   const { orgId, scenarioId, title, timeLimitMinutes, passScore, camera, screen } = parsed.data;
@@ -64,18 +67,22 @@ export async function createAssessment(_state: FormState, formData: FormData): P
     return { fieldErrors: { scenarioId: ["Pick a published scenario."] } };
   }
 
-  const { error } = await db.from("assessments").insert({
-    org_id: orgId,
-    scenario_id: scenarioId,
-    title,
-    time_limit_minutes: timeLimitMinutes,
-    pass_score: passScore ?? null,
-    proctoring: { camera, screen },
-  });
+  const { data: created, error } = await db
+    .from("assessments")
+    .insert({
+      org_id: orgId,
+      scenario_id: scenarioId,
+      title,
+      time_limit_minutes: timeLimitMinutes,
+      pass_score: passScore ?? null,
+      proctoring: { camera, screen },
+    })
+    .select("id")
+    .single();
   if (error) return { error: "Could not create the assessment." };
 
   refreshJobs();
-  return { message: `Created "${title}".` };
+  return { message: `Created "${title}".`, id: created.id };
 }
 
 export async function updateAssessment(_state: FormState, formData: FormData): Promise<FormState> {
@@ -136,7 +143,7 @@ export async function cloneAssessment(_state: FormState, formData: FormData): Pr
   return { message: `Created "${title}". Edit it before linking it to a job.` };
 }
 
-export async function createJob(_state: FormState, formData: FormData): Promise<FormState> {
+export async function createJob(_state: CreatedState, formData: FormData): Promise<CreatedState> {
   const parsed = createJobSchema.safeParse(fields(formData));
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   const { orgId, title, assessmentId, deadline } = parsed.data;
@@ -148,7 +155,11 @@ export async function createJob(_state: FormState, formData: FormData): Promise<
   }
 
   const db = await createClient();
-  const { error } = await db.from("jobs").insert({ org_id: orgId, title, assessment_id: assessmentId, deadline });
+  const { data: created, error } = await db
+    .from("jobs")
+    .insert({ org_id: orgId, title, assessment_id: assessmentId, deadline })
+    .select("id")
+    .single();
   if (error) {
     // 23503: the assessment isn't in this company (composite foreign key).
     if (error.code === "23503") return { fieldErrors: { assessmentId: ["Pick one of your assessments."] } };
@@ -156,7 +167,7 @@ export async function createJob(_state: FormState, formData: FormData): Promise<
   }
 
   refreshJobs();
-  return { message: `Created "${title}". Open it to invite candidates.` };
+  return { message: `Created "${title}". Open it to invite candidates.`, id: created.id };
 }
 
 export type InviteBatchState =

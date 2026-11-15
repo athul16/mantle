@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { AuthCard } from "@/components/ui";
 import { ConfirmForm } from "./confirm-form";
 
-export const metadata = { title: "Confirm · Assessment Platform" };
+export const metadata = { title: "Confirm · Mantle" };
 
 /**
  * Landing page for Supabase email links: teammate invites

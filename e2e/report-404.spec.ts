@@ -13,7 +13,7 @@ test.describe("candidate report URLs", () => {
   test("another company's invite, an unknown id and a malformed one answer 404", async ({ page, hiring, data }) => {
     const other = await data.hiringSetup();
     const { company } = hiring;
-    await signInViaUi(page, company.users.recruiter, `/app/${company.slug}`);
+    await signInViaUi(page, company.users.recruiter, `/app/${company.slug}/jobs`);
 
     // Own invite: the report loads.
     const own = await page.goto(`/app/${company.slug}/candidates/${hiring.invite.inviteId}`);

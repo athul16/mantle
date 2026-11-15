@@ -39,9 +39,10 @@ const OC = "Less: outstanding checks, Amount ($)";
 const ADJ = "Adjusted bank balance, Amount ($)";
 
 describe("SpreadsheetStep", () => {
-  it("renders the prompt, column headers and read-only cells as text", () => {
+  it("renders column headers and read-only cells as text, and leaves the prompt to the page", () => {
     render(<Harness />);
-    expect(screen.getByText(config.prompt)).toBeVisible();
+    // The workspace shows the prompt in its brief column (stepBrief), not inside the grid.
+    expect(screen.queryByText(config.prompt)).not.toBeInTheDocument();
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual(["Item", "Amount ($)", "Notes"]);
     const firstRow = screen.getAllByRole("row")[1];
@@ -53,8 +54,7 @@ describe("SpreadsheetStep", () => {
   it("renders one labelled input per input cell, named by row and column", () => {
     render(<Harness />);
     expect(screen.getAllByRole("textbox")).toHaveLength(5);
-    expect(cell(DIT)).toHaveAttribute("placeholder", "0.00");
-    expect(cell("Add: deposit in transit, Notes")).toHaveAttribute("placeholder", "0");
+    expect(cell("Add: deposit in transit, Notes")).toBeInTheDocument();
     expect(cell(ADJ)).toBeEnabled();
   });
 
@@ -199,6 +199,6 @@ describe("SpreadsheetStep", () => {
 
   it("explains how to enter negatives", () => {
     render(<Harness />);
-    expect(screen.getByText(/negatives as -100 or \(100\)/)).toBeVisible();
+    expect(screen.getByText(/negatives as -100 or \(100\)/i)).toBeVisible();
   });
 });

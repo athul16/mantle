@@ -19,6 +19,8 @@ export async function signInViaUi(page: Page, user: SignInUser, next?: string, {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).not.toHaveURL(/\/login(\?|$)/);
   if (mfa) await completeMfaIfAsked(page, user);
+  // Let the landing page finish rendering, so a test's next page.goto doesn't cut it off mid-load.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 }
 
 /** On the sign-in code page (/app/account/verify), enter the current code and wait to leave it. */
@@ -37,7 +39,8 @@ export async function completeMfaIfAsked(page: Page, user: SignInUser) {
 
 /** Types the current authenticator code into the form on the page and submits it. */
 export async function enterCode(page: Page, secret: string, button: string | RegExp = /^(Verify|Turn on two-factor)/) {
-  await page.getByLabel("6-digit code").fill(totpCode(secret));
+  // "Code" on the sign-in code page, "Enter the 6-digit code the app shows." when setting up.
+  await page.getByRole("textbox", { name: /code/i }).fill(totpCode(secret));
   await page.getByRole("button", { name: button }).click();
 }
 
