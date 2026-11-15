@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { Button, FormMessage } from "@/components/ui";
-import { inviteCandidates, resendInviteAction, revokeInviteAction } from "../actions";
+import { EXTRA_TIME_PERCENTS, type Accommodations } from "@/lib/accommodations";
+import { inviteCandidates, resendInviteAction, revokeInviteAction, setAccommodationsAction } from "../actions";
 
 export function InviteCandidatesForm({ orgId, jobId, max }: { orgId: string; jobId: string; max: number }) {
   const [state, action, pending] = useActionState(inviteCandidates, undefined);
@@ -104,5 +105,72 @@ export function InviteRowActions({
       </div>
       {note ? <p className={`text-xs ${resendState?.error || revokeState?.error ? "text-red-600" : "text-green-700"}`}>{note}</p> : null}
     </div>
+  );
+}
+
+/**
+ * Extra time and monitoring waivers for one invite (D9). Only offered until
+ * the candidate starts; the database refuses changes after that and audits
+ * every change.
+ */
+export function AccommodationsForm({
+  orgId,
+  inviteId,
+  email,
+  current,
+  camera,
+  screen,
+}: {
+  orgId: string;
+  inviteId: string;
+  email: string;
+  current: Accommodations;
+  /** Whether the assessment uses the camera / screen share (a waiver only matters then). */
+  camera: boolean;
+  screen: boolean;
+}) {
+  const [state, action, pending] = useActionState(setAccommodationsAction, undefined);
+  return (
+    <details className="text-left">
+      <summary className="cursor-pointer text-xs underline">Accommodations</summary>
+      <form action={action} className="mt-2 space-y-2 rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+        <input type="hidden" name="orgId" value={orgId} />
+        <input type="hidden" name="inviteId" value={inviteId} />
+        <label className="block space-y-1">
+          <span className="text-xs font-medium">Extra time for {email}</span>
+          <select
+            name="extraTimePercent"
+            defaultValue={String(current.extraTimePercent)}
+            className="block rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
+          >
+            {EXTRA_TIME_PERCENTS.map((p) => (
+              <option key={p} value={p}>
+                {p === 0 ? "None" : `+${p}%`}
+              </option>
+            ))}
+          </select>
+        </label>
+        {camera ? (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="waiveCamera" defaultChecked={current.waiveCamera} />
+            <span>No camera for this candidate</span>
+          </label>
+        ) : null}
+        {screen ? (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="waiveScreen" defaultChecked={current.waiveScreen} />
+            <span>No screen share for this candidate</span>
+          </label>
+        ) : null}
+        <p className="text-xs text-neutral-500">
+          Applies only to this candidate and can change until they start. Each change is recorded in the audit log.
+        </p>
+        <Button type="submit" variant="secondary" disabled={pending} className="px-3 py-1">
+          {pending ? "Saving…" : "Save accommodations"}
+        </Button>
+        <FormMessage message={state?.message} />
+        <FormMessage error={state?.error} />
+      </form>
+    </details>
   );
 }

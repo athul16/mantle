@@ -1,3 +1,4 @@
+import { describeAccommodations, readAccommodations } from "@/lib/accommodations";
 import type { AttemptScore, StepScore } from "@/lib/engine/types";
 import type { InviteStatus } from "@/lib/jobs/status";
 
@@ -185,9 +186,21 @@ export function buildTimeline(
 
     let text: string;
     switch (e.kind) {
-      case "started_attempt":
-        text = "Started the assessment";
+      case "started_attempt": {
+        const a = (e.payload as { accommodations?: { extraTimePercent?: unknown; waiveCamera?: unknown; waiveScreen?: unknown } } | null)
+          ?.accommodations;
+        const applied = a
+          ? describeAccommodations(
+              readAccommodations({
+                extra_time_percent: typeof a.extraTimePercent === "number" ? a.extraTimePercent : 0,
+                waive_camera: a.waiveCamera === true,
+                waive_screen: a.waiveScreen === true,
+              }),
+            )
+          : [];
+        text = applied.length ? `Started the assessment with accommodations: ${applied.join(", ")}` : "Started the assessment";
         break;
+      }
       case "opened_message": {
         const id = field(e.payload, "messageId");
         text = `Opened message "${(id && opts.messageSubjects[id]) ?? id ?? "unknown"}"`;

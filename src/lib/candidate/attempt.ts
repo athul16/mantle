@@ -76,6 +76,8 @@ export async function startAttempt(session: CandidateSession, now = new Date()):
   if (attempt.status !== "not_started") return { ok: false, error: "already_submitted" };
   if (now > session.invite.startBy) return { ok: false, error: "expired" };
 
+  // timeLimitMinutes already includes any extra time set on the invite (D9),
+  // so the server-enforced deadline carries it; the browser only displays it.
   const deadline = new Date(now.getTime() + session.invite.timeLimitMinutes * 60_000);
   const { data, error } = await createServiceClient()
     .from("attempts")
@@ -86,7 +88,14 @@ export async function startAttempt(session: CandidateSession, now = new Date()):
     .select("id");
   if (error) throw new Error(`starting attempt failed: ${error.message}`);
   // Zero rows: a parallel request started it first, which is fine.
-  if (data.length) await addEvent(attempt, "started_attempt", { deadlineAt: deadline.toISOString() });
+  if (data.length) {
+    const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
+    await addEvent(attempt, "started_attempt", {
+      deadlineAt: deadline.toISOString(),
+      timeLimitMinutes: session.invite.timeLimitMinutes,
+      ...(extraTimePercent || waiveCamera || waiveScreen ? { accommodations: { extraTimePercent, waiveCamera, waiveScreen } } : {}),
+    });
+  }
   return { ok: true };
 }
 
@@ -283,10 +292,12 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
   await addEvent(attempt, "submitted_attempt", { reason });
   await scoreAndStore(session);
   // A camera / screen gap still open (tab closed, never reconnected) ends here (D4).
-  await closeDowntimeAtEnd(attempt, session.invite.assessmentId, {
-    at: submittedAt,
-    closedBy: reason === "timeout" ? "deadline" : "submitted",
-  });
+  await closeDowntimeAtEnd(
+    attempt,
+    session.invite.assessmentId,
+    { at: submittedAt, closedBy: reason === "timeout" ? "deadline" : "submitted" },
+    session.invite.accommodations,
+  );
 }
 
 /**

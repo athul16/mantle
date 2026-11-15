@@ -141,6 +141,8 @@ Changes from the original draft:
 - `invites.candidate_name`, `invites.created_by`; `attempts.scenario_id`, `attempts.submit_reason`; `assessments.title`, `assessments.pass_score`.
 - Triggers: published scenarios can't be edited; an assessment's time limit, proctoring, and scenario lock once a candidate starts.
 - Role-check helpers live in a `private` schema the API doesn't expose.
+- `invites.last_sent_at` and `invites.sent_count` (D12/S1): set on the first send and every resend; the job page shows "last sent". A partial unique index `invites_job_email_live_key` on `(job_id, lower(email))` for invited, started and completed rows (D12/S2) stops two batches from inviting the same email at once; the batch action retries its check when the insert hits it. Invites still marked invited after their expiry are marked expired before a batch, so they leave the index and can be re-invited.
+- `invite_accommodations` (D9): per-invite extra time (+0/25/50/100%) and camera / screen-share waivers. Members read it; writes only through `set_invite_accommodations()`, which allows admins and recruiters before the candidate starts and writes the audit log. The extra time is applied to `attempts.deadline_at` when the attempt starts. `organizations.settings.contact_email` (set by admins through `set_contact_email()`) is shown to candidates.
 
 Original draft table list (still accurate for the main columns):
 

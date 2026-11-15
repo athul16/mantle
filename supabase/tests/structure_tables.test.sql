@@ -24,7 +24,7 @@ $$;
 
 select tables_are(
   'public',
-  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles'],
+  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles', 'invite_accommodations'],
   'public has exactly the expected tables'
 );
 
@@ -114,7 +114,9 @@ select set_eq(
        ('expires_at', 'timestamp with time zone', true, '', ''),
        ('status', 'text', true, '''invited''::text', ''),
        ('created_by', 'uuid', false, '', ''),
-       ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
+       ('created_at', 'timestamp with time zone', true, 'now()', ''),
+       ('last_sent_at', 'timestamp with time zone', true, 'now()', ''),
+       ('sent_count', 'integer', true, '1', '') $$,
   'invites: columns, types, nullability, defaults'
 );
 select col_is_pk('public', 'invites', array['id'], 'invites: primary key (id)');
