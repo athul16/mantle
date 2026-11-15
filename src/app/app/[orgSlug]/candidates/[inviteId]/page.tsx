@@ -125,6 +125,9 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
             canSeeMedia={flags.canSeeMedia}
             camera={proctoring.camera}
             screen={proctoring.screen}
+            gaze={proctoring.gaze}
+            microphone={proctoring.microphone}
+            fullscreen={proctoring.fullscreen}
           />
           <TeamVotes orgId={orgId} attemptId={attempt.id} notes={report.notes} userId={user.id} myVote={myVote} />
           {deleteCard}
