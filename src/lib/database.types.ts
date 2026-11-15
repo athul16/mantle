@@ -51,6 +51,77 @@ export type Database = {
           },
         ]
       }
+      ai_shadow_scores: {
+        Row: {
+          attempt_id: string
+          cache_creation_input_tokens: number | null
+          cache_read_input_tokens: number | null
+          created_at: string
+          criteria: Json
+          duration_ms: number | null
+          error: string | null
+          id: number
+          input_tokens: number | null
+          max_points: number | null
+          model: string
+          org_id: string
+          output_tokens: number | null
+          points: number | null
+          prompt_version: string
+          status: string
+          step_id: string
+          stop_reason: string | null
+        }
+        Insert: {
+          attempt_id: string
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          created_at?: string
+          criteria?: Json
+          duration_ms?: number | null
+          error?: string | null
+          id?: never
+          input_tokens?: number | null
+          max_points?: number | null
+          model: string
+          org_id: string
+          output_tokens?: number | null
+          points?: number | null
+          prompt_version: string
+          status: string
+          step_id: string
+          stop_reason?: string | null
+        }
+        Update: {
+          attempt_id?: string
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          created_at?: string
+          criteria?: Json
+          duration_ms?: number | null
+          error?: string | null
+          id?: never
+          input_tokens?: number | null
+          max_points?: number | null
+          model?: string
+          org_id?: string
+          output_tokens?: number | null
+          points?: number | null
+          prompt_version?: string
+          status?: string
+          step_id?: string
+          stop_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_shadow_scores_attempt_id_org_id_fkey"
+            columns: ["attempt_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       assessments: {
         Row: {
           created_at: string
@@ -133,6 +204,7 @@ export type Database = {
       }
       attempts: {
         Row: {
+          auto_score: Json | null
           created_at: string
           deadline_at: string | null
           id: string
@@ -147,6 +219,7 @@ export type Database = {
           submitted_at: string | null
         }
         Insert: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -161,6 +234,7 @@ export type Database = {
           submitted_at?: string | null
         }
         Update: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -701,6 +775,7 @@ export type Database = {
         Row: {
           answer: Json
           attempt_id: string
+          auto_score: Json | null
           org_id: string
           score: Json | null
           step_id: string
@@ -709,6 +784,7 @@ export type Database = {
         Insert: {
           answer: Json
           attempt_id: string
+          auto_score?: Json | null
           org_id: string
           score?: Json | null
           step_id: string
@@ -717,6 +793,7 @@ export type Database = {
         Update: {
           answer?: Json
           attempt_id?: string
+          auto_score?: Json | null
           org_id?: string
           score?: Json | null
           step_id?: string

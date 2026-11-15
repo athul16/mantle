@@ -94,7 +94,7 @@ export async function scoredAttempt(
   must(
     await db
       .from("attempts")
-      .update({ submitted_at: submittedAt.toISOString(), submit_reason: "candidate", score: score as unknown as Json })
+      .update({ submitted_at: submittedAt.toISOString(), submit_reason: "candidate", score: score as unknown as Json, auto_score: score as unknown as Json })
       .eq("id", attemptId),
   );
   must(
@@ -105,6 +105,7 @@ export async function scoredAttempt(
         step_id: stepId,
         answer,
         score: (score.steps[stepId] ?? null) as Json,
+        auto_score: (score.steps[stepId] ?? null) as Json,
       })),
     ),
   );

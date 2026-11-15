@@ -294,13 +294,20 @@ describe("attempt", () => {
     const keys = demoPettyCash.generate(await seedFor(c.attemptId)).keys as Record<string, { value: number }>;
     expect(await saveAnswer(await fresh(c.sessionToken), "expected-cash", { value: keys["expected-cash"].value })).toMatchObject({ ok: true });
 
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
     expect(await submitAttempt(await fresh(c.sessionToken))).toEqual({ ok: true, reason: "candidate" });
+    // D8 shadow scoring is scheduled after submit; with no API key (tests) it skips.
+    expect(info).toHaveBeenCalledWith(expect.stringContaining(`skipping attempt ${c.attemptId}`));
+    info.mockRestore();
 
     const row = await attemptRow(c.attemptId);
     expect(row).toMatchObject({ status: "scored", submit_reason: "candidate" });
     expect(row.score).toMatchObject({ points: 2, maxPoints: 4 });
-    const response = must(await service.from("step_responses").select("score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
+    const response = must(await service.from("step_responses").select("score, auto_score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
     expect(response.score).toMatchObject({ points: 2, maxPoints: 2 });
+    // The automatic score is stored next to the final one (D11).
+    expect(response.auto_score).toEqual(response.score);
+    expect(must(await service.from("attempts").select("auto_score").eq("id", c.attemptId).single()).auto_score).toEqual(row.score);
     expect(must(await service.from("invites").select("status").eq("id", c.inviteId).single()).status).toBe("completed");
 
     // Done means done: no more saves, no new code.

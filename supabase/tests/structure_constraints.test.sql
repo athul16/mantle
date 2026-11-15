@@ -56,7 +56,8 @@ select set_eq(
        ('audit_log',        'actor_id',          'auth.users',      'id',        'a'),
        ('invite_accommodations', 'org_id',           'organizations', 'id',        'c'),
        ('invite_accommodations', 'invite_id,org_id', 'invites',       'id,org_id', 'c'),
-       ('invite_accommodations', 'set_by',           'auth.users',    'id',        'n') $$,
+       ('invite_accommodations', 'set_by',           'auth.users',    'id',        'n'),
+       ('ai_shadow_scores',      'attempt_id,org_id', 'attempts',      'id,org_id', 'c') $$,
   'foreign keys: columns, targets and on-delete behaviour'
 );
 
@@ -75,7 +76,8 @@ select set_eq(
        ('attempts',        'invite_id',            false),
        ('invite_secrets',  'token_hash',           false),
        ('attempt_secrets', 'session_token_hash',   false),
-       ('flags',           'attempt_id,rule',      false) $$,
+       ('flags',           'attempt_id,rule',      false),
+       ('ai_shadow_scores', 'attempt_id,step_id,model,prompt_version', false) $$,
   'unique constraints (scenarios treats null org_id as one library namespace)'
 );
 
@@ -99,7 +101,9 @@ select set_eq(
        ('media',         'media_source_check'),
        ('flags',         'flags_status_check'),
        ('flags',         'flags_review_note_length'),
-       ('notes',         'notes_vote_check') $$,
+       ('notes',         'notes_vote_check'),
+       ('ai_shadow_scores', 'ai_shadow_scores_status_check'),
+       ('ai_shadow_scores', 'ai_shadow_scores_criteria_check') $$,
   'check constraints present (their values are exercised in enums_check_values)'
 );
 

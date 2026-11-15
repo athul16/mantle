@@ -4,7 +4,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(29);
+select plan(32);
 
 -- A scored attempt on inv_a2: one numeric step (2/2) and one rubric step
 -- waiting for review (0 of 3 + 2 provisional points).
@@ -21,6 +21,10 @@ insert into public.step_responses (attempt_id, org_id, step_id, answer, score) v
    '{"points": 0, "maxPoints": 5, "needsReview": true, "items": [
       {"id": "tone",  "label": "Tone",  "earned": 0, "max": 3},
       {"id": "facts", "label": "Facts", "earned": 0, "max": 2}]}');
+
+-- The server stores the automatic score twice: as the final score and as auto_score.
+update public.attempts set auto_score = score where id = pg_temp.fx('att_scored');
+update public.step_responses set auto_score = score where attempt_id = pg_temp.fx('att_scored');
 
 -- Catalog and grants
 select is((select prosecdef from pg_proc where oid = 'public.review_rubric_step(uuid, text, jsonb)'::regprocedure), true,
@@ -76,6 +80,15 @@ select is((select (score ->> 'points')::numeric from public.step_responses where
           4.5::numeric, 'step_responses.score is updated too');
 select is((select count(*)::int from public.audit_log where target = pg_temp.fx('att_scored')::text || ':mail' and action = 'reviewed_rubric'
              and actor_id = pg_temp.fx('a_recruiter')), 1, 'the review is in the audit log');
+
+select is((select (auto_score ->> 'points')::numeric from public.attempts where id = pg_temp.fx('att_scored')), 2::numeric,
+          'attempts.auto_score keeps the automatic total');
+select ok((select (auto_score -> 'steps' -> 'mail' ->> 'needsReview')::boolean
+                  and auto_score -> 'steps' -> 'mail' -> 'items' -> 0 ->> 'earned' = '0'
+             from public.attempts where id = pg_temp.fx('att_scored')),
+          'attempts.auto_score keeps the provisional rubric step');
+select is((select (auto_score ->> 'points')::numeric from public.step_responses where attempt_id = pg_temp.fx('att_scored') and step_id = 'mail'),
+          0::numeric, 'step_responses.auto_score is not changed by the review');
 
 -- A reviewed step can be overridden later
 select is(pg_temp.try_as('a_admin', $$select public.review_rubric_step(pg_temp.fx('att_scored'), 'mail', '{"tone": 3, "facts": 2}')$$), '1',

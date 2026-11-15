@@ -62,7 +62,9 @@ select is_empty(
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
         and c.relname not in ('invite_secrets', 'attempt_secrets')
         and a.attnum > 0 and not a.attisdropped
-        and a.attname ~ '(hash|token|seed|secret|code)' $$,
+        and a.attname ~ '(hash|token|seed|secret|code)'
+        -- token usage counts of AI shadow scores (server only, see ai_shadow_scores.test.sql)
+        and not (c.relname = 'ai_shadow_scores' and a.attname ~ '_tokens$') $$,
   'no hash, token, seed, secret or code column outside the secret tables'
 );
 

@@ -3,11 +3,13 @@ import "server-only";
 import type { StepScore } from "../../types";
 
 /**
- * Seam for a future AI (or other automatic) rubric scorer. Nothing calls a
- * model yet: `inbox_reply` scores 0 provisional points with `needsReview`, and
- * a person marks it. When a scorer exists, it runs after submit (outside
- * scoreAttempt, which stays synchronous) and its output goes through
- * `applyRubricResults`, which still marks the step for human review.
+ * Seam for an AI (or other automatic) rubric scorer. `inbox_reply` scores 0
+ * provisional points with `needsReview`, and a person marks it. The Claude
+ * scorer (ai-scorer.ts) runs after submit, outside scoreAttempt (which stays
+ * synchronous), in shadow mode only (decision D8): its results are stored
+ * server-side for comparison and never shown or counted. If its suggestions
+ * are ever shown (D8 C), they go through `applyRubricResults`, which still
+ * marks the step for human review.
  */
 
 export interface RubricCriterion {
