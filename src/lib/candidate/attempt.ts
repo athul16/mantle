@@ -4,6 +4,7 @@ import type { Json } from "@/lib/database.types";
 import { renderAttemptForCandidate, stepAvailableAtMinute } from "@/lib/engine/server/render";
 import { parseAnswerForStep, scoreAttempt } from "@/lib/engine/server/score";
 import type { AttemptScore, PublicMessage, PublicStep } from "@/lib/engine/types";
+import { closeDowntimeAtEnd } from "@/lib/proctoring/flags";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CLIENT_EVENT_KINDS, type ClientEventKind } from "./config";
 import { ATTEMPT_COLUMNS, type AttemptRow } from "./invite";
@@ -281,6 +282,11 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
 
   await addEvent(attempt, "submitted_attempt", { reason });
   await scoreAndStore(session);
+  // A camera / screen gap still open (tab closed, never reconnected) ends here (D4).
+  await closeDowntimeAtEnd(attempt, session.invite.assessmentId, {
+    at: submittedAt,
+    closedBy: reason === "timeout" ? "deadline" : "submitted",
+  });
 }
 
 /**

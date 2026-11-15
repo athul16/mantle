@@ -1,4 +1,5 @@
 import type { ReportFlag } from "@/lib/proctoring/report";
+import { formatSeconds } from "@/lib/proctoring/rules";
 import { FlagReviewForm } from "./flag-review-form";
 
 const muted = "text-neutral-600 dark:text-neutral-400";
@@ -29,7 +30,23 @@ export function offsetFrom(startedAt: string | null, at: string): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
+const CLOSED_BY: Record<string, string> = {
+  reconnected: "back on",
+  submitted: "never back; counted until submit",
+  deadline: "never back; counted until the time ran out",
+};
+
+/** One camera / screen gap (D4): how long, from when to when, and how it ended. */
+function downtimeLine(e: ReportFlag["events"][number], startedAt: string | null): string {
+  const what = e.source === "camera" ? "Camera off" : "Screen share stopped";
+  const from = offsetFrom(startedAt, e.at);
+  const to = e.endAt ? offsetFrom(startedAt, e.endAt) : "";
+  const span = from && to ? ` · ${from} to ${to} into the test` : "";
+  return `${what} for ${formatSeconds((e.downMs ?? 0) / 1000)} (${CLOSED_BY[e.closedBy ?? "reconnected"]})${span}`;
+}
+
 function eventLine(e: ReportFlag["events"][number], startedAt: string | null): string {
+  if (e.kind === "monitoring_down") return downtimeLine(e, startedAt);
   const parts = [EVENT_TEXT[e.kind] ?? e.kind];
   if (e.awayMs) parts.push(`${Math.round(e.awayMs / 1000)} s away`);
   if (e.chars) parts.push(`${e.chars} characters`);
@@ -84,6 +101,12 @@ export function FlagsSection({
               </h3>
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
             </header>
+
+            {f.rule === "downtime" ? (
+              <p className={`text-sm ${muted}`}>
+                The task was covered during each gap and the timer kept running. Judge whether the lost time affected the result.
+              </p>
+            ) : null}
 
             {f.events.length ? (
               <ul aria-label="Evidence" className="space-y-0.5 text-sm">
