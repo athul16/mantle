@@ -21,11 +21,13 @@ _Last updated: 2026-11-15._
 
 ## Current implementation
 
-What runs today, from the code on main and the cloud project (2026-11-10).
+What runs today, from the code on main and the cloud project (2026-11-15, main at `97d2aa2`).
 
-**Hosting.** Vercel builds and deploys production from `main` (previews per PR). One Supabase cloud project (`fexzsiizgcjuddtoeaui`, Free plan) holds the database, auth and storage. Email goes through Resend when `RESEND_API_KEY` is set; otherwise messages are written to `.dev-outbox/`. Resend is not set in production yet.
+**Hosting.** Vercel (Hobby) builds and deploys production from `main` (previews per PR) at `https://assessment-platform-rho-ecru.vercel.app`. Hobby blocks deploys of commits whose author isn't on the Vercel team, so collaborators' PR previews show BLOCKED; their code deploys once merged. One Supabase cloud project (`fexzsiizgcjuddtoeaui`, Free plan) holds the database, auth and storage. Email goes through Resend when `RESEND_API_KEY` is set; otherwise messages are written to `.dev-outbox/`. Production has Resend in **test mode**: `EMAIL_FROM` is `Assessment Platform <onboarding@resend.dev>`, so invites and codes only reach the Resend account owner's address until a domain is verified. `/api/health` returns all true.
 
-**Database.** 16 tables in `public`: `organizations`, `memberships`, `jobs`, `assessments`, `scenarios`, `invites`, `invite_secrets`, `attempts`, `attempt_secrets`, `step_responses`, `action_events`, `integrity_events`, `media`, `flags`, `notes`, `audit_log`. RLS on every table; answer keys and tokens live in the `*_secrets` tables, which only the server reads. Five migrations, all applied in the cloud:
+**Cloud test data.** One test admin (`pilot-admin@example.com`, company slug `test`, TOTP enrolled; password kept by the founder, not in the repo) with one job, "Demo Job", on `demo-petty-cash`.
+
+**Database.** 19 tables in `public`: `organizations`, `memberships`, `profiles`, `jobs`, `assessments`, `scenarios`, `invites`, `invite_secrets`, `invite_accommodations`, `attempts`, `attempt_secrets`, `step_responses`, `action_events`, `integrity_events`, `media`, `flags`, `notes`, `audit_log`, `ai_shadow_scores`. RLS on every table; answer keys and tokens live in the `*_secrets` tables and AI shadow scores in `ai_shadow_scores`, which only the server reads. 13 migrations, all applied in the cloud with versions matching the files (the last 7 applied 2026-11-15):
 
 | Migration | Adds |
 | --- | --- |
@@ -34,6 +36,14 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 | `20261109034338_org_slug` | Company URLs (`organizations.slug`), `create_organization` |
 | `20261110120000_review_rubric_step` | `review_rubric_step`: a recruiter scores a rubric step, score and audit log updated |
 | `20261110160000_proctoring` | Private `proctoring` bucket (2 MB images), `private.can_view_media`, `flags.rule` and `flags.review_note`, reviewers may change only review columns |
+| `20261110200000_retention` | Per-company retention, daily purge, delete candidate on request (PR #25) |
+| `20261111100000_last_admin_guard` | Trigger: an org always keeps one admin (D13 Q4, PR #34) |
+| `20261111100100_profiles` | `profiles` synced from `auth.users`; teammates read without the service key (D13 Q5, PR #34) |
+| `20261111110000_retention_clocks` | Two retention periods: media 90 days (30–365), results 365 (30–730); `set_retention` (D2, PR #32) |
+| `20261111120000_invite_sends_and_unique` | `invites.last_sent_at`, `sent_count`; one live invite per email per job (D12, PR #35) |
+| `20261111121000_accommodations_contact_email` | `invite_accommodations` (extra time, camera/screen waiver), company contact email (D9, PR #35) |
+| `20261111140000_auto_score` | `auto_score` kept next to the final `score`, write-once (D11, PR #33) |
+| `20261111141000_ai_shadow_scores` | Server-only AI shadow scores and `private.ai_shadow_agreement` view (D8, PR #33) |
 
 **Look and feel.** Every screen follows the Mantle prototype (`docs/design/prototype.html`, see `13-design-system.md`). Prototype features the backend doesn't support yet are listed below under "Prototype features not built yet".
 
@@ -47,7 +57,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
-**Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
+**Known gaps before a pilot.** No verified email domain (Resend test mode only reaches one address); Supabase Auth email templates from PR #34 not pasted into the dashboard yet (teammate invite links break until they are); `ANTHROPIC_API_KEY` not set in Vercel (shadow scoring skips); `CRON_SECRET` status unchecked; Supabase still on Free (pauses after 7 idle days); `harbor-lane-bank-rec` waits on an accountant. Pilot decisions D1–D16 are decided (`decisions/2026-11-10-pilot-decisions.md`) and the code for them is merged.
 
 ## Prototype features not built yet
 
@@ -96,24 +106,25 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 ## Waiting on people, not code
 
-- [ ] Resend: account, verified sending subdomain, SMTP in Supabase (setup guide sent as a PDF). Blocks stage A.
-- [ ] Supabase → Authentication → URL Configuration: Site URL and redirect URLs.
+- [ ] Resend: buy and verify a sending domain, then set `EMAIL_FROM` to an address on it (production runs in Resend test mode from `onboarding@resend.dev` until then), and point Supabase Auth SMTP at Resend.
+- [ ] Supabase → Authentication → Emails: paste `supabase/templates/invite.html` (Invite user) and `confirmation.html` (Confirm signup) from PR #34; URL Configuration: remove `/auth/callback`, keep `/auth/confirm` and `/auth/set-password`.
+- [ ] Supabase → Authentication: turn on leaked-password protection (security advisor warning).
+- [ ] Vercel env vars: `ANTHROPIC_API_KEY` (server only; D8 shadow scoring skips without it); confirm `CRON_SECRET` is set.
+- [x] Vercel env vars `RESEND_API_KEY` and `EMAIL_FROM` (Production and Preview); `/api/health` returns all true (2026-11-15).
 - [x] Vercel project from the GitHub repo, with the env vars in `01-architecture-and-hosting.md` (production deploys from main).
-- [ ] Open decisions Q2, Q3, Q4, Q5, Q7, Q9 in `decisions/2026-11-08-skeleton-open-questions.md` (none urgent).
-- [ ] Stage A provisional decisions in `decisions/2026-11-09-stage-a-open-decisions.md`, including two schema decisions (S1, S2).
-- [x] Apply migration `20261110160000_proctoring.sql` to the cloud project (applied 2026-11-10, with the rubric review migration).
-- [x] Apply migration `20261110200000_retention.sql` (PR #25) to the cloud project (applied 2026-11-10).
-- [ ] Vercel env vars: `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`; then `/api/health` should return all true (`12-pilot-runbook.md`).
-- [ ] Decide D1 to D16 in `decisions/2026-11-10-pilot-decisions.md` (D3, D2, D1, D13, D12 first).
+- [x] Decide D1 to D16 in `decisions/2026-11-10-pilot-decisions.md` (decided 2026-11-10; they also settle Q2–Q9, S1/S2, the PR #19 report rules and the PR #23 proctoring questions). Q2 (email code on sign-up) waits for a verified Resend domain.
+- [x] Apply all migrations to the cloud project (13, last 7 applied 2026-11-15; versions match `supabase/migrations/`).
+- [x] Candidate report for another company's invite id returns a real 404 (PR #27).
 - [ ] Publish `harbor-lane-bank-rec` (`pnpm scenarios:publish`) after an accountant reviews it.
-- [ ] Open decisions from PR #19: viewers can add notes and votes; the report rebuilds expected answers from the attempt seed; a review overwrites the provisional score (audit log keeps the record).
-- [ ] Remaining app issue: the candidate report for another company's invite id may return 200 with the 404 page (same pattern fixed for jobs in PR #21). Colour contrast and the other E2E bugs are fixed (PRs #17, #21, #23).
-- [ ] Proctoring open decisions (privacy, retention, consent wording) in PR #23.
+- [ ] D3 free legal checks (compare notice with competitors, pilot firm HR review, UNC law clinics / Launch Chapel Hill); paid lawyer before charging, leaving NC, or turning on AI scoring.
+- [ ] D14: ask pilot firms what they would pay (first round free).
 
 ## Log
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-15 | PR #36 merged: Mantle UI rebuild (Andy). Cloud: migrations `20261111100000` to `20261111141000` applied (versions match the files). Production email live in Resend test mode (`onboarding@resend.dev`, delivers only to the Resend account owner). `/api/health` all true |
+| 2026-11-15 | Pilot decisions built and merged, each test-first with CI green: PR #30 Harbor Lane `{{first_name}}` greeting and NSF date order (D10); PR #31 camera/screen downtime recorded and flagged, timer never pauses (D4); PR #34 MFA for recruiters (and viewers when `viewers_see_media`), button-confirm auth links, last-admin trigger, `profiles` (D1, D13); PR #32 two retention periods and required Monitored / Not monitored choice (D2, D5); PR #35 invite last sent and send count, unique live invites, per-invite accommodations, contact email (D12, D9); PR #33 `auto_score` and shadow AI scoring with Claude Sonnet 5.5 (D11, D8); PR #37 flaky downtime test fix |
 | 2026-11-12 | Mantle UI from the prototype (`docs/design/prototype.html`, `13-design-system.md`): design tokens and components ported (`src/app/mantle.css`, `src/components/`), every company and candidate screen and both emails restyled. Behaviour changes: `/app/<slug>` opens Jobs (no dashboard); invite form moved to `/jobs/<id>/invite`; assessment configure screens at `/jobs/assessments/new` and `/jobs/assessments/<id>`; monitoring consent moved to the verify page (consent version `2026-11-11.verify-table`); explicit start photo and a connection check on the system check; task-centred workspace with calculator, new-mail toast and one-minute warning; report shows percentile, votes and integrity signal counts |
 | 2026-11-14 | CI fixes for the Mantle UI (PR #36): `/app/<slug>` now redirects to Jobs over HTTP in `src/proxy.ts` (no client-side jump); the verify form keeps a name, code and consent typed before hydration; account-menu links no longer prefetch (404s after sign-out); screenshot baselines regenerated |
 | 2026-11-15 | Main (PRs #32, #35, #33, #37) merged into the Mantle UI (PR #36): Configure assessment asks Monitored / Not monitored with nothing preselected (camera and screen switches appear only when Monitored); Settings has the two retention fields and the candidate contact email; the job page shows last sent date and send count, and the invite drawer sets accommodations (extra time, camera / screen waivers), shown on the row and the report; the report shows the automatic score next to the final one; the verify page states both retention periods and the contact line, and the instructions show extra time and waivers. Consent version `2026-11-15.verify-table.contact` |
