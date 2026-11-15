@@ -282,7 +282,12 @@ function spanStats(list: Span[], countFrom: number) {
   };
 }
 
-const withoutLength = (list: Span[]): EvidenceEvent[] => list.map(({ lengthMs: _length, ...rest }) => rest);
+const withoutLength = (list: Span[]): EvidenceEvent[] =>
+  list.map((s) => {
+    const rest: Span = { ...s };
+    delete rest.lengthMs;
+    return rest;
+  });
 
 const STOP: Record<string, DownSource> = { camera_stopped: "camera", screen_share_stopped: "screen", fullscreen_exited: "fullscreen" };
 const START: Record<string, DownSource> = { camera_started: "camera", screen_share_started: "screen", fullscreen_entered: "fullscreen" };
