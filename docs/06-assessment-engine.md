@@ -72,7 +72,7 @@ Code: `src/lib/engine/`. Split so answer keys can't reach the browser:
 | Folder | Holds | Runs in |
 | --- | --- | --- |
 | `types.ts` | Shared shapes (`ScenarioDefinition`, `Step`, `Message`, `StepScore`, `AttemptScore`); no keys | Both |
-| `server/` | Seeded RNG (sfc32 + cyrb128), `{{name}}` / `{{name\|money}}` templates, step-type interface, registry, render, score | Server only (`import "server-only"`) |
+| `server/` | Seeded RNG (sfc32 + cyrb128), `{{name}}` / `{{name\|money}}` templates (plus `{{first_name}}`, the candidate's, "there" if unknown; not seeded), step-type interface, registry, render, score | Server only (`import "server-only"`) |
 | `client/` | Browser registry, `StepView` | Browser |
 | `step-types/<type>/` | `public.ts` (what the candidate sees, answer shape), `client.tsx` (input), `server.ts` (key schema, `parseAnswer`, `score`) | Split per file |
 | `scenarios/` | Code-defined scenarios + generators, registered by `slug@version` | Server only |
