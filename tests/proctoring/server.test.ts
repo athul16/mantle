@@ -159,10 +159,13 @@ describe("downtime (timer keeps running, D4)", () => {
 
   it("records a down period when the source comes back, once, and flags a long gap", async () => {
     const c = await candidate(proctoredJob);
+    // One clock reading for both ends, so the gap is exactly 45 s.
+    const now = Date.now();
+    const at = (msAgo: number) => new Date(now - msAgo).toISOString();
     await proctoring.recordSignals(c.session, {
       signals: [
-        { kind: "screen_share_stopped", at: iso(120_000) },
-        { kind: "screen_share_started", at: iso(75_000), surface: "monitor" },
+        { kind: "screen_share_stopped", at: at(120_000) },
+        { kind: "screen_share_started", at: at(75_000), surface: "monitor" },
       ],
     });
     // Another batch must not record the same gap again.
