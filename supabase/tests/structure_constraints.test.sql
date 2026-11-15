@@ -30,6 +30,7 @@ select set_eq(
        -- (table, columns, references, referenced columns, on delete: c=cascade a=no action)
        ('memberships',      'org_id',            'organizations',   'id',        'c'),
        ('memberships',      'user_id',           'auth.users',      'id',        'c'),
+       ('profiles',         'id',                'auth.users',      'id',        'c'),
        ('scenarios',        'org_id',            'organizations',   'id',        'c'),
        ('assessments',      'org_id',            'organizations',   'id',        'c'),
        ('assessments',      'scenario_id',       'scenarios',       'id',        'a'),

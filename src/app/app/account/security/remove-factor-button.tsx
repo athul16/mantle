@@ -3,9 +3,9 @@
 import { useFormStatus } from "react-dom";
 import { removeFactor } from "../actions";
 
-export function RemoveFactorButton({ factorId, name, last, isAdmin }: { factorId: string; name: string; last: boolean; isAdmin: boolean }) {
+export function RemoveFactorButton({ factorId, name, last, required }: { factorId: string; name: string; last: boolean; required: boolean }) {
   const warning =
-    last && isAdmin
+    last && required
       ? `Remove ${name}? This turns two-factor off, and you'll need to set it up again before you can use your company.`
       : `Remove ${name}? It will no longer work for signing in.`;
   return (

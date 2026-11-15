@@ -4,7 +4,7 @@ import { Icon } from "@/components/icons";
 import { AuthCard, Notice } from "@/components/ui";
 import { getAssuranceLevels, listMemberships, requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SECURITY_PATH, VERIFY_PATH, safeNext } from "../mfa-gate";
+import { SECURITY_PATH, VERIFY_PATH, mfaRequired, safeNext } from "../mfa-gate";
 import { AccountShell } from "../shell";
 import { EnrollPanel } from "./enroll-panel";
 import { RemoveFactorButton } from "./remove-factor-button";
@@ -38,15 +38,14 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
   const supabase = await createClient();
   const [{ data: factorData }, memberships] = await Promise.all([supabase.auth.mfa.listFactors(), listMemberships()]);
   const factors = (factorData?.totp ?? []).filter((f) => f.status === "verified");
-  const adminOf = memberships.filter((m) => m.role === "admin");
-  const isAdmin = adminOf.length > 0;
+  // Admins and recruiters must use it, and viewers when their company shows them candidate media.
+  const required = memberships.some((m) => mfaRequired(m.role, m.viewersSeeMedia));
   const removeError =
     params.error === "remove" ? <Notice tone="bad">Could not remove that authenticator app. Sign in again and retry.</Notice> : null;
 
-  // An admin sent here to set up two-factor before opening their company: the
+  // Someone sent here to set up two-factor before opening their company: the
   // centred setup screen, no company navigation (they can't use it yet).
   if (next && factors.length === 0) {
-    const company = adminOf.length === 1 ? `Admins at ${adminOf[0].orgName}` : "Company admins";
     return (
       <AuthCard
         title="Turn on two-factor authentication"
@@ -58,7 +57,7 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
             style={{ padding: "12px 16px", borderRadius: 10, background: "var(--accent-soft)", border: "1px solid var(--accent-line)", color: "var(--accent-ink)" }}
           >
             <Icon name="shield" />
-            <span className="small">{company} must use two-factor authentication. Set it up to open the company.</span>
+            <span className="small">Your role in this company requires two-factor authentication. Set up an authenticator app to continue.</span>
           </div>
         }
         below={<p className="xs muted" style={{ textAlign: "center" }}>{SAFETY}</p>}
@@ -86,7 +85,7 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
                       <span className="small strong" style={{ display: "block" }}>{displayName(f.friendly_name)}</span>
                       <span className="xs muted">Added {formatDate(f.created_at)}</span>
                     </span>
-                    <RemoveFactorButton factorId={f.id} name={f.friendly_name || "this authenticator app"} last={factors.length === 1} isAdmin={isAdmin} />
+                    <RemoveFactorButton factorId={f.id} name={f.friendly_name || "this authenticator app"} last={factors.length === 1} required={required} />
                   </li>
                 ))}
               </ul>
@@ -109,7 +108,9 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
           )}
           <EnrollPanel next={next} label={factors.length ? "Add another authenticator app" : "Set up an authenticator app"} primary={!factors.length} />
           <p className="xs muted">
-            {isAdmin ? "Admins must have it turned on to use their company. Recruiters and viewers can turn it on here too." : "It's optional for recruiters and viewers, and recommended."}
+            {required
+              ? "Your role requires it: admins and recruiters must have it turned on, and viewers too when their company shows them candidate snapshots."
+              : "It's optional for you, and recommended."}
           </p>
         </Card>
         <p className="xs muted">{SAFETY}</p>

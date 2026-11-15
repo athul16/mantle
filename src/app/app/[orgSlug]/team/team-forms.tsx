@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState } from "react";
 import { Icon } from "@/components/icons";
 import { Button, FormMessage } from "@/components/ui";
 import { ROLES_FOR_UI, type UiRole } from "./roles";
@@ -65,12 +65,7 @@ export function InviteForm({ orgId }: { orgId: string }) {
   );
 }
 
-export function TwoFactor({ pending, on }: { pending: boolean; on: boolean }) {
-  if (pending) return <span className="muted">—</span>;
-  return on ? <span className="badge b-ok">On</span> : <span className="badge">Off</span>;
-}
-
-/** The role, two-factor and actions cells of an admin's team table row. */
+/** The role and actions cells of an admin's team table row. */
 export function MemberControls({
   orgId,
   userId,
@@ -78,7 +73,6 @@ export function MemberControls({
   role,
   isSelf,
   pending,
-  twoFactor,
 }: {
   orgId: string;
   userId: string;
@@ -86,7 +80,6 @@ export function MemberControls({
   role: UiRole;
   isSelf: boolean;
   pending: boolean;
-  twoFactor: ReactNode;
 }) {
   const [roleState, roleAction, rolePending] = useActionState(changeRole, undefined);
   const [removeState, removeAction, removePending] = useActionState(removeMember, undefined);
@@ -120,7 +113,6 @@ export function MemberControls({
         </form>
         {roleState?.error ? <p className="co-err xs" style={{ maxWidth: 260 }}>{roleState.error}</p> : null}
       </td>
-      <td>{twoFactor}</td>
       <td className="r">
         <form
           action={removeAction}

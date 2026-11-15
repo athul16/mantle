@@ -18,12 +18,12 @@ const removeMember = vi.mocked(actions.removeMember);
 
 type ControlsProps = Parameters<typeof MemberControls>[0];
 /** MemberControls renders the role, two-factor and actions cells of a team table row. */
-function renderControls(props: Omit<ControlsProps, "email" | "pending" | "twoFactor"> & Partial<ControlsProps>) {
+function renderControls(props: Omit<ControlsProps, "email" | "pending"> & Partial<ControlsProps>) {
   return render(
     <table>
       <tbody>
         <tr>
-          <MemberControls email="sam@example.com" pending={false} twoFactor={null} {...props} />
+          <MemberControls email="sam@example.com" pending={false} {...props} />
         </tr>
       </tbody>
     </table>,

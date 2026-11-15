@@ -1,14 +1,14 @@
 import { Avatar } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { requireOrgMembership, requireUser, type Role } from "@/lib/auth";
+import { getProfiles, isPendingInvite } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { ROLES_FOR_UI } from "./roles";
-import { InviteForm, MemberControls, TwoFactor } from "./team-forms";
+import { InviteForm, MemberControls } from "./team-forms";
 
 export const metadata = { title: "Team · Mantle" };
 
-type Member = { userId: string; role: Role; email: string; pending: boolean; invitedAt: string | null; twoFactor: boolean };
+type Member = { userId: string; role: Role; email: string; pending: boolean; invitedAt: string | null };
 
 async function loadMembers(orgId: string): Promise<Member[]> {
   // Membership rows come through RLS as the signed-in user.
@@ -20,26 +20,18 @@ async function loadMembers(orgId: string): Promise<Member[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
 
-  // Emails and authenticator factors live in Supabase Auth, which only the
-  // service role can read. We only look up users RLS already showed us, i.e.
-  // members of the caller's org.
-  const service = createServiceClient();
-  return Promise.all(
-    data.map(async (m) => {
-      const [{ data: u }, { data: f }] = await Promise.all([
-        service.auth.admin.getUserById(m.user_id),
-        service.auth.admin.mfa.listFactors({ userId: m.user_id }),
-      ]);
-      return {
-        userId: m.user_id,
-        role: m.role as Role,
-        email: u.user?.email ?? "(unknown)",
-        pending: Boolean(u.user?.invited_at && !u.user?.last_sign_in_at),
-        invitedAt: u.user?.invited_at ?? null,
-        twoFactor: (f?.factors ?? []).some((x) => x.factor_type === "totp" && x.status === "verified"),
-      };
-    }),
-  );
+  // Emails and invite state come from profiles, also through RLS.
+  const profiles = await getProfiles(supabase, data.map((m) => m.user_id));
+  return data.map((m) => {
+    const profile = profiles.get(m.user_id);
+    return {
+      userId: m.user_id,
+      role: m.role as Role,
+      email: profile?.email ?? "(unknown)",
+      pending: isPendingInvite(profile),
+      invitedAt: profile?.invitedAt ?? null,
+    };
+  });
 }
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -74,7 +66,6 @@ export default async function TeamPage({ params }: PageProps<"/app/[orgSlug]/tea
             <tr>
               <th>Person</th>
               <th>Role</th>
-              <th>Two-factor</th>
               <th className="r">
                 <span className="sr">Actions</span>
               </th>
@@ -105,14 +96,11 @@ export default async function TeamPage({ params }: PageProps<"/app/[orgSlug]/tea
                     </span>
                   </td>
                   {isAdmin ? (
-                    <MemberControls orgId={orgId} userId={m.userId} email={m.email} role={m.role} isSelf={isSelf} pending={m.pending} twoFactor={<TwoFactor pending={m.pending} on={m.twoFactor} />} />
+                    <MemberControls orgId={orgId} userId={m.userId} email={m.email} role={m.role} isSelf={isSelf} pending={m.pending} />
                   ) : (
                     <>
                       <td>
                         <span className="small ink2">{roleLabel}</span>
-                      </td>
-                      <td>
-                        <TwoFactor pending={m.pending} on={m.twoFactor} />
                       </td>
                       <td />
                     </>

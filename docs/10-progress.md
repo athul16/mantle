@@ -58,6 +58,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 - Messaging candidates (bulk, per row, from the report); reminders (manual, and "2 days before invites close"); extend one candidate's invite; "Invite again" after a revoke; who revoked and when.
 - Accommodations: the recruiter drawer (extra time %, no camera, no screen sharing, note) and the "+N min" badges everywhere.
 - Company profile: logo upload, a named candidate contact (shown on emails, landing, done and error pages), teammate display names, inviter name on set-password, resending a teammate invite, a Team step in onboarding.
+- A two-factor on/off column on Team. Teammates are now read from `profiles` without the service key (PR #34), and factor status isn't in there yet.
 - Settings: "Let viewers see proctoring snapshots"; per-assessment "Who can see snapshots", extra-time toggle, phone side camera.
 - Assessments: preview as candidate, Build your own, pharmacy library, "New" badges and recruiter-facing descriptions.
 - Jobs: archived jobs, last activity, row actions menu, job owner.
