@@ -400,6 +400,8 @@ export type Database = {
           set_at: string
           set_by: string | null
           waive_camera: boolean
+          waive_fullscreen: boolean
+          waive_microphone: boolean
           waive_screen: boolean
         }
         Insert: {
@@ -409,6 +411,8 @@ export type Database = {
           set_at?: string
           set_by?: string | null
           waive_camera?: boolean
+          waive_fullscreen?: boolean
+          waive_microphone?: boolean
           waive_screen?: boolean
         }
         Update: {
@@ -418,6 +422,8 @@ export type Database = {
           set_at?: string
           set_by?: string | null
           waive_camera?: boolean
+          waive_fullscreen?: boolean
+          waive_microphone?: boolean
           waive_screen?: boolean
         }
         Relationships: [
@@ -577,6 +583,7 @@ export type Database = {
           attempt_id: string
           id: number
           org_id: string
+          reason: string | null
           source: string
           storage_path: string
         }
@@ -585,6 +592,7 @@ export type Database = {
           attempt_id: string
           id?: never
           org_id: string
+          reason?: string | null
           source: string
           storage_path: string
         }
@@ -593,6 +601,7 @@ export type Database = {
           attempt_id?: string
           id?: never
           org_id?: string
+          reason?: string | null
           source?: string
           storage_path?: string
         }
@@ -845,6 +854,8 @@ export type Database = {
           p_extra_time_percent: number
           p_invite_id: string
           p_waive_camera: boolean
+          p_waive_fullscreen?: boolean
+          p_waive_microphone?: boolean
           p_waive_screen: boolean
         }
         Returns: undefined
