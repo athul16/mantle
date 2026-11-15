@@ -35,8 +35,8 @@ vi.mock("@/lib/proctoring/client/gaze", () => ({
 async function load() {
   vi.resetModules();
   const mod = await import("@/app/a/[token]/check/system-check");
-  const proctoring = await import("@/lib/proctoring/client/proctoring");
-  return { SystemCheck: mod.SystemCheck, heldMicrophone: proctoring.heldMicrophone };
+  const store = await import("@/lib/proctoring/client/media-store");
+  return { SystemCheck: mod.SystemCheck, heldMicrophone: () => store.heldMedia("microphone") };
 }
 
 const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);

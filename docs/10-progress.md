@@ -2,7 +2,7 @@
 
 Where the phase 1 build stands. Update this file whenever a build step lands.
 
-_Last updated: 2026-11-15._
+_Last updated: 2026-11-15 (proctoring v2)._
 
 ## Skeleton build order (from `08-roadmap-and-open-questions.md`)
 
@@ -25,7 +25,7 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Hosting.** Vercel builds and deploys production from `main` (previews per PR). One Supabase cloud project (`fexzsiizgcjuddtoeaui`, Free plan) holds the database, auth and storage. Email goes through Resend when `RESEND_API_KEY` is set; otherwise messages are written to `.dev-outbox/`. Resend is not set in production yet.
 
-**Database.** 16 tables in `public`: `organizations`, `memberships`, `jobs`, `assessments`, `scenarios`, `invites`, `invite_secrets`, `attempts`, `attempt_secrets`, `step_responses`, `action_events`, `integrity_events`, `media`, `flags`, `notes`, `audit_log`. RLS on every table; answer keys and tokens live in the `*_secrets` tables, which only the server reads. Five migrations, all applied in the cloud:
+**Database.** 16 tables in `public`: `organizations`, `memberships`, `jobs`, `assessments`, `scenarios`, `invites`, `invite_secrets`, `attempts`, `attempt_secrets`, `step_responses`, `action_events`, `integrity_events`, `media`, `flags`, `notes`, `audit_log`. RLS on every table; answer keys and tokens live in the `*_secrets` tables, which only the server reads. Fourteen migrations in `supabase/migrations/` (the table below lists the first five; the newest is `20261115120000_proctoring_v2`, which adds media `audio` and `reason`, an audio-accepting bucket and the full screen and microphone waiver columns, and has not been applied to the cloud yet):
 
 | Migration | Adds |
 | --- | --- |
@@ -43,11 +43,11 @@ What runs today, from the code on main and the cloud project (2026-11-10).
 
 **Engine.** Five step types: `numeric`, `inbox_reply` (rubric; human review, AI scorer not wired), `spreadsheet`, `journal_entry`, `document_review`. Four scenarios in code: `demo-petty-cash`, `demo-mini-close`, `demo-entries-review`, `harbor-lane-bank-rec`. Only `demo-petty-cash` v1 is published to the cloud; publishing is `pnpm scenarios:publish`. `/dev/engine` previews any scenario.
 
-**Proctoring.** Rules (`src/lib/proctoring/rules.ts`): `left_window`, `paste`, `fullscreen`, `screen_share`, `camera`, `multiple_displays`. Camera and screen snapshots every 45 s and on leaving the window, uploaded with signed URLs. Each attempt gets an integrity label (`clear`, `review`, `suspicious`); nothing auto-rejects.
+**Proctoring (v2, 2026-11-15).** Settings per assessment: camera, screen, require full screen, microphone, gaze check; per-invite waivers for each of them except gaze (which follows the camera). Rules (`src/lib/proctoring/rules.ts`): `left_window`, `paste`, `copy`, `copy_then_leave`, `fullscreen`, `screen_share`, `camera`, `multiple_displays`, `downtime`, `gaze`, `no_face`, `multiple_faces`, `speech`. Camera and screen snapshots every 45 s and on leaving the window; while away, screenshots at +2 s, +6 s, every 10 s and on return; audio clips only around speech; gaze runs on the device and sends events only. The label is severity based: suspicious for combinations (left window with camera or screen trouble, copy then leave, multiple faces, speech with looking away or leaving, or 3+ kinds of flag), review for any other flag, clear for none, with the reasons shown on the report. Nothing auto-rejects. Details: `02-security-and-integrity.md`, `decisions/2026-11-15-proctoring-v2.md`.
 
 **Tests.** 48 Vitest files (498 tests, 27 of them component files), 14 pgTAP files (820 assertions), 19 Playwright specs (63 tests, 3 browsers, axe on every page), no open `test.fixme`. CI on every PR: `checks` (lint, types, unit, component), `database` (pgTAP), `e2e`. Work is test-first (`11-testing.md`).
 
-**Known gaps before a pilot.** Resend not set up (production invites and codes error until it is); `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
+**Known gaps before a pilot.** Proctoring v2 has not been tried in real browsers yet: full screen, speech detection and the gaze angles are only checked with Chromium's fake camera and microphone and unit tests, so the thresholds are first guesses; the report doesn't show how long an audio clip is; the gaze check downloads about 19 MB of MediaPipe files (cached after the first load); legal review (D3) before candidates outside North Carolina. Resend not set up (production invites and codes error until it is); `CRON_SECRET` not yet set in Vercel; Supabase still on Free (pauses after 7 idle days); AI rubric scorer; `harbor-lane-bank-rec` waits on an accountant; the team decisions in `decisions/2026-11-10-pilot-decisions.md`.
 
 ## Prototype features not built yet
 
@@ -114,6 +114,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-15 | Proctoring v2 (branch `feat/proctoring-v2`): pasting `123 456` fills the verify code; Require full screen, Microphone and Gaze check settings; full screen and microphone waivers per invite (migration `20261115120000_proctoring_v2`, consent version `2026-11-15.proctoring-v2`); away screenshots, full-screen cover, mic monitor with speech clips, on-device gaze check, cut and copy recorded; rules for copy, copy then leave, gaze, no face, multiple faces, speech and full-screen downtime; severity-based label with reasons; report with Copies and new counters, filmstrip per absence and audio players. Reverses D6 (full screen is now an option) and D7 (on-device gaze is built); see `decisions/2026-11-15-proctoring-v2.md`. E2E in `e2e/proctoring/proctoring-v2.spec.ts` |
 | 2026-11-12 | Mantle UI from the prototype (`docs/design/prototype.html`, `13-design-system.md`): design tokens and components ported (`src/app/mantle.css`, `src/components/`), every company and candidate screen and both emails restyled. Behaviour changes: `/app/<slug>` opens Jobs (no dashboard); invite form moved to `/jobs/<id>/invite`; assessment configure screens at `/jobs/assessments/new` and `/jobs/assessments/<id>`; monitoring consent moved to the verify page (consent version `2026-11-11.verify-table`); explicit start photo and a connection check on the system check; task-centred workspace with calculator, new-mail toast and one-minute warning; report shows percentile, votes and integrity signal counts |
 | 2026-11-14 | CI fixes for the Mantle UI (PR #36): `/app/<slug>` now redirects to Jobs over HTTP in `src/proxy.ts` (no client-side jump); the verify form keeps a name, code and consent typed before hydration; account-menu links no longer prefetch (404s after sign-out); screenshot baselines regenerated |
 | 2026-11-15 | Main (PRs #32, #35, #33, #37) merged into the Mantle UI (PR #36): Configure assessment asks Monitored / Not monitored with nothing preselected (camera and screen switches appear only when Monitored); Settings has the two retention fields and the candidate contact email; the job page shows last sent date and send count, and the invite drawer sets accommodations (extra time, camera / screen waivers), shown on the row and the report; the report shows the automatic score next to the final one; the verify page states both retention periods and the contact line, and the instructions show extra time and waivers. Consent version `2026-11-15.verify-table.contact` |

@@ -43,29 +43,6 @@ const MAX_AUDIO_CLIPS = 300;
 const GAZE_NOTE = "Your device couldn't run the facing-the-screen check; your camera is still on.";
 const FULLSCREEN_NOTE = "This browser can't run the test in full screen, so it runs in the window. Nothing is recorded about this.";
 
-// The microphone stream opened on the system check, kept for the workspace
-// (media-store holds camera and screen only; see its note on client navigation).
-let heldMic: MediaStream | undefined;
-const micLive = (s: MediaStream | undefined) => !!s && s.getAudioTracks().some((t) => t.readyState === "live");
-
-export function holdMicrophone(stream: MediaStream) {
-  if (heldMic && heldMic !== stream) stopStream(heldMic);
-  heldMic = stream;
-}
-
-/** The held microphone stream, if it is still live. */
-export function heldMicrophone(): MediaStream | undefined {
-  if (micLive(heldMic)) return heldMic;
-  heldMic = undefined;
-  return undefined;
-}
-
-/** Stops and forgets the held microphone. */
-export function releaseMicrophone() {
-  stopStream(heldMic);
-  heldMic = undefined;
-}
-
 const noSubscribe = () => () => {};
 const fullscreenSupported = () =>
   typeof document !== "undefined" && document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === "function";
@@ -91,7 +68,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   const awayCapture = useRef<AwayCapture | null>(null);
   const [camera, setCamera] = useState<DeviceState>(() => ({ on: !!(settings.camera && heldMedia("camera")) }));
   const [screen, setScreen] = useState<DeviceState>(() => ({ on: !!(settings.screen && heldMedia("screen")) }));
-  const [mic, setMic] = useState<DeviceState>(() => ({ on: !!(settings.microphone && heldMicrophone()) }));
+  const [mic, setMic] = useState<DeviceState>(() => ({ on: !!(settings.microphone && heldMedia("microphone")) }));
   // Bumped each time the microphone is (re)opened here, so the start effect runs
   // for the new monitor. A held stream's monitor is made on mount, before that effect.
   const [micGeneration, setMicGeneration] = useState(0);
@@ -143,7 +120,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
     (stream: MediaStream) => {
       if (micStream.current !== stream) return;
       micStream.current = null;
-      if (heldMic === stream) heldMic = undefined;
+      dropMedia("microphone");
       const monitor = audio.current;
       audio.current = null;
       void monitor?.stop();
@@ -157,7 +134,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   const attachMic = useCallback(
     (stream: MediaStream) => {
       micStream.current = stream;
-      holdMicrophone(stream);
+      holdMedia("microphone", stream);
       void audio.current?.stop();
       audio.current = createAudioMonitor({
         stream,
@@ -230,7 +207,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
       if (held) attach("screen", held);
     }
     if (settings.microphone) {
-      const held = heldMicrophone();
+      const held = heldMedia("microphone");
       if (held) attachMic(held);
       else timers.push(setTimeout(() => void startMicrophone(), 0));
     }
@@ -248,7 +225,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
       const stream = micStream.current;
       micStream.current = null;
       if (stream) {
-        if (heldMic === stream) heldMic = undefined;
+        dropMedia("microphone");
         stopStream(stream);
       }
     };
@@ -381,7 +358,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
               </div>
             ) : (
               <span className="ovicon" style={bad ? { background: "var(--bad-bg)", color: "var(--bad)" } : { background: "var(--subtle)", color: "var(--ink-2)" }}>
-                {micLostNow && lostCount === 1 && !fullscreenOnly ? <MicIcon className="i-lg" /> : <Icon name={icon} className="i-lg" />}
+                {micLostNow && lostCount === 1 && !fullscreenOnly ? <Icon name="mic" className="i-lg" /> : <Icon name={icon} className="i-lg" />}
               </span>
             )}
             <div className="col g6">
@@ -413,7 +390,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
               ) : null}
               {settings.microphone && !mic.on ? (
                 <button type="button" className="btn btn-dark btn-lg" onClick={() => void startMicrophone()} disabled={mic.starting}>
-                  <MicIcon />
+                  <Icon name="mic" />
                   Turn on microphone
                 </button>
               ) : null}
@@ -448,16 +425,6 @@ type ProctoringState = {
 
 const ProctoringContext = createContext<ProctoringState | null>(null);
 
-/** Microphone glyph (the shared icon set has none yet). */
-function MicIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className ? `i ${className}` : "i"} viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-    </svg>
-  );
-}
-
 /**
  * Camera thumbnail, screen-share chip and microphone chip for the workspace
  * header (prototype .camthumb / .scr). Renders nothing when the assessment
@@ -483,7 +450,7 @@ export function ProctoringIndicators({ bare = false }: { bare?: boolean }) {
       ) : null}
       {settings.microphone ? (
         <span className={micOn ? "scr" : "scr off"} role="img" aria-label={micOn ? "Microphone on" : "Microphone off"}>
-          <MicIcon />
+          <Icon name="mic" />
           <span className="sr">{micOn ? "Microphone on" : "Microphone off"}</span>
         </span>
       ) : null}

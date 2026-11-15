@@ -7,8 +7,8 @@ import { isMonitored, monitoringNotice, type MonitoringSettings, type Proctoring
 import { createAudioMonitor } from "@/lib/proctoring/client/audio";
 import { createGazeMonitor } from "@/lib/proctoring/client/gaze";
 import { CAMERA_MESSAGES, MICROPHONE_MESSAGES, SCREEN_MESSAGES, canShareScreen, openCamera, openMicrophone, openScreen } from "@/lib/proctoring/client/media";
+import { CameraPreview } from "@/lib/proctoring/client/proctoring";
 import { holdMedia } from "@/lib/proctoring/client/media-store";
-import { CameraPreview, holdMicrophone } from "@/lib/proctoring/client/proctoring";
 import { makeSignal, sendSignals } from "@/lib/proctoring/client/signals";
 import { takeSnapshot } from "@/lib/proctoring/client/snapshots";
 
@@ -151,7 +151,7 @@ export function SystemCheck({
       setMic({ state: "fail", detail: MICROPHONE_MESSAGES[r.reason], reason: r.reason });
       return;
     }
-    holdMicrophone(r.stream);
+    holdMedia("microphone", r.stream);
     record("microphone_started");
     setSound("listening");
     setMicStream(r.stream);
@@ -340,7 +340,7 @@ export function SystemCheck({
                 if (e.target.checked) void agree();
               }}
             />
-            <span className="small strong">I agree to camera and screen monitoring for this test, as described above.</span>
+            <span className="small strong">{consentLabel(proctoring)}</span>
           </label>
           {consentError ? <p className="small badc">{consentError}</p> : null}
         </section>
@@ -376,7 +376,9 @@ export function SystemCheck({
       {proctoring.microphone && mic.state === "fail" ? (
         <section className="card" style={{ padding: "18px 20px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }} aria-label="Microphone">
           <div style={{ flex: "1 1 280px" }}>
-            <h2 style={{ fontSize: 16 }}>Turn on your microphone</h2>
+            <h2 style={{ fontSize: 16 }}>
+              <Icon name="mic" /> Turn on your microphone
+            </h2>
             <p className="small badc" style={{ marginTop: 4 }} role="alert">
               {mic.detail}
             </p>
@@ -426,6 +428,13 @@ export function SystemCheck({
       </div>
     </>
   );
+}
+
+/** What the candidate agrees to, named from what this assessment actually captures. */
+export function consentLabel(p: Proctoring): string {
+  const parts = [p.camera ? "camera" : null, p.screen ? "screen" : null, p.microphone ? "microphone" : null].filter(Boolean) as string[];
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : (parts[0] ?? "");
+  return `I agree to ${list ? `${list} monitoring` : "monitoring"} for this test, as described above.`;
 }
 
 function StatusIcon({ state }: { state: RowState }) {
