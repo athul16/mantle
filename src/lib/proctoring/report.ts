@@ -25,7 +25,8 @@ export type ReportFlag = {
   reviewedAt: string | null;
   reviewerEmail: string | null;
   createdAt: string;
-  events: Pick<EvidenceEvent, "kind" | "at" | "awayMs" | "chars" | "surface">[];
+  /** Downtime flags (D4) carry one event per gap: source, downMs, endAt and closedBy. */
+  events: Pick<EvidenceEvent, "kind" | "at" | "awayMs" | "chars" | "surface" | "source" | "downMs" | "endAt" | "closedBy">[];
   media: ReportFlagMedia[];
 };
 
@@ -67,7 +68,17 @@ export async function getFlagsForReport(db: Db, orgId: string, attemptId: string
         reviewedAt: r.reviewed_at,
         reviewerEmail: r.reviewed_by ? (emails.get(r.reviewed_by) ?? "(former teammate)") : null,
         createdAt: r.created_at,
-        events: (ev.events ?? []).map(({ kind, at, awayMs, chars, surface }) => ({ kind, at, awayMs, chars, surface })),
+        events: (ev.events ?? []).map(({ kind, at, awayMs, chars, surface, source, downMs, endAt, closedBy }) => ({
+          kind,
+          at,
+          awayMs,
+          chars,
+          surface,
+          source,
+          downMs,
+          endAt,
+          closedBy,
+        })),
         media: (ev.mediaIds ?? []).map((id) => media.get(id)).filter((m): m is ReportFlagMedia => !!m),
       };
     }),

@@ -3,7 +3,7 @@ import "server-only";
 import type { PublicMessage, PublicStep, Variant } from "../types";
 import { getServerStepType } from "./registry";
 import type { ServerScenario } from "./scenario";
-import { fillTemplate } from "./template";
+import { fillTemplate, templateValues, type CandidateContext } from "./template";
 
 /**
  * Everything the browser gets for a scenario goes through this file, and none
@@ -18,17 +18,23 @@ function findStep(scenario: ServerScenario, stepId: string) {
   return step;
 }
 
-function toPublicStep(scenario: ServerScenario, stepId: string, variant: Variant): PublicStep {
+function toPublicStep(scenario: ServerScenario, stepId: string, variant: Variant, candidate: CandidateContext): PublicStep {
   const step = findStep(scenario, stepId);
   const stepType = getServerStepType(step.type);
   const config = stepType.configSchema.parse(step.config);
-  const fill = (template: string) => fillTemplate(template, variant.values);
+  const values = templateValues(variant.values, candidate);
+  const fill = (template: string) => fillTemplate(template, values);
   return { id: step.id, type: step.type, title: fill(step.title), config: stepType.toPublic(config, { variant, fill }) };
 }
 
 /** One step's public config with this candidate's variant values filled in. No answer key. */
-export function renderStepForCandidate(scenario: ServerScenario, stepId: string, seed: string): PublicStep {
-  return toPublicStep(scenario, stepId, scenario.generate(seed));
+export function renderStepForCandidate(
+  scenario: ServerScenario,
+  stepId: string,
+  seed: string,
+  candidate: CandidateContext = {},
+): PublicStep {
+  return toPublicStep(scenario, stepId, scenario.generate(seed), candidate);
 }
 
 /** Minute at which a step becomes available: when its first linked message arrives (0 if none). */
@@ -42,14 +48,17 @@ export function stepAvailableAtMinute(scenario: ServerScenario, stepId: string):
  * The candidate's view at `elapsedMinutes` into the attempt: arrived messages
  * (newest first) and the steps available so far. `elapsedMinutes` must come
  * from the server (now - attempts.started_at), never from the browser.
+ * `candidate` fills `{{first_name}}`; without a name it reads "there".
  */
 export function renderAttemptForCandidate(
   scenario: ServerScenario,
   seed: string,
   elapsedMinutes: number,
+  candidate: CandidateContext = {},
 ): { intro: string; messages: PublicMessage[]; steps: PublicStep[] } {
   const variant = scenario.generate(seed);
-  const fill = (template: string) => fillTemplate(template, variant.values);
+  const values = templateValues(variant.values, candidate);
+  const fill = (template: string) => fillTemplate(template, values);
 
   const messages = scenario.definition.messages
     .filter((m) => (m.arriveAtMinute ?? 0) <= elapsedMinutes)
@@ -65,7 +74,7 @@ export function renderAttemptForCandidate(
 
   const steps = scenario.definition.steps
     .filter((s) => stepAvailableAtMinute(scenario, s.id) <= elapsedMinutes)
-    .map((s) => toPublicStep(scenario, s.id, variant));
+    .map((s) => toPublicStep(scenario, s.id, variant, candidate));
 
   return { intro: fill(scenario.definition.intro), messages, steps };
 }

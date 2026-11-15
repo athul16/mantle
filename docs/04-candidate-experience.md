@@ -22,7 +22,7 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 - **Left:** inbox. Messages can arrive over time (scheduled by the scenario). Unread counts, timestamps.
 - **Right:** workspace. Opens whatever the current message or task needs: spreadsheet grid, PDF/document viewer, journal entry builder, reply composer, multiple choice.
 - **Built-in calculator** for accounting.
-- **Banners:** shown immediately if camera or screen share drops; the test pauses until restored.
+- **Banners:** shown immediately if camera or screen share drops. The task area is covered until it is back, but the **timer keeps running** (decision D4, 2026-11-10); the message tells the candidate so. Each down period (start, end, camera or screen) is recorded, and the report shows the gaps and the total so the recruiter can judge it (see `docs/02-security-and-integrity.md`). A refresh or closed tab during a gap ends it when the source is back, or at submit or the deadline if it never is.
 
 ## Behavior
 

@@ -14,10 +14,10 @@ import {
   PROCTORING_BUCKET,
   readProctoring,
   type MonitoringSettings,
-  type Proctoring,
   type SnapshotSource,
 } from "./config";
-import { evaluateRules, integrityLabel, parseSignalBatch, type MediaRef, type SignalEvent } from "./rules";
+import { recordDownPeriods, refreshFlags } from "./flags";
+import { parseSignalBatch } from "./rules";
 
 /**
  * Proctoring for candidate routes. Every function starts from a verified
@@ -60,50 +60,12 @@ export async function recordSignals(session: CandidateSession, body: unknown, no
   );
   if (error) throw new Error(`recording signals failed: ${error.message}`);
 
+  await recordDownPeriods(attempt);
   await refreshFlags(attempt, await getProctoringSettings(session));
   return { ok: true, recorded: signals.length };
 }
 
-/**
- * Re-runs the rules over everything recorded for the attempt. New rules get a
- * flag; open flags get the latest reason and evidence; flags a recruiter has
- * already confirmed or cleared are left exactly as reviewed. Also sets the
- * attempt's integrity label.
- */
-export async function refreshFlags(attempt: AttemptKey, settings: Proctoring): Promise<void> {
-  const db = createServiceClient();
-  const [events, media, existing] = await Promise.all([
-    db.from("integrity_events").select("id, at, kind, payload").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
-    db.from("media").select("id, at, source").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
-    db.from("flags").select("id, rule, status").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).not("rule", "is", null),
-  ]);
-  for (const r of [events, media, existing]) if (r.error) throw new Error(`loading proctoring data failed: ${r.error.message}`);
-
-  const drafts = evaluateRules((events.data ?? []) as SignalEvent[], (media.data ?? []) as MediaRef[], settings);
-  const byRule = new Map((existing.data ?? []).map((f) => [f.rule!, f]));
-
-  for (const d of drafts) {
-    const current = byRule.get(d.rule);
-    const evidence = d.evidence as unknown as Json;
-    if (!current) {
-      const { error } = await db
-        .from("flags")
-        .insert({ attempt_id: attempt.id, org_id: attempt.org_id, rule: d.rule, reason: d.reason, evidence });
-      // 23505: a parallel batch raised the same rule first; the next batch updates it.
-      if (error && error.code !== "23505") throw new Error(`raising flag failed: ${error.message}`);
-    } else if (current.status === "open") {
-      const { error } = await db.from("flags").update({ reason: d.reason, evidence }).eq("id", current.id).eq("status", "open");
-      if (error) throw new Error(`updating flag failed: ${error.message}`);
-    }
-  }
-
-  const { error } = await db
-    .from("attempts")
-    .update({ integrity_label: integrityLabel(drafts) })
-    .eq("id", attempt.id)
-    .eq("org_id", attempt.org_id);
-  if (error) throw new Error(`setting integrity label failed: ${error.message}`);
-}
+export { refreshFlags };
 
 // ---------------------------------------------------------------------------
 // Consent
