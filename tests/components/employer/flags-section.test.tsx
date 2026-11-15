@@ -64,6 +64,25 @@ describe("FlagsSection", () => {
     expect(items[1]).toHaveTextContent("Pasted from their own earlier answer.");
   });
 
+  it("lists each downtime gap with its length, span and how it ended", () => {
+    const downtime: ReportFlag = {
+      ...open,
+      id: "f3",
+      rule: "downtime",
+      reason: "Camera or screen share was down 2 times: the task was covered for 2 min 5 s in total while the timer kept running",
+      events: [
+        { kind: "monitoring_down", at: "2026-11-10T10:05:00.000Z", source: "screen", downMs: 45_000, endAt: "2026-11-10T10:05:45.000Z", closedBy: "reconnected" },
+        { kind: "monitoring_down", at: "2026-11-10T10:58:40.000Z", source: "camera", downMs: 80_000, endAt: "2026-11-10T11:00:00.000Z", closedBy: "deadline" },
+      ],
+      media: [],
+    };
+    renderSection({ flags: [downtime] });
+    const items = within(screen.getByRole("list", { name: "Evidence" })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Screen share stopped for 45 s (back on) · 5:00 to 5:45 into the test");
+    expect(items[1]).toHaveTextContent("Camera off for 1 min 20 s (never back; counted until the time ran out) · 58:40 to 1:00:00 into the test");
+    expect(screen.getByText(/the timer kept running\. Judge whether the lost time affected the result/)).toBeVisible();
+  });
+
   it("says flags are for review and never reject anyone", () => {
     renderSection();
     expect(screen.getByText(/Flags point to moments worth checking\. They don't reject anyone/)).toBeVisible();

@@ -85,9 +85,10 @@ beforeAll(async () => {
   if (b.error) throw b.error;
   orgB = b.data as string;
   orgIds.push(orgB);
-  // Admins' actions need two-factor (aal2).
+  // Admins' and recruiters' actions need two-factor (aal2, decision D1).
   await enrollTotp(owner.client);
   await enrollTotp(outsider.client);
+  await enrollTotp(recruiter.client);
 
   const m = await service.from("memberships").insert([
     { org_id: orgA, user_id: recruiter.id, role: "recruiter" },

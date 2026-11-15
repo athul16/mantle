@@ -626,6 +626,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_sign_in_at: string | null
+          id: string
+          invited_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id?: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           created_at: string
@@ -716,8 +743,16 @@ export type Database = {
         Args: { p_limit?: number; p_now?: string }
         Returns: { invite_id: string; org_id: string; retained_until: string }[]
       }
+      list_media_past_retention: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: { attempt_id: string; org_id: string; retained_until: string }[]
+      }
       purge_candidate_for_retention: {
         Args: { p_invite_id: string; p_now?: string }
+        Returns: string[]
+      }
+      purge_media_for_retention: {
+        Args: { p_attempt_id: string; p_now?: string }
         Returns: string[]
       }
       review_rubric_step: {
@@ -737,7 +772,10 @@ export type Database = {
         }
         Returns: undefined
       }
-      set_retention_days: { Args: { p_days: number; p_org_id: string }; Returns: number }
+      set_retention: {
+        Args: { p_media_days: number; p_org_id: string; p_results_days: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

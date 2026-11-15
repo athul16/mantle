@@ -37,4 +37,8 @@ MVP may ship with admin + recruiter only.
 
 ## As built (Nov 2026)
 
-All three roles are built and enforced twice: in server code (`requireMembership` / `requireOrgMembership` in `src/lib/auth.ts`) and in the database (RLS policies). The team page (`/app/<slug>/team`) lets admins invite by email, change roles, and remove members; others see it read-only. A company can't drop to zero admins (checked in app code; a database rule for this is open decision Q4). Viewers see proctoring media only when the company setting `viewers_see_media` is on.
+All three roles are built and enforced twice: in server code (`requireMembership` / `requireOrgMembership` in `src/lib/auth.ts`) and in the database (RLS policies). The team page (`/app/<slug>/team`) lets admins invite by email, change roles, and remove members; others see it read-only. A company can't drop to zero admins: a database trigger (`memberships_keep_one_admin`) refuses removing, demoting or moving an org's last admin for anyone, the service role included, and the team page shows a friendly message first (decision D13 / Q4). Deleting the whole company, or the person's account, is not blocked. Viewers see proctoring media only when the company setting `viewers_see_media` is on.
+
+Two-factor (decision D1): admins and recruiters must use an authenticator app, and viewers must too while `viewers_see_media` is on, because that lets them see snapshots. See `02-security-and-integrity.md`.
+
+The team page reads names and invite state from `profiles` with the member's own client, so a member sees the emails of people in their own companies only.

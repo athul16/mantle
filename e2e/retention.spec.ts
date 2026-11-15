@@ -1,6 +1,6 @@
 /**
- * Retention (docs/02 Compliance): an admin changes how long candidate data is
- * kept, then deletes one candidate's data from the report. Other roles see the
+ * Retention (docs/02 Compliance): an admin changes how long photos and results
+ * are kept, then deletes one candidate's data from the report. Other roles see the
  * setting read-only and get no delete button.
  */
 import { signInViaUi } from "./fixtures";
@@ -36,34 +36,46 @@ async function candidateWithEvidence(data: TestData) {
   return { co, jobId, invite, attemptId, path };
 }
 
-test("an admin changes how long candidate data is kept", async ({ page, company, signInAs, land }) => {
+test("an admin changes how long photos and results are kept", async ({ page, company, signInAs, land }) => {
   await signInAs("admin", `/app/${company.slug}`);
   await page.getByRole("link", { name: "Settings" }).click();
   await land(new RegExp(`/app/${company.slug}/settings$`), "Settings");
 
-  const days = page.getByLabel("Keep candidate data for (days)");
-  await expect(days).toHaveValue("180");
+  const media = page.getByLabel("Keep photos and screenshots for (days)");
+  const results = page.getByLabel("Keep results for (days)");
+  await expect(media).toHaveValue("90");
+  await expect(results).toHaveValue("365");
 
-  await days.fill("10");
+  await media.fill("10");
+  await results.fill("900");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Enter a whole number of days from 30 to 730.")).toBeVisible();
+  await expect(media).toHaveAccessibleDescription(/Enter a whole number of days from 30 to 365\./);
+  await expect(results).toHaveAccessibleDescription(/Enter a whole number of days from 30 to 730\./);
 
-  await days.fill("90");
+  await media.fill("200");
+  await results.fill("100");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Saved. Candidate data is kept for 90 days.")).toBeVisible();
+  await expect(page.getByText("Photos and screenshots can't be kept longer than results.")).toBeVisible();
+
+  await media.fill("60");
+  await results.fill("200");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved. Photos and screenshots are kept for 60 days, results for 200 days.")).toBeVisible();
 
   const org = must(await db().from("organizations").select("settings").eq("id", company.orgId).single());
-  expect((org.settings as { retention_days?: number }).retention_days).toBe(90);
+  expect(org.settings).toMatchObject({ media_retention_days: 60, results_retention_days: 200 });
 
   await page.reload();
-  await expect(page.getByLabel("Keep candidate data for (days)")).toHaveValue("90");
+  await expect(page.getByLabel("Keep photos and screenshots for (days)")).toHaveValue("60");
+  await expect(page.getByLabel("Keep results for (days)")).toHaveValue("200");
 });
 
-test("a recruiter sees the retention setting read-only", async ({ page, company, signInAs, land }) => {
+test("a recruiter sees the retention settings read-only", async ({ page, company, signInAs, land }) => {
   await signInAs("recruiter", `/app/${company.slug}/settings`);
   await land(new RegExp(`/app/${company.slug}/settings$`), "Settings");
-  await expect(page.getByText("Candidate data is kept for 180 days")).toBeVisible();
-  await expect(page.getByLabel("Keep candidate data for (days)")).toHaveCount(0);
+  await expect(page.getByText("Photos and screenshots are kept for 90 days")).toBeVisible();
+  await expect(page.getByText("Results are kept for 365 days")).toBeVisible();
+  await expect(page.getByLabel("Keep photos and screenshots for (days)")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
 });
 

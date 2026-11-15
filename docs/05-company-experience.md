@@ -8,7 +8,7 @@ The company side turns a pile of applicants into a short ranked list. The candid
 | --- | --- | --- | --- |
 | 1 | Sign up / org setup | Company name, logo, invite teammates with roles | MVP |
 | 2 | Assessment library | Ready-made simulations (Accounting Intern, Pharma Intern); preview as candidate | MVP |
-| 3 | Configure assessment | Time limit, pass score, proctoring toggles (camera, screen, phone) | MVP |
+| 3 | Configure assessment | Time limit, pass score, a required Monitored / Not monitored choice with nothing preselected (decision D5); if Monitored, camera and/or screen (phone later). The server rejects a missing choice | MVP |
 | 4 | Create job | Role name, linked assessment, invite deadline | MVP |
 | 5 | Invite candidates | Paste emails, CSV upload, or public link for a job posting | MVP |
 | 6 | Candidates table | Status (invited, started, completed, expired), score, percentile, integrity label; sort, filter, bulk advance/reject, reminders | MVP |
@@ -17,7 +17,7 @@ The company side turns a pile of applicants into a short ranked list. The candid
 | 9 | Analytics | Invited → completed funnel, score distribution, pass rates | Later |
 | 10 | Scenario builder | Companies author or customize simulations | Later |
 | 11 | Integrations | ATS sync (Greenhouse, Lever, Workday) | Later |
-| 12 | Settings and billing | Branding, email templates, retention, Stripe, SSO | Later |
+| 12 | Settings and billing | Retention: media and results periods (built, see docs/02). Branding, email templates, Stripe, SSO | Later |
 
 For pilots, our team can run screens 1 to 3 for the client.
 

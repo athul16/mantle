@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { createServiceClient } from "@/lib/supabase/service";
+import { getEmails } from "@/lib/profiles";
 import { PROCTORING_BUCKET, readProctoring, type Proctoring } from "./config";
 import type { EvidenceEvent } from "./rules";
 
@@ -25,7 +25,8 @@ export type ReportFlag = {
   reviewedAt: string | null;
   reviewerEmail: string | null;
   createdAt: string;
-  events: Pick<EvidenceEvent, "kind" | "at" | "awayMs" | "chars" | "surface">[];
+  /** Downtime flags (D4) carry one event per gap: source, downMs, endAt and closedBy. */
+  events: Pick<EvidenceEvent, "kind" | "at" | "awayMs" | "chars" | "surface" | "source" | "downMs" | "endAt" | "closedBy">[];
   media: ReportFlagMedia[];
 };
 
@@ -52,7 +53,7 @@ export async function getFlagsForReport(db: Db, orgId: string, attemptId: string
   const evidenceOf = (e: unknown) => (e ?? {}) as { events?: EvidenceEvent[]; mediaIds?: number[] };
   const mediaIds = [...new Set(rows.flatMap((r) => evidenceOf(r.evidence).mediaIds ?? []))].filter((n) => Number.isInteger(n));
   const media = canSeeMedia && mediaIds.length ? await signedMedia(db, orgId, attemptId, mediaIds) : new Map<number, ReportFlagMedia>();
-  const emails = await reviewerEmails(rows.map((r) => r.reviewed_by).filter((id): id is string => !!id));
+  const emails = await getEmails(db, rows.map((r) => r.reviewed_by).filter((id): id is string => !!id));
 
   return {
     canSeeMedia,
@@ -67,7 +68,17 @@ export async function getFlagsForReport(db: Db, orgId: string, attemptId: string
         reviewedAt: r.reviewed_at,
         reviewerEmail: r.reviewed_by ? (emails.get(r.reviewed_by) ?? "(former teammate)") : null,
         createdAt: r.created_at,
-        events: (ev.events ?? []).map(({ kind, at, awayMs, chars, surface }) => ({ kind, at, awayMs, chars, surface })),
+        events: (ev.events ?? []).map(({ kind, at, awayMs, chars, surface, source, downMs, endAt, closedBy }) => ({
+          kind,
+          at,
+          awayMs,
+          chars,
+          surface,
+          source,
+          downMs,
+          endAt,
+          closedBy,
+        })),
         media: (ev.mediaIds ?? []).map((id) => media.get(id)).filter((m): m is ReportFlagMedia => !!m),
       };
     }),
@@ -107,20 +118,6 @@ async function signedMedia(db: Db, orgId: string, attemptId: string, ids: number
     const url = urlFor.get(r.storage_path);
     if (url) out.set(r.id, { id: r.id, at: r.at, source: r.source as ReportFlagMedia["source"], url });
   }
-  return out;
-}
-
-/** Reviewer emails (auth admin lookup, like note authors on the report). */
-async function reviewerEmails(ids: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  if (!ids.length) return out;
-  const service = createServiceClient();
-  await Promise.all(
-    [...new Set(ids)].map(async (id) => {
-      const { data } = await service.auth.admin.getUserById(id);
-      if (data.user?.email) out.set(id, data.user.email);
-    }),
-  );
   return out;
 }
 

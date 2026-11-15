@@ -33,30 +33,59 @@ export async function removeCandidateObjects(client: PurgeClient, orgId: string,
   return own.length;
 }
 
-export type PurgeSummary = { checked: number; purged: number; failed: number; objectsRemoved: number };
+export type PurgeCounts = { checked: number; purged: number; failed: number; objectsRemoved: number };
+export type PurgeSummary = { media: PurgeCounts; results: PurgeCounts };
+
+type Clock = { list: string; purge: string; idArg: string; idOf: (row: Record<string, string>) => string; label: string };
+
+/** Media clock: an attempt's snapshot rows and files, nothing else. */
+const MEDIA: Clock = {
+  list: "list_media_past_retention",
+  purge: "purge_media_for_retention",
+  idArg: "p_attempt_id",
+  idOf: (r) => r.attempt_id,
+  label: "media",
+};
+/** Results clock: the whole candidate (invite, attempt, answers, flags, notes) and any files left. */
+const RESULTS: Clock = {
+  list: "list_candidates_past_retention",
+  purge: "purge_candidate_for_retention",
+  idArg: "p_invite_id",
+  idOf: (r) => r.invite_id,
+  label: "candidate",
+};
+
+async function runClock(client: PurgeClient, clock: Clock, now: string, limit: number): Promise<PurgeCounts> {
+  const listed = await client.rpc(clock.list, { p_now: now, p_limit: limit });
+  if (listed.error) throw new Error(`listing ${clock.label} past retention failed: ${listed.error.message}`);
+  const rows = (listed.data ?? []) as (Record<string, string> & { org_id: string })[];
+
+  const counts: PurgeCounts = { checked: rows.length, purged: 0, failed: 0, objectsRemoved: 0 };
+  for (const row of rows) {
+    try {
+      const purged = await client.rpc(clock.purge, { [clock.idArg]: clock.idOf(row), p_now: now });
+      if (purged.error) throw new Error(purged.error.message);
+      counts.purged++;
+      counts.objectsRemoved += await removeCandidateObjects(client, row.org_id, (purged.data ?? []) as string[]);
+    } catch (err) {
+      counts.failed++;
+      console.error(`retention purge failed for one ${clock.label}`, err instanceof Error ? err.message : err);
+    }
+  }
+  return counts;
+}
 
 /**
- * The daily purge: every candidate past their org's retention, oldest first,
- * in batches. One failure doesn't stop the rest; the summary holds counts only
- * (no ids or emails), so it is safe to log and return.
+ * The daily purge, one clock after the other, oldest first, in batches. Media
+ * first: snapshots past the org's media period go while the results stay. Then
+ * every candidate past the results period goes entirely. One failure doesn't
+ * stop the rest; the summary holds counts only (no ids or emails), so it is
+ * safe to log and return.
  */
 export async function runRetentionPurge(client: PurgeClient, opts: { now?: Date; limit?: number } = {}): Promise<PurgeSummary> {
   const now = (opts.now ?? new Date()).toISOString();
-  const listed = await client.rpc("list_candidates_past_retention", { p_now: now, p_limit: opts.limit ?? 200 });
-  if (listed.error) throw new Error(`listing candidates past retention failed: ${listed.error.message}`);
-  const rows = (listed.data ?? []) as { invite_id: string; org_id: string }[];
-
-  const summary: PurgeSummary = { checked: rows.length, purged: 0, failed: 0, objectsRemoved: 0 };
-  for (const row of rows) {
-    try {
-      const purged = await client.rpc("purge_candidate_for_retention", { p_invite_id: row.invite_id, p_now: now });
-      if (purged.error) throw new Error(purged.error.message);
-      summary.purged++;
-      summary.objectsRemoved += await removeCandidateObjects(client, row.org_id, (purged.data ?? []) as string[]);
-    } catch (err) {
-      summary.failed++;
-      console.error("retention purge failed for one candidate", err instanceof Error ? err.message : err);
-    }
-  }
-  return summary;
+  const limit = opts.limit ?? 200;
+  const media = await runClock(client, MEDIA, now, limit);
+  const results = await runClock(client, RESULTS, now, limit);
+  return { media, results };
 }

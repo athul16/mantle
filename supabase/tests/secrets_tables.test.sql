@@ -70,8 +70,9 @@ select is_empty(
 select set_eq(
   $$ select p.proname::text from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef $$,
-  $$ values ('create_organization'), ('review_rubric_step'), ('set_retention_days'), ('delete_candidate_data'),
+  $$ values ('create_organization'), ('review_rubric_step'), ('set_retention'), ('delete_candidate_data'),
             ('list_candidates_past_retention'), ('purge_candidate_for_retention'),
+            ('list_media_past_retention'), ('purge_media_for_retention'),
             ('set_invite_accommodations'), ('set_contact_email') $$,
   'only the known security definer functions are in public (signup, rubric review, retention, accommodations, contact email)'
 );

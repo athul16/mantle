@@ -29,7 +29,13 @@ test("a recruiter creates, edits and clones an assessment", async ({ page, compa
   await expect(form.getByLabel("Time limit (minutes)")).toHaveValue("20");
   await form.getByLabel("Title").fill("Close round A");
   await form.getByLabel("Pass score (%)").fill("70");
-  await form.getByLabel("Camera snapshots").uncheck();
+  // Proctoring is a required choice with nothing preselected; the sources appear once Monitored is picked.
+  await expect(form.getByLabel("Camera snapshots")).toHaveCount(0);
+  await expect(form.getByRole("radio", { name: "Monitored", exact: true })).not.toBeChecked();
+  await expect(form.getByRole("radio", { name: "Not monitored" })).not.toBeChecked();
+  await form.getByRole("radio", { name: "Monitored", exact: true }).check();
+  await expect(form.getByLabel("Camera snapshots")).not.toBeChecked();
+  await form.getByLabel("Screen share").check();
   const held = await hold(page, isServerAction);
   await form.getByRole("button", { name: "Create assessment" }).click();
   await held.arrived;

@@ -1,5 +1,5 @@
 /** Assessments page client forms: create, edit settings, clone. */
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssessmentSummary } from "@/lib/jobs/queries";
@@ -46,8 +46,69 @@ describe("CreateAssessmentForm", () => {
     expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(30);
     expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveValue(null);
     expect(screen.getByRole("textbox", { name: "Title" })).toBeRequired();
-    expect(screen.getByRole("checkbox", { name: "Camera snapshots" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Screen share" })).toBeChecked();
+  });
+
+  it("asks Monitored or Not monitored with nothing preselected, and explains each", () => {
+    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    const group = screen.getByRole("group", { name: "Proctoring" });
+    const monitored = within(group).getByRole("radio", { name: "Monitored" });
+    const notMonitored = within(group).getByRole("radio", { name: "Not monitored" });
+    expect(monitored).not.toBeChecked();
+    expect(notMonitored).not.toBeChecked();
+    expect(monitored).toBeRequired();
+    expect(monitored).toHaveAccessibleDescription(/camera photos and\/or screen screenshots/);
+    expect(notMonitored).toHaveAccessibleDescription(/No camera or screen capture/);
+    expect(screen.queryByRole("checkbox", { name: "Camera snapshots" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Screen share" })).not.toBeInTheDocument();
+  });
+
+  it("shows unticked camera and screen options only once Monitored is picked", async () => {
+    const user = userEvent.setup();
+    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    expect(screen.getByRole("checkbox", { name: "Camera snapshots" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Screen share" })).not.toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
+    expect(screen.queryByRole("checkbox", { name: "Camera snapshots" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the proctoring choice when the simulation changes", async () => {
+    const user = userEvent.setup();
+    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Simulation" }), "Mini month-end close (v1)");
+    expect(screen.getByRole("radio", { name: "Not monitored" })).toBeChecked();
+  });
+
+  it("submits Not monitored with no camera or screen fields", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ message: "Created." });
+    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    await user.type(screen.getByRole("textbox", { name: "Title" }), "Open book");
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    await user.click(screen.getByRole("checkbox", { name: "Camera snapshots" }));
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
+    await user.click(screen.getByRole("button", { name: "Create assessment" }));
+    await waitFor(() => expect(createAssessment).toHaveBeenCalled());
+    expect(formDataOf(createAssessment)).toEqual({
+      orgId: "org-1",
+      scenarioId: "sc-1",
+      title: "Open book",
+      timeLimitMinutes: "30",
+      passScore: "",
+      monitoring: "not_monitored",
+    });
+  });
+
+  it("shows the server's proctoring error on the group", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ fieldErrors: { monitoring: ["Choose whether candidates are monitored."] } });
+    render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
+    const form = screen.getByRole("button", { name: "Create assessment" }).closest("form");
+    form?.setAttribute("novalidate", "");
+    await user.type(screen.getByRole("textbox", { name: "Title" }), "x");
+    await user.click(screen.getByRole("button", { name: "Create assessment" }));
+    expect(await screen.findByRole("group", { name: "Proctoring" })).toHaveAccessibleDescription("Choose whether candidates are monitored.");
   });
 
   it("updates the suggested time limit when the simulation changes", async () => {
@@ -82,7 +143,8 @@ describe("CreateAssessmentForm", () => {
     await user.clear(screen.getByRole("spinbutton", { name: "Time limit (minutes)" }));
     await user.type(screen.getByRole("spinbutton", { name: "Time limit (minutes)" }), "40");
     await user.type(screen.getByRole("spinbutton", { name: "Pass score (%)" }), "65");
-    await user.click(screen.getByRole("checkbox", { name: "Camera snapshots" }));
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    await user.click(screen.getByRole("checkbox", { name: "Screen share" }));
     await user.click(screen.getByRole("button", { name: "Create assessment" }));
 
     expect(await screen.findByRole("button", { name: "Creating…" })).toBeDisabled();
@@ -92,6 +154,7 @@ describe("CreateAssessmentForm", () => {
       title: "Junior AP screen",
       timeLimitMinutes: "40",
       passScore: "65",
+      monitoring: "monitored",
       screen: "on",
     });
     await act(async () => pending.resolve({ message: 'Created "Junior AP screen".' }));
@@ -110,6 +173,7 @@ describe("CreateAssessmentForm", () => {
     });
     render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
     await user.type(screen.getByRole("textbox", { name: "Title" }), "x");
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
     await user.click(screen.getByRole("button", { name: "Create assessment" }));
 
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Title" })).toHaveAccessibleDescription("Give the assessment a title."));
@@ -123,6 +187,7 @@ describe("CreateAssessmentForm", () => {
     createAssessment.mockResolvedValueOnce({ error: "Viewers can't create assessments." });
     render(<CreateAssessmentForm orgId="org-1" scenarios={scenarios} />);
     await user.type(screen.getByRole("textbox", { name: "Title" }), "x");
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
     await user.click(screen.getByRole("button", { name: "Create assessment" }));
     expect(await screen.findByText("Viewers can't create assessments.")).toBeVisible();
   });
@@ -142,11 +207,20 @@ describe("EditAssessmentForm", () => {
     expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Staff accountant screen");
     expect(screen.getByRole("spinbutton", { name: "Time limit (minutes)" })).toHaveValue(50);
     expect(screen.getByRole("spinbutton", { name: "Pass score (%)" })).toHaveValue(70);
+    expect(screen.getByRole("radio", { name: "Monitored" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Camera snapshots" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Screen share" })).toBeChecked();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByRole("button", { name: "Edit settings" })).toBeVisible();
+  });
+
+  it("opens an unmonitored assessment with Not monitored chosen", async () => {
+    const user = userEvent.setup();
+    render(<EditAssessmentForm orgId="org-1" assessment={{ ...assessment, proctoring: { camera: false, screen: false } }} />);
+    await user.click(screen.getByRole("button", { name: "Edit settings" }));
+    expect(screen.getByRole("radio", { name: "Not monitored" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Screen share" })).not.toBeInTheDocument();
   });
 
   it("leaves the pass score empty when there is none", async () => {
@@ -173,6 +247,7 @@ describe("EditAssessmentForm", () => {
       title: "Senior screen",
       timeLimitMinutes: "50",
       passScore: "70",
+      monitoring: "monitored",
       screen: "on",
     });
     await act(async () => pending.resolve({ message: "Saved." }));

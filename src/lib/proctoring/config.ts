@@ -1,4 +1,4 @@
-import { DEFAULT_RETENTION_DAYS } from "@/lib/retention/policy";
+import { DEFAULT_MEDIA_RETENTION_DAYS, DEFAULT_RESULTS_RETENTION_DAYS } from "@/lib/retention/policy";
 
 /**
  * Proctoring constants shared by the browser, the server and tests. Nothing
@@ -47,26 +47,38 @@ export type ClientSignalKind = (typeof CLIENT_SIGNAL_KINDS)[number];
 /** Recorded by the server itself, never accepted from the browser. */
 export const CONSENT_SIGNAL = "consented_to_monitoring";
 
+/**
+ * Recorded by the server, one per period the camera or screen share was down
+ * (the task area was covered and the timer kept running, D4). Payload: source,
+ * from, to, downMs, closedBy, stopEventId. See downPeriods() in rules.ts.
+ */
+export const DOWNTIME_SIGNAL = "monitoring_down";
+
 /** Values of MediaTrackSettings.displaySurface, plus "unknown" for browsers that don't say. */
 export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", "unknown"] as const;
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
 
 /** Version of the monitoring notice, stored with each consent. Change it when the text changes. */
-export const MONITORING_CONSENT_VERSION = "2026-11-11.contact";
+export const MONITORING_CONSENT_VERSION = "2026-11-14.retention-clocks.contact";
 
 /**
  * What the notice needs: what is captured (after any waiver for this
- * candidate), the org's retention (organizations.settings.retention_days) and
+ * candidate), the org's two retention periods (organizations.settings) and
  * whom to ask about accommodations (organizations.settings.contact_email).
  */
-export type MonitoringSettings = Proctoring & { retentionDays?: number; contactEmail?: string | null };
+export type MonitoringSettings = Proctoring & {
+  mediaRetentionDays?: number;
+  resultsRetentionDays?: number;
+  contactEmail?: string | null;
+};
 
 /**
  * The monitoring notice on the system check: what is captured, why, who sees
  * it and for how long (docs/02 Compliance). Shown before any device prompt.
  */
 export function monitoringNotice(settings: MonitoringSettings, companyName: string): string[] {
-  const days = settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  const mediaDays = settings.mediaRetentionDays ?? DEFAULT_MEDIA_RETENTION_DAYS;
+  const resultsDays = settings.resultsRetentionDays ?? DEFAULT_RESULTS_RETENTION_DAYS;
   const captured: string[] = [];
   if (settings.camera) captured.push("a camera photo every 30 to 60 seconds and when you leave the test window");
   if (settings.screen) captured.push("a screenshot of your entire screen at the same times");
@@ -75,7 +87,7 @@ export function monitoringNotice(settings: MonitoringSettings, companyName: stri
     `While you take this test we record ${joinList(captured)}.`,
     `Why: so ${companyName} can trust that the work is yours. Only ${companyName}'s hiring team can see the photos and screenshots.`,
     "Unusual moments are marked for a person to check, with the matching photos. No one is rejected automatically.",
-    `How long: kept for ${days} days after your assessment ends, then deleted. ${companyName} can delete it sooner on request. We don't use the photos to identify you.`,
+    `How long: the photos and screenshots are kept for ${mediaDays} days after your assessment ends, then deleted. Your answers, results and the hiring team's notes are kept for ${resultsDays} days, then deleted. ${companyName} can delete them sooner on request. We don't use the photos to identify you.`,
     accommodationLine(companyName, settings.contactEmail),
   ];
 }

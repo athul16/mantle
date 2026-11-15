@@ -1,15 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
-import { mfaGate, mfaRedirectPath } from "@/app/app/account/mfa-gate";
+import { mfaGate, mfaRedirectPath, mfaRequired, viewersSeeMedia } from "@/app/app/account/mfa-gate";
 import type { Database } from "@/lib/database.types";
 
 const AUTH_PAGES = ["/login", "/signup"];
 
 // Refreshes the Supabase session cookie on every matched request and does an
 // optimistic redirect for /app. Real authorization happens in pages/actions
-// (src/lib/auth.ts) and in RLS. Company admins below aal2 are sent to set up
-// or enter two-factor here, before any company page renders.
+// (src/lib/auth.ts) and in RLS. Members who must use two-factor (admins,
+// recruiters, and viewers when the company shows them media) but are below
+// aal2 are sent to set up or enter it here, before any company page renders.
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -51,15 +52,15 @@ export async function updateSession(request: NextRequest) {
   // /app/account/* is the user's own account (two-factor setup), not a company.
   const slugInPath = pathname.match(/^\/app\/([^/]+)/)?.[1];
   const orgSlug = user && (request.method === "GET" || request.method === "HEAD") && slugInPath !== "account" ? slugInPath : undefined;
-  const role = orgSlug ? await roleIn(supabase, user!.id, orgSlug) : undefined;
-  if (orgSlug && role === null) return notFoundRewrite(request, response);
+  const member = orgSlug ? await membershipIn(supabase, user!.id, orgSlug) : undefined;
+  if (orgSlug && member === null) return notFoundRewrite(request, response);
 
-  // Admins must be at aal2 (password + authenticator code). Decided before the
+  // Two-factor (aal2: password + authenticator code). Decided before the
   // page's own lookups so an aal1 session learns nothing about the company's
   // jobs or candidates. Server actions (POST) are checked in requireMembership.
-  if (orgSlug && role === "admin") {
+  if (member && mfaRequired(member.role, member.viewersSeeMedia)) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const gate = mfaGate(role, { currentLevel: aal?.currentLevel ?? null, nextLevel: aal?.nextLevel ?? null });
+    const gate = mfaGate(member.role, { currentLevel: aal?.currentLevel ?? null, nextLevel: aal?.nextLevel ?? null }, member);
     if (gate !== "ok") {
       // A server action's redirect (e.g. login → next) renders its target with
       // an internal fetch, marked by the forwarded x-action-redirect header,
@@ -101,19 +102,24 @@ export async function updateSession(request: NextRequest) {
 }
 
 // Same rule as requireOrgMembership: the user's own client, so RLS decides.
-// The user's role in the company, null if they aren't a member, undefined if
-// the lookup failed (let the request through; the layout still checks both
-// membership and two-factor).
-async function roleIn(supabase: SupabaseClient<Database>, userId: string, orgSlug: string): Promise<string | null | undefined> {
+// The user's role in the company (and whether its viewers see media), null if
+// they aren't a member, undefined if the lookup failed (let the request
+// through; the layout still checks both membership and two-factor).
+async function membershipIn(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  orgSlug: string,
+): Promise<{ role: string; viewersSeeMedia: boolean } | null | undefined> {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(orgSlug)) return null;
   const { data, error } = await supabase
     .from("memberships")
-    .select("role, organizations!inner(slug)")
+    .select("role, organizations!inner(slug, settings)")
     .eq("user_id", userId)
     .eq("organizations.slug", orgSlug)
     .limit(1);
   if (error) return undefined;
-  return data[0]?.role ?? null;
+  const row = data[0];
+  return row ? { role: row.role, viewersSeeMedia: viewersSeeMedia(row.organizations.settings) } : null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

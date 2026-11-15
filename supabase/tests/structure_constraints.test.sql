@@ -30,6 +30,7 @@ select set_eq(
        -- (table, columns, references, referenced columns, on delete: c=cascade a=no action)
        ('memberships',      'org_id',            'organizations',   'id',        'c'),
        ('memberships',      'user_id',           'auth.users',      'id',        'c'),
+       ('profiles',         'id',                'auth.users',      'id',        'c'),
        ('scenarios',        'org_id',            'organizations',   'id',        'c'),
        ('assessments',      'org_id',            'organizations',   'id',        'c'),
        ('assessments',      'scenario_id',       'scenarios',       'id',        'a'),
@@ -85,7 +86,7 @@ select set_eq(
   $$ values
        ('organizations', 'organizations_name_check'),
        ('organizations', 'organizations_slug_format'),
-       ('organizations', 'organizations_retention_days_range'),
+       ('organizations', 'organizations_retention_range'),
        ('organizations', 'organizations_contact_email_format'),
        ('invite_accommodations', 'invite_accommodations_extra_time_percent_check'),
        ('memberships',   'memberships_role_check'),
