@@ -75,6 +75,11 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
   const rows: [string, string, string][] = [];
   if (settings.camera) rows.push(["Camera snapshots", "Occasional photos, not video", "Confirm the same person does the whole simulation"]);
   if (settings.screen) rows.push(["Your entire screen", "Only while the simulation is open", "Show that no other tools or people helped"]);
+  if (settings.microphone)
+    rows.push(["Short audio clips", "Only when speech is heard, not a continuous recording", "Check that no one else is helping you"]);
+  if (settings.fullscreen) rows.push(["Full screen", "The task runs full screen; leaving it is noted", "Keep your attention on the task"]);
+  if (settings.camera && settings.gaze)
+    rows.push(["Facing the screen", "Checked on your device; only the result is sent, never the image", "Notice when you look away or others appear"]);
   rows.push(["Your activity", "Opens, edits, sends, copy and paste — timestamped", "Show how you worked, not just what you submitted"]);
 
   const notice = (
@@ -115,7 +120,9 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
           <Icon name="trash" />
           <span className="small">
             <span className="strong">
-              {settings.camera || settings.screen ? `Photos and screenshots deleted after ${mediaDays} days.` : null} Answers and results
+              {settings.camera || settings.screen || settings.microphone
+                ? `${settings.microphone ? "Photos, screenshots and audio clips" : "Photos and screenshots"} deleted after ${mediaDays} days.`
+                : null} Answers and results
               deleted after {resultsDays} days.
             </span>{" "}
             {company} can delete them sooner on request.
@@ -130,7 +137,7 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
         </div>
       </div>
       <p className="small ink2" data-testid="accommodation-contact">
-        Need extra time, or can&apos;t use a camera or share your screen? Contact{" "}
+        Need extra time, or can&apos;t use a camera, microphone, full screen or share your screen? Contact{" "}
         {settings.contactEmail ? (
           <>
             {company} at <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
