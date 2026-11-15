@@ -236,6 +236,26 @@ describe("harbor-lane-bank-rec: every variant is internally consistent", () => {
     }
   });
 
+  it("the NSF check comes back after the deposit that carried it, and both ledgers run in date order", () => {
+    for (const seed of SEEDS.slice(0, 20)) {
+      const { bank, gl } = screen(seed);
+      const carried = gl.filter((r) => /Maple St\. Bakery/.test(r.desc));
+      expect(carried.length, seed).toBe(1);
+      expect(carried[0].debit).toBeGreaterThan(0);
+      // docs/07: the bakery's wholesale check went in with the 10/22 deposit and bounced on 10/24.
+      expect(carried[0].date).toBe("10/22");
+      const deposit = bank.find((r) => /^Deposit/i.test(r.desc) && r.date === carried[0].date);
+      expect(deposit?.credit, seed).toBe(carried[0].debit);
+      const returned = bank.find((r) => /NSF/.test(r.desc))!;
+      expect(returned.date).toBe("10/24");
+      expect(returned.date > carried[0].date).toBe(true);
+      for (const ledger of [bank, gl]) {
+        const dates = ledger.slice(1).map((r) => r.date);
+        expect(dates, seed).toEqual([...dates].sort());
+      }
+    }
+  });
+
   it("the reconciliation ties, and the missed-update trap also ties at a different number", () => {
     for (const seed of SEEDS) {
       const s = solve(seed);
@@ -480,6 +500,24 @@ describe("harbor-lane-bank-rec: timeline of messages", () => {
       if (m.stepId) expect(scenario.definition.steps.map((s) => s.id)).toContain(m.stepId);
     }
     expect(msgs[1].subject).toMatch(/^RE:/);
+  });
+
+  it("Dana greets the candidate by first name, or 'there' without one", () => {
+    const greeting = (name?: string | null) =>
+      renderAttemptForCandidate(scenario, "abc", 0, { name }).messages[0].body.split("\n")[0];
+    expect(greeting("Priya Raman")).toBe("Hi Priya,");
+    expect(greeting(null)).toBe("Hi there,");
+    expect(greeting(undefined)).toBe("Hi there,");
+    expect(renderAttemptForCandidate(scenario, "abc", 0).messages[0].body).toMatch(/^Hi there,\n/);
+  });
+
+  it("the name changes only the greeting, never the numbers", () => {
+    for (const seed of SEEDS.slice(0, 20)) {
+      const named = renderAttemptForCandidate(scenario, seed, scenario.timeLimitMinutes, { name: "Priya Raman" });
+      const plain = renderAttemptForCandidate(scenario, seed, scenario.timeLimitMinutes);
+      expect(JSON.stringify(named).replace("Hi Priya,", "Hi there,")).toBe(JSON.stringify(plain));
+      expect(renderAttemptForCandidate(scenario, seed, scenario.timeLimitMinutes, { name: "Priya Raman" })).toEqual(named);
+    }
   });
 
   it("all three tasks are available from the start, so the update can change work already done", () => {

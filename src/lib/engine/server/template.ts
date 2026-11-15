@@ -14,6 +14,41 @@ export function fillTemplate(template: string, values: Record<string, VariantVal
   });
 }
 
+/** Who the material is rendered for. Not seeded: the same seed renders the same numbers for anyone. */
+export interface CandidateContext {
+  /** The name the candidate gave when verifying (invites.candidate_name). */
+  name?: string | null;
+}
+
+/** Template names filled from the candidate, not the variant. A generator can't use them. */
+export const CANDIDATE_TEMPLATE_NAMES = ["first_name"] as const;
+
+/** Used in place of a first name when the candidate gave none, so "Hi {{first_name}}," reads "Hi there,". */
+export const FIRST_NAME_FALLBACK = "there";
+
+const MAX_FIRST_NAME = 40;
+
+/** First word of the candidate's name, or the fallback. */
+export function candidateFirstName(name: string | null | undefined): string {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  return first ? first.slice(0, MAX_FIRST_NAME) : FIRST_NAME_FALLBACK;
+}
+
+/**
+ * Variant values plus the candidate's own (`{{first_name}}`), for filling
+ * material the candidate sees. Throws if a generator emits a reserved name,
+ * so a variant value can never silently shadow the candidate's.
+ */
+export function templateValues(
+  values: Record<string, VariantValue>,
+  candidate: CandidateContext = {},
+): Record<string, VariantValue> {
+  for (const name of CANDIDATE_TEMPLATE_NAMES) {
+    if (name in values) throw new Error(`variant value "${name}" is reserved for the candidate`);
+  }
+  return { ...values, first_name: candidateFirstName(candidate.name) };
+}
+
 export function formatValue(value: VariantValue, format?: string): string {
   switch (format) {
     case undefined:
