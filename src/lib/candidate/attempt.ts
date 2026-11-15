@@ -4,6 +4,7 @@ import type { Json } from "@/lib/database.types";
 import { renderAttemptForCandidate, stepAvailableAtMinute } from "@/lib/engine/server/render";
 import { parseAnswerForStep, scoreAttempt } from "@/lib/engine/server/score";
 import type { AttemptScore, PublicMessage, PublicStep } from "@/lib/engine/types";
+import { closeDowntimeAtEnd } from "@/lib/proctoring/flags";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CLIENT_EVENT_KINDS, type ClientEventKind } from "./config";
 import { ATTEMPT_COLUMNS, type AttemptRow } from "./invite";
@@ -128,7 +129,9 @@ export async function getWorkspaceView(session: CandidateSession, now = new Date
     getSeed(attempt),
     loadAnswers(attempt),
   ]);
-  const view = renderAttemptForCandidate(scenario, seed, elapsedMinutes(attempt, now));
+  const view = renderAttemptForCandidate(scenario, seed, elapsedMinutes(attempt, now), {
+    name: session.invite.candidateName,
+  });
   const visible = new Set(view.steps.map((s) => s.id));
 
   return {
@@ -162,7 +165,7 @@ export async function getOpenedMessageIds(attempt: Pick<AttemptRow, "id" | "org_
 /** Scenario intro for the instructions page (no variant-specific keys involved). */
 export async function getIntro(session: CandidateSession): Promise<{ title: string; intro: string; stepCount: number }> {
   const [scenario, seed] = await Promise.all([loadScenario(session.attempt.scenario_id), getSeed(session.attempt)]);
-  const view = renderAttemptForCandidate(scenario, seed, 0);
+  const view = renderAttemptForCandidate(scenario, seed, 0, { name: session.invite.candidateName });
   return { title: scenario.title, intro: view.intro, stepCount: scenario.definition.steps.length };
 }
 
@@ -279,6 +282,11 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
 
   await addEvent(attempt, "submitted_attempt", { reason });
   await scoreAndStore(session);
+  // A camera / screen gap still open (tab closed, never reconnected) ends here (D4).
+  await closeDowntimeAtEnd(attempt, session.invite.assessmentId, {
+    at: submittedAt,
+    closedBy: reason === "timeout" ? "deadline" : "submitted",
+  });
 }
 
 /**

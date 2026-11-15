@@ -122,6 +122,8 @@ beforeAll(async () => {
   orgIds.push(orgB);
   // The outsider is org B's admin, so their actions need two-factor (aal2).
   await enrollTotp(outsider.client);
+  // Recruiters must use two-factor too.
+  await enrollTotp(recruiter.client);
 
   const m = await service.from("memberships").insert([
     { org_id: orgA, user_id: recruiter.id, role: "recruiter" },

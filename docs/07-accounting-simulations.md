@@ -118,8 +118,8 @@ Tabs 1 and 2 are read-only; tabs 3 and 4 are answered.
 | 10/12 | Deposit | | 4,760.00 | 30,435.00 |
 | 10/14 | Check #1043 | 2,610.00 | | 27,825.00 |
 | 10/18 | Check #1044 | 1,920.00 | | 25,905.00 |
-| 10/20 | Returned item: NSF, Maple St. Bakery | 480.00 | | 25,425.00 |
-| 10/22 | Deposit | | 6,035.00 | 31,460.00 |
+| 10/22 | Deposit | | 6,035.00 | 31,940.00 |
+| 10/24 | Returned item: NSF, Maple St. Bakery | 480.00 | | 31,460.00 |
 | 10/25 | Check #1045 | 4,400.00 | | 27,060.00 |
 | 10/27 | Check #1047 | 1,140.00 | | 25,920.00 |
 | 10/31 | Monthly service fee | 35.00 | | 25,885.00 |
@@ -213,6 +213,24 @@ Strong reply (rubric reference, never shown to candidates):
 > {first_name}
 
 Process signals worth reporting: time from the minute-12 message arriving to it being opened, and whether the reconciliation changed afterward.
+
+### Build status (`harbor-lane-bank-rec` v1)
+
+Built in `src/lib/engine/scenarios/harbor-lane-bank-rec.ts`; every amount and check number is seeded per candidate. Decision D10 (2026-11-10): fix the cheap gaps, accept the rest, publish after an accountant's review.
+
+Fixed:
+
+- **First-name greeting.** Dana's first email opens "Hi {first_name}," using the first word of the name the candidate gave when verifying, or "Hi there," if none. Any scenario can use `{{first_name}}`.
+- **Date order.** The NSF return now comes after the deposit that held the bakery's check (deposit 10/22, return 10/24). This example used to date the return 10/20, two days before the deposit.
+
+Accepted for v1 (forced by the current step types):
+
+- One spreadsheet grid instead of four tabs; bank statement and GL are read-only sections above the reconciliation, journal entries are their own step, and candidates can't insert rows.
+- The reconciliation has a fixed row per item type (interest, cancelled checks, fees, NSF, book errors) so each item scores on its own. The row names hint at what to look for.
+- Cells score all-or-nothing, so a candidate who misses the update scores 25 of 45 on the reconciliation, not 30. The report shows the trap balance next to the expected one.
+- The reply needs a human reviewer (no AI scorer in the scoring path), so a perfect attempt shows 60 automatic points until it is marked.
+- Accounts payable is accepted for the check-error entry without the explanation, because the journal step can't read the memo.
+- Process signals come from attempt events, not the scenario.
 
 ## Step types needed
 

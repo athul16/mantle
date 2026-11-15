@@ -575,6 +575,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_sign_in_at: string | null
+          id: string
+          invited_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id?: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           created_at: string

@@ -7,6 +7,7 @@ import {
   CLIENT_SIGNAL_KINDS,
   CONSENT_SIGNAL,
   DISPLAY_SURFACES,
+  DOWNTIME_SIGNAL,
   type ClientSignalKind,
   type DisplaySurface,
   type Proctoring,
@@ -25,6 +26,14 @@ export const THRESHOLDS = {
   pasteChars: 200,
   /** Leaving full screen once is often an accidental Esc; flag from this many. */
   fullscreenExits: 2,
+  /**
+   * Camera or screen share down (task area covered, timer still running, D4).
+   * Flag one gap at least this long... Same bar as one long absence: a blip
+   * from a flaky webcam or a browser prompt stays out of the way.
+   */
+  longDowntimeSeconds: 30,
+  /** ...or this much covered time in total (overlapping camera and screen gaps count once). */
+  totalDowntimeSeconds: 60,
   /** Snapshots within this many seconds of an event are its evidence. */
   mediaWindowSeconds: 90,
   maxEvidenceEvents: 20,
@@ -33,7 +42,7 @@ export const THRESHOLDS = {
   suspiciousFlags: 3,
 } as const;
 
-export type RuleId = "left_window" | "paste" | "fullscreen" | "screen_share" | "camera" | "multiple_displays";
+export type RuleId = "left_window" | "paste" | "fullscreen" | "screen_share" | "camera" | "multiple_displays" | "downtime";
 
 export type SignalPayload = { awayMs?: number; chars?: number; surface?: DisplaySurface };
 
@@ -57,6 +66,25 @@ export interface EvidenceEvent {
   awayMs?: number;
   chars?: number;
   surface?: string;
+  /** Downtime gaps: which source, how long, when it ended and why. */
+  source?: DownSource;
+  downMs?: number;
+  endAt?: string;
+  closedBy?: DownClosedBy;
+}
+
+export type DownSource = "camera" | "screen";
+/** A gap ends when the source is back, or at the attempt's end if it never came back (tab closed, say). */
+export type DownClosedBy = "reconnected" | "submitted" | "deadline";
+
+export interface DownPeriod {
+  source: DownSource;
+  /** The camera_stopped / screen_share_stopped event that opened the gap; one period per stop. */
+  stopEventId: number;
+  from: string;
+  to: string;
+  downMs: number;
+  closedBy: DownClosedBy;
 }
 
 export interface FlagEvidence {
@@ -115,6 +143,71 @@ function nearbyMedia(events: EvidenceEvent[], media: MediaRef[]): number[] {
 function flag(rule: RuleId, reason: string, matched: EvidenceEvent[], media: MediaRef[]): FlagDraft {
   const events = matched.slice(0, THRESHOLDS.maxEvidenceEvents);
   return { rule, reason, evidence: { events, mediaIds: nearbyMedia(events, media), total: matched.length } };
+}
+
+const STOP: Record<string, DownSource> = { camera_stopped: "camera", screen_share_stopped: "screen" };
+const START: Record<string, DownSource> = { camera_started: "camera", screen_share_started: "screen" };
+
+/**
+ * Periods the camera or screen share was down: from each stop to the next
+ * start of the same source. A page refresh or a closed tab during a gap just
+ * means the next start comes later (or never); a gap still open when the
+ * attempt ends is closed at `end` (submit or deadline). Without `end`, open
+ * gaps are left out until they close.
+ */
+export function downPeriods(events: SignalEvent[], end?: { at: string; closedBy: Exclude<DownClosedBy, "reconnected"> }): DownPeriod[] {
+  const sorted = [...events].sort((a, b) => ms(a.at) - ms(b.at) || a.id - b.id);
+  const open: Partial<Record<DownSource, SignalEvent>> = {};
+  const out: DownPeriod[] = [];
+  const close = (source: DownSource, to: string, closedBy: DownClosedBy) => {
+    const stop = open[source]!;
+    delete open[source];
+    out.push({ source, stopEventId: stop.id, from: stop.at, to, downMs: Math.max(0, ms(to) - ms(stop.at)), closedBy });
+  };
+  for (const e of sorted) {
+    if (end && ms(e.at) > ms(end.at)) break;
+    const stopped = STOP[e.kind];
+    const started = START[e.kind];
+    if (stopped && !open[stopped]) open[stopped] = e;
+    else if (started && open[started]) close(started, e.at, "reconnected");
+  }
+  if (end) for (const source of ["camera", "screen"] as const) if (open[source]) close(source, end.at, end.closedBy);
+  return out.sort((a, b) => ms(a.from) - ms(b.from));
+}
+
+/** Wall-clock time covered by any gap (a camera and a screen gap at once count once). */
+function coveredMs(periods: { from: string; to: string }[]): number {
+  const spans = periods.map((p) => [ms(p.from), ms(p.to)] as const).sort((a, b) => a[0] - b[0]);
+  let total = 0;
+  let [curStart, curEnd] = [NaN, NaN];
+  for (const [a, b] of spans) {
+    if (!(a <= curEnd)) {
+      if (curEnd > curStart) total += curEnd - curStart;
+      [curStart, curEnd] = [a, b];
+    } else if (b > curEnd) curEnd = b;
+  }
+  if (curEnd > curStart) total += curEnd - curStart;
+  return total;
+}
+
+/** Recorded down periods (DOWNTIME_SIGNAL events), one per stop event, for the sources this assessment uses. */
+function recordedDowntime(events: SignalEvent[], settings: Proctoring): EvidenceEvent[] {
+  const seen = new Set<number>();
+  const out: EvidenceEvent[] = [];
+  for (const e of events) {
+    if (e.kind !== DOWNTIME_SIGNAL) continue;
+    const p = e.payload as Partial<DownPeriod>;
+    const source = p.source === "camera" || p.source === "screen" ? p.source : undefined;
+    const downMs = num(p.downMs);
+    if (!source || !settings[source] || downMs === undefined || typeof p.from !== "string" || typeof p.to !== "string") continue;
+    if (typeof p.stopEventId === "number") {
+      if (seen.has(p.stopEventId)) continue;
+      seen.add(p.stopEventId);
+    }
+    const closedBy = p.closedBy === "submitted" || p.closedBy === "deadline" ? p.closedBy : "reconnected";
+    out.push({ id: e.id, kind: DOWNTIME_SIGNAL, at: p.from, source, downMs, endAt: p.to, closedBy });
+  }
+  return out.sort((a, b) => ms(a.at) - ms(b.at));
 }
 
 /** Flags for one attempt. Re-running it on more events gives the same rules with updated evidence. */
@@ -176,6 +269,17 @@ export function evaluateRules(events: SignalEvent[], media: MediaRef[], settings
   if (settings.camera) {
     const off = of("camera_stopped").map((e) => toEvidence(e));
     if (off.length) flags.push(flag("camera", `Camera turned off ${plural(off.length, "time")}`, off, media));
+  }
+
+  // Downtime (D4): the timer never pauses, so show how long the task was covered for the recruiter to judge.
+  const gaps = recordedDowntime(sorted, settings);
+  if (gaps.length) {
+    const covered = coveredMs(gaps.map((g) => ({ from: g.at, to: g.endAt! }))) / 1000;
+    const longest = Math.max(...gaps.map((g) => g.downMs ?? 0)) / 1000;
+    if (longest >= THRESHOLDS.longDowntimeSeconds || covered >= THRESHOLDS.totalDowntimeSeconds) {
+      const reason = `Camera or screen share was down ${plural(gaps.length, "time")}: the task was covered for ${formatSeconds(covered)} in total while the timer kept running`;
+      flags.push(flag("downtime", reason, gaps, media));
+    }
   }
 
   return flags;

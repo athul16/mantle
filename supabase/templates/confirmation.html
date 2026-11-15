@@ -1,0 +1,8 @@
+<!-- Sign-up confirmation (Supabase Auth "Confirm signup" template). The link
+     opens a page with a "Confirm email" button; only the button uses the
+     token, so email link scanners (Microsoft Safe Links) can't use it up. Paste
+     this into the hosted project too: Authentication > Emails > Confirm signup. -->
+<h2>Confirm your email</h2>
+<p>Thanks for signing up for Assessment Platform.</p>
+<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/onboarding">Confirm your email</a></p>
+<p>The link opens a page with a "Confirm email" button. If you didn't sign up, you can ignore this email.</p>
