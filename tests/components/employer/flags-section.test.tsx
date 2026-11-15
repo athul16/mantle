@@ -189,3 +189,152 @@ describe("FlagsSection", () => {
     expect(screen.getByText(/Camera and screen monitoring were off for this assessment; only browser activity was checked\./)).toBeVisible();
   });
 });
+
+describe("FlagsSection: proctoring v2", () => {
+  const away = (n: number) => new Date(Date.parse("2026-11-10T10:20:00.000Z") + n * 1000).toISOString();
+  const media = (id: number, n: number, source: "camera" | "screen" | "audio", reason?: "left_window" | "away" | "returned" | "speech") => ({
+    id,
+    source,
+    at: away(n),
+    url: `https://storage.test/${id}.${source === "audio" ? "webm" : "jpg"}`,
+    reason: reason ?? null,
+  });
+  const leave: ReportFlag = {
+    ...open,
+    id: "fl",
+    rule: "left_window",
+    reason: "Left the test window 1 time",
+    events: [
+      {
+        kind: "left_window",
+        at: away(0),
+        awayMs: 8000,
+        mediaIds: [1, 2, 3, 4],
+        media: [media(1, 2, "screen"), media(2, 6, "screen"), media(3, 3, "camera"), media(4, 8, "screen", "returned")],
+      },
+    ],
+    media: [],
+  };
+
+  it("shows the label with its reasons and the one-line explanation", () => {
+    const copyLeave: ReportFlag = { ...open, id: "c", rule: "copy_then_leave", reason: "x", events: [], media: [] };
+    renderSection({ flags: [copyLeave] });
+    const card = screen.getByRole("region", { name: "Integrity" });
+    expect(within(card).getByTestId("integrity-label")).toHaveTextContent("Suspicious");
+    expect(card).toHaveTextContent("Copied text, then left the test window");
+    expect(card).toHaveTextContent("Suspicious = a combination of signals that together suggest outside help; Review = something unusual a person should look at.");
+  });
+
+  it("labels a single minor flag as review and a clean attempt as clear", () => {
+    const { unmount } = renderSection({ flags: [{ ...open, rule: "paste", events: [], media: [] }] });
+    expect(screen.getByTestId("integrity-label")).toHaveTextContent("Review");
+    expect(screen.getByText(/Flagged for review: pasted text/)).toBeVisible();
+    unmount();
+    renderSection({ flags: [] });
+    expect(screen.getByTestId("integrity-label")).toHaveTextContent("Clear");
+  });
+
+  it("counts copies and, when on, looks away, no face, extra faces, speech and full screen exits", () => {
+    renderSection({
+      counts: { copied: 2, cut: 1, looking_away: 3, no_face: 1, multiple_faces: 2, speech_started: 4, fullscreen_exited: 5 },
+      gaze: true,
+      microphone: true,
+      fullscreen: true,
+    });
+    const rows = screen.getByRole("region", { name: "Integrity" }).querySelector("dl")!;
+    expect(rows).toHaveTextContent("Copies3");
+    expect(rows).toHaveTextContent("Looked away3");
+    expect(rows).toHaveTextContent("No face1");
+    expect(rows).toHaveTextContent("More than one face2");
+    expect(rows).toHaveTextContent("Speech heard4");
+    expect(rows).toHaveTextContent("Full screen exits5");
+    expect(rows).toHaveTextContent("Pastes4");
+  });
+
+  it("hides the optional counters when the setting is off", () => {
+    renderSection({ counts: { looking_away: 3, speech_started: 1 } });
+    const rows = screen.getByRole("region", { name: "Integrity" }).querySelector("dl")!;
+    expect(rows).not.toHaveTextContent("Looked away");
+    expect(rows).not.toHaveTextContent("Speech heard");
+    expect(rows).toHaveTextContent("Copies0");
+  });
+
+  it("words the new events", () => {
+    const f: ReportFlag = {
+      ...open,
+      rule: "gaze",
+      events: [
+        { kind: "looking_away", at: away(0), direction: "left", awayMs: 12_000 },
+        { kind: "no_face", at: away(20), awayMs: 5000 },
+        { kind: "multiple_faces", at: away(30), faces: 2 },
+        { kind: "speech_started", at: away(40), speechMs: 8000 },
+        { kind: "copied", at: away(50), chars: 12 },
+        { kind: "cut", at: away(60), chars: 3 },
+      ],
+      media: [],
+    };
+    renderSection({ flags: [f] });
+    const items = within(screen.getByRole("list", { name: "Evidence" })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Looked away (left) for 12 s");
+    expect(items[1]).toHaveTextContent("No face in view for 5 s");
+    expect(items[2]).toHaveTextContent("2 faces in view");
+    expect(items[3]).toHaveTextContent("Speech heard for 8 s");
+    expect(items[4]).toHaveTextContent("Copied text, 12 characters");
+    expect(items[5]).toHaveTextContent("Cut text, 3 characters");
+  });
+
+  it("reads a copy-then-leave pair as one line", () => {
+    const f: ReportFlag = {
+      ...open,
+      rule: "copy_then_leave",
+      events: [
+        { kind: "copied", at: away(0), chars: 340 },
+        { kind: "left_window", at: away(4) },
+      ],
+      media: [],
+    };
+    renderSection({ flags: [f] });
+    const items = within(screen.getByRole("list", { name: "Evidence" })).getAllByRole("listitem");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent("Copied 340 characters, then left the window 4 s later");
+  });
+
+  it("words a full screen downtime gap", () => {
+    const f: ReportFlag = {
+      ...open,
+      rule: "downtime",
+      events: [{ kind: "monitoring_down", at: "2026-11-10T10:05:00.000Z", source: "fullscreen", downMs: 20_000, endAt: "2026-11-10T10:05:20.000Z", closedBy: "reconnected" }],
+      media: [],
+    };
+    renderSection({ flags: [f] });
+    expect(screen.getByRole("list", { name: "Evidence" })).toHaveTextContent("Left full screen for 20 s (back on)");
+  });
+
+  it("shows a filmstrip per departure with offsets and alt text", () => {
+    renderSection({ flags: [leave] });
+    const strip = screen.getByRole("list", { name: "Screenshots while away" });
+    const imgs = within(strip).getAllByRole("img");
+    expect(imgs.map((i) => i.getAttribute("alt"))).toEqual(["Screen 2 s after leaving", "Camera 3 s after leaving", "Screen 6 s after leaving", "Screen when back"]);
+    expect(strip).toHaveTextContent("+2 s");
+    expect(strip).toHaveTextContent("+6 s");
+    expect(strip).toHaveTextContent("back");
+    expect(imgs[0].closest("a")).toHaveAttribute("href", "https://storage.test/1.jpg");
+  });
+
+  it("hides the filmstrip when media may not be seen", () => {
+    renderSection({ flags: [leave], canSeeMedia: false });
+    expect(screen.queryByRole("list", { name: "Screenshots while away" })).toBeNull();
+  });
+
+  it("renders audio evidence as a labelled player", () => {
+    const f: ReportFlag = { ...open, rule: "speech", events: [], media: [media(9, 10, "audio", "speech")] };
+    const { container } = renderSection({ flags: [f] });
+    const audio = container.querySelector("audio")!;
+    expect(audio).toHaveAttribute("controls");
+    expect(audio).toHaveAttribute("preload", "none");
+    expect(audio).toHaveAttribute("src", "https://storage.test/9.webm");
+    expect(audio).toHaveAttribute("aria-label", expect.stringContaining("Audio clip (speech heard)"));
+    expect(screen.getByText(/Audio clip \(speech heard\)/)).toBeVisible();
+    expect(screen.queryAllByRole("img")).toEqual([]);
+  });
+});
