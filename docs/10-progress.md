@@ -63,11 +63,10 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 - Jobs: archived jobs, last activity, row actions menu, job owner.
 - Invite page: public link, editing the invite message, full email preview.
 - Export: PDF reports, snapshots, stage and notes columns, a server-side export logged with the user's name (CSV is built in the browser today); More filters; pagination.
-- Report: AI-suggested rubric scores with reasoning and "Accept AI", the one-line summary, score distribution curve (a strip of real scores is shown), PDF download, the submitted spreadsheet viewer, all-snapshots and full activity log pages, extra time / monitoring downtime / one device and IP rows. Analytics tab.
+- Report: AI-suggested rubric scores with reasoning and "Accept AI", the one-line summary, score distribution curve (a strip of real scores is shown), PDF download, the submitted spreadsheet viewer, all-snapshots and full activity log pages, extra time / one device and IP rows (camera and screen gaps already show as a downtime flag). Analytics tab.
 
 **Candidate side**
 - Accommodation requests (links in the invite email, landing and verify; the request dialog), the no-webcam path and the approved no-camera option.
-- Pausing the clock while camera or screen sharing is down (open decision; today the clock keeps running).
 - Saving offline on the device; a Send button and sent state for replies, "Write a follow-up".
 - A materials list with separate read-only source tabs (bank statement, cash ledger).
 - Task-complete detection (green task pills; review statuses such as "Entry 2 out of balance" and last change time).

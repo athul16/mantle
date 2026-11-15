@@ -83,7 +83,7 @@ describe("Proctoring on", () => {
       </Proctoring>,
     );
     expect(gate()).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("The timer is running");
+    expect(gate()).toHaveTextContent("The timer keeps running while this message is open; it does not pause.");
     // The covered workspace can't be reached by keyboard or screen reader.
     expect(screen.getByTestId("proctored-content")).toHaveAttribute("inert");
     await waitFor(() => expect(media.getUserMedia).toHaveBeenCalled());

@@ -16,7 +16,7 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  * material, so the rec always ties. Derived figures (adjusted balance, the
  * check-error amount) exist only in the keys.
  *
- * Differences from docs/07 forced by the current step types:
+ * Differences from docs/07, accepted for v1 (decision D10, 2026-11-10):
  * - The workbook is one spreadsheet grid, not four tabs: bank statement and GL
  *   are read-only sections above the reconciliation, and journal entries are
  *   their own step. Candidates can't insert rows.
@@ -31,13 +31,17 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  *   "missed update" label.
  * - The reply rubric needs a reviewer (no AI scorer yet), so a perfect attempt
  *   shows 60 automatic points until the reply is marked.
- * - Emails can't greet the candidate by first name; the engine doesn't have it.
  * - Accounts payable is accepted for the check-error entry without the
  *   explanation docs/07 asks for: the journal step can't read the memo.
  * - Process signals (time to open the minute-12 email, rec edits afterwards)
  *   come from attempt events, not the scenario.
- * - docs/07 dates the NSF return (10/20) before the deposit that held the
- *   bakery's check (10/22); here the check was in the 10/12 deposit.
+ *
+ * Fixed under D10 (v1 was never published, so v1 itself changed):
+ * - Dana's first email greets the candidate by first name ({{first_name}},
+ *   from the name they gave when verifying; "Hi there," without one).
+ * - The bakery's check is in the 10/22 deposit as docs/07 says, and the bank
+ *   returns it NSF on 10/24, after that deposit. docs/07 had the return on
+ *   10/20, before the deposit; docs/07 now says 10/24 too.
  */
 
 const ACCOUNTS = [
@@ -63,8 +67,8 @@ const BANK_ROWS: LedgerRow[] = [
   { date: "10/12", desc: "Deposit", in: "dep2" },
   { date: "10/14", desc: "Check #{{no3}}", out: "chk3_cleared" },
   { date: "10/18", desc: "Check #{{no4}}", out: "chk4" },
-  { date: "10/20", desc: "Returned item: NSF, Maple St. Bakery", out: "nsf" },
   { date: "10/22", desc: "Deposit", in: "dep3" },
+  { date: "10/24", desc: "Returned item: NSF, Maple St. Bakery", out: "nsf" },
   { date: "10/25", desc: "Check #{{no5}}", out: "chk5" },
   { date: "10/27", desc: "Check #{{no7}}", out: "chk7" },
   { date: "10/31", desc: "Monthly service fee", out: "fee" },
@@ -75,10 +79,10 @@ const GL_ROWS: LedgerRow[] = [
   { date: "10/02", ref: "DEP", desc: "Daily sales deposit", in: "dep1" },
   { date: "10/05", ref: "{{no1}}", desc: "Coastal Roasters, coffee beans", out: "chk1" },
   { date: "10/08", ref: "{{no2}}", desc: "Piedmont Dairy", out: "chk2" },
-  { date: "10/12", ref: "DEP", desc: "Sales deposit incl. Maple St. Bakery wholesale check", in: "dep2" },
+  { date: "10/12", ref: "DEP", desc: "Daily sales deposit", in: "dep2" },
   { date: "10/14", ref: "{{no3}}", desc: "Coastal Roasters, coffee beans", out: "chk3_booked" },
   { date: "10/18", ref: "{{no4}}", desc: "Bull City Equipment Repair", out: "chk4" },
-  { date: "10/22", ref: "DEP", desc: "Daily sales deposit", in: "dep3" },
+  { date: "10/22", ref: "DEP", desc: "Sales deposit incl. Maple St. Bakery wholesale check", in: "dep3" },
   { date: "10/25", ref: "{{no5}}", desc: "Triangle Property Mgmt, rent", out: "chk5" },
   { date: "10/26", ref: "{{no6}}", desc: "Office Depot, office supplies", out: "chk6" },
   { date: "10/27", ref: "{{no7}}", desc: "City Utilities", out: "chk7" },
@@ -234,7 +238,7 @@ export const harborLaneBankRec = defineScenario({
         from: "Dana Ruiz, Senior Associate, Oakline CPA Group",
         subject: "Harbor Lane: October bank rec",
         body: [
-          "Hi,",
+          "Hi {{first_name}},",
           "",
           "Welcome aboard! First assignment: Harbor Lane Coffee Co. needs their October bank reconciliation for their operating account (checking ending 4471).",
           "",

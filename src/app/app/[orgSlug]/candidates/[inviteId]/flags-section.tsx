@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/components/icons";
 import type { ReportFlag } from "@/lib/proctoring/report";
+import { formatSeconds } from "@/lib/proctoring/rules";
 import { FlagReviewForm } from "./flag-review-form";
 import type { SignalCounts } from "./integrity";
 import { CardTitle } from "./report-ui";
@@ -25,7 +26,23 @@ export function offsetFrom(startedAt: string | null, at: string): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
+const CLOSED_BY: Record<string, string> = {
+  reconnected: "back on",
+  submitted: "never back; counted until submit",
+  deadline: "never back; counted until the time ran out",
+};
+
+/** One camera / screen gap (D4): how long, from when to when, and how it ended. */
+function downtimeLine(e: ReportFlag["events"][number], startedAt: string | null): string {
+  const what = e.source === "camera" ? "Camera off" : "Screen share stopped";
+  const from = offsetFrom(startedAt, e.at);
+  const to = e.endAt ? offsetFrom(startedAt, e.endAt) : "";
+  const span = from && to ? ` · ${from} to ${to} into the test` : "";
+  return `${what} for ${formatSeconds((e.downMs ?? 0) / 1000)} (${CLOSED_BY[e.closedBy ?? "reconnected"]})${span}`;
+}
+
 function eventLine(e: ReportFlag["events"][number], startedAt: string | null): string {
+  if (e.kind === "monitoring_down") return downtimeLine(e, startedAt);
   const parts = [EVENT_TEXT[e.kind] ?? e.kind];
   if (e.awayMs) parts.push(`${Math.round(e.awayMs / 1000)} s away`);
   if (e.chars) parts.push(`${e.chars} characters`);
@@ -222,6 +239,9 @@ function FlagHead({ flag, startedAt }: { flag: ReportFlag; startedAt: string | n
 function FlagEvidence({ flag, startedAt, canSeeMedia }: { flag: ReportFlag; startedAt: string | null; canSeeMedia: boolean }) {
   return (
     <>
+      {flag.rule === "downtime" ? (
+        <p className="small ink2">The task was covered during each gap and the timer kept running. Judge whether the lost time affected the result.</p>
+      ) : null}
       {canSeeMedia && flag.media.length ? (
         <ul aria-label="Snapshots" style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gridTemplateColumns: flag.media.length > 1 ? "1fr 1fr" : "1fr", gap: 8 }}>
           {flag.media.map((m) => {

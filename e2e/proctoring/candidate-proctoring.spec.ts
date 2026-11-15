@@ -117,10 +117,21 @@ test("a candidate consents, passes the camera and screen checks and is monitored
   // Stopping the share covers the workspace (the timer keeps running) until it is shared again.
   await endScreenShare(page);
   const cover = page.getByRole("dialog", { name: "Screen sharing stopped" });
-  await expect(cover).toContainText("Screen sharing stopped. Share your entire screen again to continue.");
+  await expect(cover).toContainText("Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.");
+  await expect(cover).toContainText("The timer keeps running while this message is open; it does not pause.");
   await a11y();
   await cover.getByRole("button", { name: "Share entire screen" }).click();
   await expect(cover).toHaveCount(0);
+  // The gap is recorded for the report (D4), closed when the share came back.
+  await expect
+    .poll(
+      async () =>
+        must(await db().from("integrity_events").select("payload").eq("attempt_id", attempt.id).eq("kind", "monitoring_down")).map(
+          (r) => (r.payload as { source: string; closedBy: string }).source + ":" + (r.payload as { closedBy: string }).closedBy,
+        ),
+      { timeout: 20_000 },
+    )
+    .toEqual(["screen:reconnected"]);
   await expect
     .poll(async () => must(await db().from("flags").select("rule").eq("attempt_id", attempt.id).eq("rule", "screen_share")), { timeout: 20_000 })
     .toHaveLength(1);

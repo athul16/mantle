@@ -15,8 +15,9 @@ import { useBrowserSignals, type Signal } from "./use-browser-signals";
  *   running, snapshots go up every SNAPSHOT_INTERVAL_MS and whenever the
  *   candidate leaves the window, and losing either brings the cover back.
  *
- * The cover blocks the page; the server timer keeps running (open decision:
- * pausing the clock while sharing is down).
+ * The cover blocks the page; the server timer keeps running (D4: it never
+ * pauses). The server records each down period and the report shows the gaps
+ * (src/lib/proctoring/flags.ts).
  */
 
 type DeviceState = { on: boolean; message?: string; starting?: boolean };
@@ -197,7 +198,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
                 {heading}
               </h2>
               <p className="ink2">
-                This simulation needs {need}. Your work is saved. The timer is running on our server while this message is open.
+                This simulation needs {need}. Your work is saved. The timer keeps running while this message is open; it does not pause. The hiring team sees how long your camera or screen was off.
               </p>
             </div>
             {[camera.message, screen.message].filter(Boolean).map((m) => (

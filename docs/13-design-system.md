@@ -48,7 +48,7 @@ Keep these unless the team decides otherwise:
 
 - **Links inside running text are underlined** (`mantle.css`, "app additions"). The accent blue on near-black text fails axe's `link-in-text-block` check, which CI runs on every page.
 - **Read-only users see text, not disabled controls**, on Team and Settings (the prototype greys out the controls). This is clearer and more accessible.
-- **Honest copy where the app works differently:** no "AI-suggested" wording (nothing is AI-scored yet), rubric scores are number inputs (partial points), the monitoring overlay says the clock keeps running, and an invite batch with an invalid address is blocked rather than skipped.
+- **Honest copy where the app works differently:** no "AI-suggested" wording (nothing is AI-scored yet), rubric scores are number inputs (partial points), the monitoring overlay says the timer keeps running (team decision D4: it never pauses, and the report shows each gap), and an invite batch with an invalid address is blocked rather than skipped.
 - **Scores show one decimal**, so close candidates aren't hidden as ties.
 - **The Create job dialog keeps a time-zone note** under "Invites close" (invites expire at the end of that day in the recruiter's time zone).
 - **Two-factor setup shows the QR code after a click**, so a page reload can't create two enrolments.

@@ -47,6 +47,13 @@ export type ClientSignalKind = (typeof CLIENT_SIGNAL_KINDS)[number];
 /** Recorded by the server itself, never accepted from the browser. */
 export const CONSENT_SIGNAL = "consented_to_monitoring";
 
+/**
+ * Recorded by the server, one per period the camera or screen share was down
+ * (the task area was covered and the timer kept running, D4). Payload: source,
+ * from, to, downMs, closedBy, stopEventId. See downPeriods() in rules.ts.
+ */
+export const DOWNTIME_SIGNAL = "monitoring_down";
+
 /** Values of MediaTrackSettings.displaySurface, plus "unknown" for browsers that don't say. */
 export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", "unknown"] as const;
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
