@@ -291,6 +291,24 @@ describe("AccommodationsForm", () => {
     expect(screen.getByText(/recorded in the audit log/)).toBeVisible();
   });
 
+  it("offers full screen and microphone waivers when the assessment requires them", async () => {
+    const user = userEvent.setup();
+    setAccommodationsAction.mockResolvedValueOnce({ message: "Saved." });
+    render(<AccommodationsForm orgId="org-1" inviteId="inv-1" email="jane@example.com" current={none} camera={false} screen={false} fullscreen microphone />);
+    expect(screen.getByRole("checkbox", { name: "Waive full screen" })).not.toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "Waive full screen" }));
+    await user.click(screen.getByRole("checkbox", { name: "Waive microphone" }));
+    await user.click(screen.getByRole("button", { name: "Save accommodations" }));
+    await screen.findByText("Saved.");
+    expect(formDataOf(setAccommodationsAction)).toMatchObject({ waiveFullscreen: "on", waiveMicrophone: "on" });
+  });
+
+  it("hides those waivers when the assessment doesn't use them", () => {
+    render(<AccommodationsForm orgId="org-1" inviteId="inv-1" email="jane@example.com" current={none} camera screen />);
+    expect(screen.queryByRole("checkbox", { name: "Waive full screen" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Waive microphone" })).toBeNull();
+  });
+
   it("starts from the current accommodations and saves the change", async () => {
     const user = userEvent.setup();
     setAccommodationsAction.mockResolvedValueOnce({ message: "Saved accommodations for jane@example.com." });
