@@ -99,6 +99,7 @@ select set_eq(
        ('attempts',      'attempts_submit_reason_check'),
        ('attempts',      'attempts_integrity_label_check'),
        ('media',         'media_source_check'),
+       ('media',         'media_reason_check'),
        ('flags',         'flags_status_check'),
        ('flags',         'flags_review_note_length'),
        ('notes',         'notes_vote_check'),

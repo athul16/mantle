@@ -4,7 +4,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(93);
+select plan(94);
 
 create function pg_temp.set_col(tbl text, col text, val text, key_sql text) returns text
 language sql as $$
@@ -25,7 +25,7 @@ insert into enum_cases values
   ('attempts',    'integrity_label', format('id = %L', pg_temp.fx('att_a')),
      array['clear', 'review', 'suspicious'],                              array['rejected', 'cheater', 'fail', '']),
   ('media',       'source',          format('attempt_id = %L', pg_temp.fx('att_a')),
-     array['camera', 'screen', 'phone'],                                  array['microphone', 'webcam', '']),
+     array['camera', 'screen', 'phone', 'audio'],                         array['microphone', 'webcam', '']),
   ('flags',       'status',          format('id = %L', pg_temp.fx('flag_a')),
      array['open', 'confirmed', 'cleared'],                               array['rejected', 'closed', '']),
   ('notes',       'vote',            format('id = %L', pg_temp.fx('note_a_admin')),
