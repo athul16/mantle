@@ -194,7 +194,7 @@ export async function accommodationsFor(orgId: string, inviteIds: string[]): Pro
   for (let n = 0; n < inviteIds.length; n += 200) {
     const { data, error } = await db
       .from("invite_accommodations")
-      .select("invite_id, extra_time_percent, waive_camera, waive_screen")
+      .select("invite_id, extra_time_percent, waive_camera, waive_screen, waive_fullscreen, waive_microphone")
       .eq("org_id", orgId)
       .in("invite_id", inviteIds.slice(n, n + 200));
     if (error) throw error;
