@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { applyWaivers } from "@/lib/accommodations";
+import { applyWaivers, type Accommodations } from "@/lib/accommodations";
 import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
 import type { AttemptRow, InviteContext } from "@/lib/candidate/invite";
@@ -9,11 +9,16 @@ import type { CandidateSession } from "@/lib/candidate/session";
 import { readRetention } from "@/lib/retention/policy";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
+  AUDIO_EXTENSIONS,
   CONSENT_SIGNAL,
-  MAX_SNAPSHOTS_PER_ATTEMPT,
+  MAX_MEDIA_PER_ATTEMPT,
   MONITORING_CONSENT_VERSION,
   PROCTORING_BUCKET,
+  audioMimeType,
+  isCaptureReason,
   readProctoring,
+  type CaptureReason,
+  type MediaKind,
   type MonitoringSettings,
   type SnapshotSource,
 } from "./config";
@@ -31,9 +36,10 @@ type AttemptKey = Pick<AttemptRow, "id" | "org_id">;
 const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
 
 /**
- * The camera / screen settings for this candidate: the assessment's, minus any
- * waiver set on the invite (D9; the assessment itself stays locked), plus what
- * the monitoring notice shows (retention, company contact).
+ * The proctoring settings for this candidate (camera, screen, full screen,
+ * microphone, gaze): the assessment's, minus any waiver set on the invite (D9;
+ * the assessment itself stays locked), plus what the monitoring notice shows
+ * (retention, company contact).
  */
 export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
   return getInviteProctoringSettings(session.invite);
@@ -44,18 +50,32 @@ export async function getProctoringSettings(session: CandidateSession): Promise<
  * verify page shows what will be recorded before they agree).
  */
 export async function getInviteProctoringSettings(
-  invite: Pick<InviteContext, "assessmentId" | "orgId" | "accommodations" | "contactEmail">,
+  invite: Pick<InviteContext, "inviteId" | "assessmentId" | "orgId" | "accommodations" | "contactEmail">,
 ): Promise<MonitoringSettings> {
   const db = createServiceClient();
-  const [assessment, org] = await Promise.all([
+  const [assessment, org, waivers] = await Promise.all([
     db.from("assessments").select("proctoring").eq("id", invite.assessmentId).eq("org_id", invite.orgId).single(),
     db.from("organizations").select("settings").eq("id", invite.orgId).single(),
+    // The full screen and microphone waivers are read here too, so they apply
+    // even where the invite context was loaded without them.
+    db
+      .from("invite_accommodations")
+      .select("waive_fullscreen, waive_microphone")
+      .eq("invite_id", invite.inviteId)
+      .eq("org_id", invite.orgId)
+      .maybeSingle(),
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
+  if (waivers.error) throw new Error(`accommodations lookup failed: ${waivers.error.message}`);
+  const accommodations: Accommodations = {
+    ...invite.accommodations,
+    waiveFullscreen: invite.accommodations.waiveFullscreen === true || waivers.data?.waive_fullscreen === true,
+    waiveMicrophone: invite.accommodations.waiveMicrophone === true || waivers.data?.waive_microphone === true,
+  };
   const { mediaDays, resultsDays } = readRetention(org.data.settings);
   return {
-    ...applyWaivers(readProctoring(assessment.data.proctoring), invite.accommodations),
+    ...applyWaivers(readProctoring(assessment.data.proctoring), accommodations),
     mediaRetentionDays: mediaDays,
     resultsRetentionDays: resultsDays,
     contactEmail: invite.contactEmail,
@@ -104,7 +124,14 @@ export async function recordConsent(session: CandidateSession, now = new Date())
       org_id: attempt.org_id,
       kind: CONSENT_SIGNAL,
       at: now.toISOString(),
-      payload: { version: MONITORING_CONSENT_VERSION, camera: settings.camera, screen: settings.screen },
+      payload: {
+        version: MONITORING_CONSENT_VERSION,
+        camera: settings.camera,
+        screen: settings.screen,
+        fullscreen: settings.fullscreen,
+        microphone: settings.microphone,
+        gaze: settings.gaze,
+      },
     });
   if (error) throw new Error(`recording consent failed: ${error.message}`);
   return true;
@@ -123,21 +150,42 @@ export async function hasConsented(attempt: AttemptKey): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Snapshots
+// Media: camera and screen snapshots, audio clips
 // ---------------------------------------------------------------------------
 
-export type UploadResult = { ok: true; path: string; token: string } | { ok: false; error: "not_active" | "not_enabled" | "too_many" };
+export type UploadResult =
+  | { ok: true; path: string; token: string }
+  | { ok: false; error: "not_active" | "not_enabled" | "too_many" | "bad_type" };
+
+export type MediaUploadRequest = {
+  source: MediaKind;
+  /** Why the capture was taken. Recorded when the upload is confirmed, not here. */
+  reason?: CaptureReason | string | null;
+  /** Required for audio: one of AUDIO_MIME_TYPES (parameters such as ";codecs=opus" are ignored). Snapshots are always JPEG. */
+  contentType?: string | null;
+};
+
+/** Which assessment setting each media kind needs (after waivers). */
+const SETTING_FOR: Record<MediaKind, "camera" | "screen" | "microphone"> = { camera: "camera", screen: "screen", audio: "microphone" };
 
 /**
- * A signed upload URL for one snapshot. The browser uploads straight to
- * storage with the token (never through our API); the path is fixed here,
- * inside the attempt's own folder.
+ * A signed upload URL for one snapshot or audio clip. The browser uploads
+ * straight to storage with the token (never through our API); the path is
+ * fixed here, inside the attempt's own folder:
+ * <org>/<attempt>/<camera|screen>/<file>.jpg or <org>/<attempt>/audio/<file>.<webm|ogg|m4a>.
  */
-export async function createSnapshotUpload(session: CandidateSession, source: SnapshotSource, now = new Date()): Promise<UploadResult> {
+export async function createMediaUpload(session: CandidateSession, req: MediaUploadRequest, now = new Date()): Promise<UploadResult> {
+  let ext = "jpg";
+  if (req.source === "audio") {
+    const mime = audioMimeType(req.contentType);
+    if (!mime) return { ok: false, error: "bad_type" };
+    ext = AUDIO_EXTENSIONS[mime];
+  }
+
   const attempt = await settleAttempt(session, now);
   if (!ACTIVE.includes(attempt.status)) return { ok: false, error: "not_active" };
   const settings = await getProctoringSettings(session);
-  if (!settings[source]) return { ok: false, error: "not_enabled" };
+  if (!settings[SETTING_FOR[req.source]]) return { ok: false, error: "not_enabled" };
 
   const db = createServiceClient();
   const { count, error: countError } = await db
@@ -145,32 +193,51 @@ export async function createSnapshotUpload(session: CandidateSession, source: Sn
     .select("id", { count: "exact", head: true })
     .eq("attempt_id", attempt.id)
     .eq("org_id", attempt.org_id);
-  if (countError) throw new Error(`counting snapshots failed: ${countError.message}`);
-  if ((count ?? 0) >= MAX_SNAPSHOTS_PER_ATTEMPT) return { ok: false, error: "too_many" };
+  if (countError) throw new Error(`counting media failed: ${countError.message}`);
+  if ((count ?? 0) >= MAX_MEDIA_PER_ATTEMPT) return { ok: false, error: "too_many" };
 
-  const path = `${attempt.org_id}/${attempt.id}/${source}/${now.getTime()}-${randomBytes(6).toString("hex")}.jpg`;
+  const path = `${attempt.org_id}/${attempt.id}/${req.source}/${now.getTime()}-${randomBytes(6).toString("hex")}.${ext}`;
   const { data, error } = await db.storage.from(PROCTORING_BUCKET).createSignedUploadUrl(path);
   if (error) throw new Error(`creating upload URL failed: ${error.message}`);
   return { ok: true, path: data.path, token: data.token };
 }
 
+/** A camera or screen snapshot upload (JPEG). Same as createMediaUpload without a reason. */
+export async function createSnapshotUpload(session: CandidateSession, source: SnapshotSource, now = new Date()): Promise<UploadResult> {
+  return createMediaUpload(session, { source }, now);
+}
+
 export type ConfirmResult = { ok: true; mediaId: number } | { ok: false; error: "bad_path" | "missing" | "not_active" };
 
-/** After the upload: checks the file is in this attempt's folder and exists, then records the media row. */
-export async function confirmSnapshot(session: CandidateSession, path: unknown, now = new Date()): Promise<ConfirmResult> {
+/** <source>/<file>: snapshots are .jpg, audio clips .webm, .ogg or .m4a. */
+const MEDIA_PATH = /^(?:(camera|screen)\/([A-Za-z0-9_-]{1,80}\.jpg)|(audio)\/([A-Za-z0-9_-]{1,80}\.(?:webm|ogg|m4a)))$/;
+
+/**
+ * After the upload: checks the file is in this attempt's folder and exists,
+ * then records the media row with its source and capture reason (an unknown
+ * reason is recorded as none).
+ */
+export async function confirmMedia(
+  session: CandidateSession,
+  body: { path: unknown; reason?: unknown },
+  now = new Date(),
+): Promise<ConfirmResult> {
+  const { path } = body;
   const attempt = await settleAttempt(session, now);
   const prefix = `${attempt.org_id}/${attempt.id}/`;
   if (typeof path !== "string" || !path.startsWith(prefix)) return { ok: false, error: "bad_path" };
-  const match = /^(camera|screen)\/([A-Za-z0-9_-]{1,80}\.jpg)$/.exec(path.slice(prefix.length));
+  const match = MEDIA_PATH.exec(path.slice(prefix.length));
   if (!match) return { ok: false, error: "bad_path" };
   if (!ACTIVE.includes(attempt.status)) return { ok: false, error: "not_active" };
-  const [, source, file] = match;
+  const source = (match[1] ?? match[3]) as MediaKind;
+  const file = match[2] ?? match[4];
+  const reason = isCaptureReason(body.reason) ? body.reason : null;
 
   const db = createServiceClient();
   const { data: listed, error: listError } = await db.storage
     .from(PROCTORING_BUCKET)
     .list(`${prefix}${source}`, { search: file, limit: 10 });
-  if (listError) throw new Error(`checking snapshot failed: ${listError.message}`);
+  if (listError) throw new Error(`checking media failed: ${listError.message}`);
   if (!listed?.some((o) => o.name === file)) return { ok: false, error: "missing" };
 
   const { data: existing } = await db.from("media").select("id").eq("attempt_id", attempt.id).eq("storage_path", path).maybeSingle();
@@ -178,9 +245,14 @@ export async function confirmSnapshot(session: CandidateSession, path: unknown, 
 
   const { data, error } = await db
     .from("media")
-    .insert({ attempt_id: attempt.id, org_id: attempt.org_id, source: source as SnapshotSource, storage_path: path, at: now.toISOString() })
+    .insert({ attempt_id: attempt.id, org_id: attempt.org_id, source, reason, storage_path: path, at: now.toISOString() })
     .select("id")
     .single();
-  if (error) throw new Error(`recording snapshot failed: ${error.message}`);
+  if (error) throw new Error(`recording media failed: ${error.message}`);
   return { ok: true, mediaId: data.id };
+}
+
+/** confirmMedia without a reason (kept for existing callers). */
+export async function confirmSnapshot(session: CandidateSession, path: unknown, now = new Date()): Promise<ConfirmResult> {
+  return confirmMedia(session, { path }, now);
 }

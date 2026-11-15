@@ -213,7 +213,8 @@ select set_eq(
        ('org_id', 'uuid', true, '', ''),
        ('at', 'timestamp with time zone', true, 'now()', ''),
        ('source', 'text', true, '', ''),
-       ('storage_path', 'text', true, '', '') $$,
+       ('storage_path', 'text', true, '', ''),
+       ('reason', 'text', false, '', '') $$,
   'media: columns, types, nullability, defaults'
 );
 select col_is_pk('public', 'media', array['id'], 'media: primary key (id)');
