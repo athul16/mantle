@@ -7,8 +7,8 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 | # | Screen | Contents | Phase |
 | --- | --- | --- | --- |
 | 1 | Invite email | Company name and logo, role, time needed, deadline, start link | MVP |
-| 2 | Verify | Name, email code, consent to monitoring, whom to contact for accommodations (the company's contact email) | MVP |
-| 3 | System check | Browser, screen size, connection; camera permission, entire-screen share, start photo (if enabled); phone QR pairing (phase 2) | MVP |
+| 2 | Verify | Name, email code (pasting "123 456" fills all six digits), consent to monitoring, whom to contact for accommodations (the company's contact email) | MVP |
+| 3 | System check | Browser, screen size, connection; camera permission, entire-screen share, start photo, microphone permission with a short sound check (each if enabled); the gaze model loads in the background; phone QR pairing (phase 2) | MVP |
 | 4 | Instructions | Scenario intro, time limit, allowed tools, rules, one untimed practice step | MVP |
 | 5 | Simulation workspace | See layout below | MVP |
 | 6 | Review and submit | Unanswered/flagged steps, final submit | MVP |
@@ -24,6 +24,10 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 - **Built-in calculator** for accounting.
 - **Banners:** shown immediately if camera or screen share drops. The task area is covered until it is back, but the **timer keeps running** (decision D4, 2026-11-10); the message tells the candidate so. Each down period (start, end, camera or screen) is recorded, and the report shows the gaps and the total so the recruiter can judge it (see `docs/02-security-and-integrity.md`). A refresh or closed tab during a gap ends it when the source is back, or at submit or the deadline if it never is.
 
+- **Full-screen cover:** when the assessment requires full screen, the task area is covered until the candidate presses "Go full screen" (it has to come from a click). Leaving full screen later shows "Return to full screen". The timer keeps running, and the hiring team sees when full screen was left.
+- **Microphone:** shown as a chip next to the camera and screen chips. If it turns off, the task is covered ("Your microphone is off") until it is back. The sound check on the system check asks the candidate to say a few words; if nothing is heard they get a hint and can still continue.
+- **While away:** when the candidate leaves the window, screenshots are taken in the background (see `docs/02`), and the notice tells them so before they start.
+
 ## Behavior
 
 - Every change autosaves.
@@ -33,5 +37,5 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 ## Accommodations (as built, decision D9)
 
 - The verify page and the monitoring notice tell candidates whom to ask for extra time or to take the test without a camera or screen share: the company's contact email (Settings), or "the hiring team" when none is set.
-- A recruiter or admin sets accommodations per invite before the candidate starts: +25%, +50% or +100% time, and/or no camera / no screen share. The instructions page shows the longer limit ("45 minutes (includes 50% extra time)") and which monitoring is excused. The extra time is part of the server deadline; the browser timer only displays it.
+- A recruiter or admin sets accommodations per invite before the candidate starts: +25%, +50% or +100% time, and/or no camera / no screen share. The instructions page shows the longer limit ("45 minutes (includes 50% extra time)") and which monitoring is excused (camera, screen, full screen, microphone). The extra time is part of the server deadline; the browser timer only displays it.
 

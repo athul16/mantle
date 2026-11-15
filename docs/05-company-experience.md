@@ -8,7 +8,7 @@ The company side turns a pile of applicants into a short ranked list. The candid
 | --- | --- | --- | --- |
 | 1 | Sign up / org setup | Company name, logo, invite teammates with roles | MVP |
 | 2 | Assessment library | Ready-made simulations (Accounting Intern, Pharma Intern); preview as candidate | MVP |
-| 3 | Configure assessment | Time limit, pass score, a required Monitored / Not monitored choice with nothing preselected (decision D5); if Monitored, camera and/or screen (phone later). The server rejects a missing choice | MVP |
+| 3 | Configure assessment | Time limit, pass score, a required Monitored / Not monitored choice with nothing preselected (decision D5); if Monitored, camera, screen, microphone, require full screen and gaze check (gaze needs the camera; phone later). The server rejects a missing choice | MVP |
 | 4 | Create job | Role name, linked assessment, invite deadline | MVP |
 | 5 | Invite candidates | Paste emails, CSV upload, or public link for a job posting | MVP |
 | 6 | Candidates table | Status (invited, started, completed, expired), score, percentile, integrity label; sort, filter, bulk advance/reject, reminders | MVP |
@@ -26,7 +26,7 @@ For pilots, our team can run screens 1 to 3 for the client.
 - **Summary:** overall score, per-task scores, integrity label, time taken.
 - **Per task:** what the candidate did vs. the expected answer, with partial credit explained. Rubric-scored tasks show the AI's reasoning per criterion; recruiters can override.
 - **Process:** timeline of actions (e.g., "answered urgent email within 2 minutes").
-- **Integrity:** each flag with timestamp, reason, and snapshot; confirm or clear buttons.
+- **Integrity:** the label (clear, review or suspicious) with its reasons in plain words, the counters (left the tab, pastes, copies, full screen exits, looked away, no face, speech), and each flag with timestamp, reason and evidence; confirm or clear buttons. For each absence from the window there is a filmstrip of the screenshots taken while away (+2 s, +6 s, every 10 s, and when back). Flags with speech have audio players. Cut and copy count together under Copies.
 - **Notes and votes** from teammates.
 
 Example summary:
@@ -47,4 +47,4 @@ Example summary:
 - Rubric review: admins and recruiters enter points per criterion; the database function `review_rubric_step` checks the role and ranges, records who reviewed and when, recomputes the attempt total and writes the audit log. A reviewed task can be changed later. Viewers see everything read-only, but can add notes and votes (`03-roles-and-permissions.md`).
 - Job page invite list: email, status, first invited, last sent (with the number of sends after a resend), expiry. Two batches sent at the same moment can't invite the same email twice (database unique index); the later batch reports it as already invited.
 - Accommodations (decision D9): each unstarted invite has an "Accommodations" control on the job page for extra time (+25/50/100%) and a camera or screen-share waiver, for that candidate only; the assessment's locked settings don't change. Every change goes to the audit log, and the candidate report shows the accommodations in its summary and the timeline's start line. Admins set the contact email candidates see in Settings.
-
+- Proctoring v2 settings (2026-11-15): the Configure assessment screen has switches for Require full screen, Microphone and Gaze check (gaze is only offered with the camera). The invite drawer's accommodations also waive full screen and microphone per candidate; waivers are shown on the invite row and the report. The report's Integrity card shows the label with its reasons, the new counters and filmstrips; see `docs/02` for the rules and `decisions/2026-11-15-proctoring-v2.md` for why.
