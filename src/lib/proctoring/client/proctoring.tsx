@@ -92,7 +92,8 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   const [camera, setCamera] = useState<DeviceState>(() => ({ on: !!(settings.camera && heldMedia("camera")) }));
   const [screen, setScreen] = useState<DeviceState>(() => ({ on: !!(settings.screen && heldMedia("screen")) }));
   const [mic, setMic] = useState<DeviceState>(() => ({ on: !!(settings.microphone && heldMicrophone()) }));
-  // Bumped each time a new microphone monitor is made, so the start effect runs for it.
+  // Bumped each time the microphone is (re)opened here, so the start effect runs
+  // for the new monitor. A held stream's monitor is made on mount, before that effect.
   const [micGeneration, setMicGeneration] = useState(0);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(() => (settings.camera ? (heldMedia("camera") ?? null) : null));
   const fullscreen = useSyncExternalStore(subscribeFullscreen, isFullscreen, () => false);
@@ -167,7 +168,6 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
           else record(kind, payload ?? {});
         },
       });
-      setMicGeneration((g) => g + 1);
       stream.getAudioTracks()[0]?.addEventListener("ended", () => micLost(stream));
     },
     [micLost, record],
@@ -210,6 +210,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
       return;
     }
     attachMic(result.stream);
+    setMicGeneration((g) => g + 1);
     record("microphone_started");
     setMic({ on: true });
   }, [attachMic, record]);
@@ -269,6 +270,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   }, [devicesActive, monitored, snapshot]);
 
   // Speech monitor: listens once monitoring is running (start() is idempotent).
+  // Declared after the mount effect, so a held stream's monitor already exists.
   useEffect(() => {
     if (devicesActive) audio.current?.start();
   }, [devicesActive, micGeneration]);

@@ -187,6 +187,20 @@ describe("Microphone", () => {
     expect(signalKinds()).toEqual(expect.arrayContaining(["microphone_started", "microphone_stopped"]));
   });
 
+  it("reuses the microphone the system check opened and starts listening on it", async () => {
+    const { holdMicrophone } = await import("@/lib/proctoring/client/proctoring");
+    holdMicrophone(audioStream(mic));
+    render(
+      <Proctoring settings={{ ...OFF, microphone: true }}>
+        <Work />
+      </Proctoring>,
+    );
+    expect(gate()).not.toBeInTheDocument();
+    expect(media.getUserMedia).not.toHaveBeenCalled();
+    expect(audioMonitors).toHaveLength(1);
+    expect(audioMonitors[0].start).toHaveBeenCalled();
+  });
+
   it("stops the monitor and the microphone when the workspace closes", async () => {
     const { unmount } = render(
       <Proctoring settings={{ ...OFF, microphone: true }}>
