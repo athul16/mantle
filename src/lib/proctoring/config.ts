@@ -200,10 +200,10 @@ export function monitoringNotice(settings: MonitoringSettings, companyName: stri
   return paragraphs;
 }
 
-/** Whom to ask for extra time or to take the test without a camera or screen share (D9). */
+/** Whom to ask for extra time or to take the test without a camera, microphone, full screen or screen share (D9). */
 export function accommodationLine(companyName: string, contactEmail?: string | null): string {
   const who = contactEmail ? `${companyName} at ${contactEmail}` : `${companyName}'s hiring team`;
-  return `Need extra time, or can't use a camera or share your screen? Contact ${who} before you start; they can adjust this for you.`;
+  return `Need extra time, or can't use a camera, microphone, full screen or share your screen? Contact ${who} before you start; they can adjust this for you.`;
 }
 
 function joinList(items: string[]): string {

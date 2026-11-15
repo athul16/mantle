@@ -125,6 +125,15 @@ describe("buildTimeline", () => {
   const at = (s: number) => new Date(Date.parse(start) + s * 1000).toISOString();
   const opts = { startedAt: start, stepTitles: { s1: "Reconcile", s2: "Reply" }, messageSubjects: { m1: "Urgent: cash count" } };
 
+  it("names the full screen and microphone waivers on the start event", () => {
+    const [first] = buildTimeline(
+      [{ at: at(0), kind: "started_attempt", payload: { accommodations: { extraTimePercent: 0, waiveFullscreen: true, waiveMicrophone: true } } }],
+      opts,
+    );
+    expect(first.text).toContain("full screen waived");
+    expect(first.text).toContain("microphone waived");
+  });
+
   it("labels events with the time since the start and collapses repeated saves", () => {
     const timeline = buildTimeline(
       [
