@@ -115,6 +115,19 @@ afterAll(async () => {
 });
 
 describe("invite accommodations", () => {
+  it("full screen and microphone waivers are saved and listed", async () => {
+    const inviteId = await makeInvite(`accom-${run}-fm@example.test`);
+    acting = recruiter;
+    const res = await jobsActions.setAccommodationsAction(
+      undefined,
+      form({ orgId: orgA, inviteId, extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: true, waiveMicrophone: true }),
+    );
+    expect(res).toMatchObject({ message: expect.stringContaining("Saved accommodations") });
+    const listed = (await listInvites(orgA, jobId)).find((i) => i.id === inviteId);
+    expect(listed?.accommodations).toMatchObject({ waiveFullscreen: true, waiveMicrophone: true, waiveCamera: false });
+    expect(await getInviteAccommodations(orgA, inviteId)).toMatchObject({ waiveFullscreen: true, waiveMicrophone: true });
+  });
+
   it("a recruiter sets extra time and a camera waiver; it is audited and listed", async () => {
     const inviteId = await makeInvite(`accom-${run}-c1@example.test`);
     acting = recruiter;
@@ -127,7 +140,7 @@ describe("invite accommodations", () => {
     const row = await service.from("invite_accommodations").select("*").eq("invite_id", inviteId).single();
     expect(row.data).toMatchObject({ org_id: orgA, extra_time_percent: 50, waive_camera: true, waive_screen: false, set_by: recruiter.id });
 
-    const audit = await service.from("audit_log").select("actor_id, target").eq("org_id", orgA).eq("action", "set_accommodations");
+    const audit = await service.from("audit_log").select("actor_id, target").eq("org_id", orgA).eq("action", "set_accommodations").like("target", `invite:${inviteId} %`);
     expect(audit.data).toEqual([
       { actor_id: recruiter.id, target: `invite:${inviteId} extra_time=+50% waive_camera=true waive_screen=false` },
     ]);
