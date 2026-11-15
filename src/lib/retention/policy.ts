@@ -1,34 +1,65 @@
 /**
  * How long candidate data is kept (docs/02 Compliance). Pure functions, no
  * server imports, so the settings form, the consent notice and tests share
- * them. The database applies the same rules (migration *_retention.sql): the
- * bounds as a check constraint, the clock in list_candidates_past_retention.
+ * them. The database applies the same rules (migration *_retention_clocks.sql):
+ * the bounds as a check constraint, the clocks in list_media_past_retention and
+ * list_candidates_past_retention.
  */
 
-export const DEFAULT_RETENTION_DAYS = 180;
-export const MIN_RETENTION_DAYS = 30;
-export const MAX_RETENTION_DAYS = 730;
+/**
+ * Two clocks: media (camera snapshots and screen screenshots) and results
+ * (everything else about the candidate). Media is never kept longer than results.
+ */
+export const DEFAULT_MEDIA_RETENTION_DAYS = 90;
+export const MIN_MEDIA_RETENTION_DAYS = 30;
+export const MAX_MEDIA_RETENTION_DAYS = 365;
+
+export const DEFAULT_RESULTS_RETENTION_DAYS = 365;
+export const MIN_RESULTS_RETENTION_DAYS = 30;
+export const MAX_RESULTS_RETENTION_DAYS = 730;
 
 const DAY_MS = 86_400_000;
 
-export const RETENTION_RANGE_ERROR = `Enter a whole number of days from ${MIN_RETENTION_DAYS} to ${MAX_RETENTION_DAYS}.`;
+export const MEDIA_RANGE_ERROR = `Enter a whole number of days from ${MIN_MEDIA_RETENTION_DAYS} to ${MAX_MEDIA_RETENTION_DAYS}.`;
+export const RESULTS_RANGE_ERROR = `Enter a whole number of days from ${MIN_RESULTS_RETENTION_DAYS} to ${MAX_RESULTS_RETENTION_DAYS}.`;
+export const MEDIA_LONGER_ERROR = "Photos and screenshots can't be kept longer than results.";
 
-const inRange = (n: number) => Number.isInteger(n) && n >= MIN_RETENTION_DAYS && n <= MAX_RETENTION_DAYS;
+export type Retention = { mediaDays: number; resultsDays: number };
 
-/** organizations.settings → days, with the default for a missing or invalid value. */
-export function readRetentionDays(settings: unknown): number {
-  const value = (settings as { retention_days?: unknown } | null | undefined)?.retention_days;
-  return typeof value === "number" && inRange(value) ? value : DEFAULT_RETENTION_DAYS;
+const inMediaRange = (n: number) => Number.isInteger(n) && n >= MIN_MEDIA_RETENTION_DAYS && n <= MAX_MEDIA_RETENTION_DAYS;
+const inResultsRange = (n: number) => Number.isInteger(n) && n >= MIN_RESULTS_RETENTION_DAYS && n <= MAX_RESULTS_RETENTION_DAYS;
+
+/** organizations.settings → both periods, with the defaults for missing or invalid values. */
+export function readRetention(settings: unknown): Retention {
+  const s = (settings ?? {}) as { media_retention_days?: unknown; results_retention_days?: unknown };
+  const media = s.media_retention_days;
+  const results = s.results_retention_days;
+  const resultsDays = typeof results === "number" && inResultsRange(results) ? results : DEFAULT_RESULTS_RETENTION_DAYS;
+  const mediaDays = typeof media === "number" && inMediaRange(media) ? media : DEFAULT_MEDIA_RETENTION_DAYS;
+  return { mediaDays: Math.min(mediaDays, resultsDays), resultsDays };
 }
 
-export type ParsedRetention = { ok: true; days: number } | { ok: false; error: string };
+export type ParsedRetention =
+  | ({ ok: true } & Retention)
+  | { ok: false; fieldErrors: { mediaRetentionDays?: string[]; resultsRetentionDays?: string[] } };
 
-/** Form input → days. */
-export function parseRetentionDays(input: unknown): ParsedRetention {
+const wholeNumber = (input: unknown): number | null => {
   const text = typeof input === "string" ? input.trim() : "";
-  if (!/^\d+$/.test(text)) return { ok: false, error: RETENTION_RANGE_ERROR };
-  const days = Number(text);
-  return inRange(days) ? { ok: true, days } : { ok: false, error: RETENTION_RANGE_ERROR };
+  return /^\d+$/.test(text) ? Number(text) : null;
+};
+
+/** Form input → both periods. */
+export function parseRetention(mediaInput: unknown, resultsInput: unknown): ParsedRetention {
+  const mediaDays = wholeNumber(mediaInput);
+  const resultsDays = wholeNumber(resultsInput);
+  const fieldErrors: { mediaRetentionDays?: string[]; resultsRetentionDays?: string[] } = {};
+  if (mediaDays === null || !inMediaRange(mediaDays)) fieldErrors.mediaRetentionDays = [MEDIA_RANGE_ERROR];
+  if (resultsDays === null || !inResultsRange(resultsDays)) fieldErrors.resultsRetentionDays = [RESULTS_RANGE_ERROR];
+  if (fieldErrors.mediaRetentionDays || fieldErrors.resultsRetentionDays || mediaDays === null || resultsDays === null) {
+    return { ok: false, fieldErrors };
+  }
+  if (mediaDays > resultsDays) return { ok: false, fieldErrors: { mediaRetentionDays: [MEDIA_LONGER_ERROR] } };
+  return { ok: true, mediaDays, resultsDays };
 }
 
 export type RetentionDates = {
