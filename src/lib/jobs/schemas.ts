@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { EXTRA_TIME_PERCENTS } from "@/lib/accommodations";
+import { readProctoring as readProctoringSettings, type Proctoring as ProctoringSettings } from "@/lib/proctoring/config";
 
 // Form schemas for the jobs area. Checkboxes arrive as "on" or not at all.
 
@@ -22,22 +23,27 @@ export const assessmentSettingsSchema = z.object({
   monitoring: z.enum(["monitored", "not_monitored"], { error: "Choose whether candidates are monitored." }),
   camera: checkbox,
   screen: checkbox,
+  fullscreen: checkbox,
+  microphone: checkbox,
+  gaze: checkbox,
 });
 
-export const MONITORING_NEEDS_SOURCE = "Pick camera snapshots, screen share or both.";
+export const MONITORING_NEEDS_SOURCE = "Pick camera snapshots, screen share, microphone or more.";
 
-type ProctoringFields = { monitoring: "monitored" | "not_monitored"; camera: boolean; screen: boolean };
+type ProctoringFields = { monitoring: "monitored" | "not_monitored" } & Proctoring;
 
-/** Monitored needs at least one source. */
+/** Monitored needs at least one capture source (camera, screen or microphone); full screen or gaze alone isn't enough. */
 function checkProctoring(v: ProctoringFields, ctx: z.RefinementCtx) {
-  if (v.monitoring === "monitored" && !v.camera && !v.screen) {
+  if (v.monitoring === "monitored" && !v.camera && !v.screen && !v.microphone) {
     ctx.addIssue({ code: "custom", path: ["monitoring"], message: MONITORING_NEEDS_SOURCE });
   }
 }
 
-/** Not monitored turns both sources off, whatever else was sent. */
+/** Not monitored turns everything off, whatever else was sent. Gaze needs the camera. */
 const normalizeProctoring = <T extends ProctoringFields>(v: T): T =>
-  v.monitoring === "monitored" ? v : { ...v, camera: false, screen: false };
+  v.monitoring === "monitored"
+    ? { ...v, gaze: v.gaze && v.camera }
+    : { ...v, camera: false, screen: false, fullscreen: false, microphone: false, gaze: false };
 
 export const createAssessmentSchema = assessmentSettingsSchema
   .extend({ scenarioId: z.uuid({ error: "Pick a scenario." }) })
@@ -77,12 +83,14 @@ export const accommodationsSchema = inviteActionSchema.extend({
     .refine((n) => (EXTRA_TIME_PERCENTS as readonly number[]).includes(n), { error: "Pick +0%, +25%, +50% or +100%." }),
   waiveCamera: checkbox,
   waiveScreen: checkbox,
+  waiveFullscreen: checkbox,
+  waiveMicrophone: checkbox,
 });
 
-export type Proctoring = { camera: boolean; screen: boolean };
+/** assessments.proctoring; the same type as in src/lib/proctoring/config.ts. */
+export type Proctoring = ProctoringSettings;
 
-/** Reads the proctoring jsonb column defensively. */
+/** Reads the proctoring jsonb column defensively (each setting strictly true; gaze only with the camera). */
 export function readProctoring(value: unknown): Proctoring {
-  const v = (value ?? {}) as Record<string, unknown>;
-  return { camera: v.camera === true, screen: v.screen === true };
+  return readProctoringSettings(value);
 }

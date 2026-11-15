@@ -6,6 +6,7 @@ import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { Button, FormMessage } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import type { AssessmentSummary } from "@/lib/jobs/queries";
+import { isMonitored } from "@/lib/proctoring/config";
 import { cloneAssessment, createAssessment, updateAssessment } from "../actions";
 
 /** Lengths offered in the time-limit menu, plus the recommended and current ones. */
@@ -136,10 +137,15 @@ export function ConfigureAssessmentForm({
   const router = useRouter();
   // D5: a new assessment needs an explicit Monitored / Not monitored choice, with nothing preselected.
   const [monitoring, setMonitoring] = useState<Monitoring | null>(
-    editing ? (editing.proctoring.camera || editing.proctoring.screen ? "monitored" : "not_monitored") : null,
+    editing ? (isMonitored(editing.proctoring) ? "monitored" : "not_monitored") : null,
   );
   const [camera, setCamera] = useState(editing ? editing.proctoring.camera : false);
   const [screenShare, setScreenShare] = useState(editing ? editing.proctoring.screen : false);
+  const [fullscreen, setFullscreen] = useState(editing ? editing.proctoring.fullscreen : false);
+  const [microphone, setMicrophone] = useState(editing ? editing.proctoring.microphone : false);
+  const [gazeChoice, setGazeChoice] = useState(editing ? editing.proctoring.gaze : false);
+  // Gaze needs the camera: it reads as off, and isn't sent, while the camera is off.
+  const gaze = camera && gazeChoice;
   const errors = state?.fieldErrors;
   const created = !editing ? createState?.id : undefined;
 
@@ -243,6 +249,33 @@ export function ConfigureAssessmentForm({
                     <div>
                       <div className="small strong">Entire-screen sharing</div>
                       <div className="xs muted">The workspace locks if sharing stops, until it&apos;s restored</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <Toggle name="fullscreen" label="Require full screen" on={fullscreen} onChange={setFullscreen} disabled={locked} />
+                    <div>
+                      <div className="small strong">Require full screen</div>
+                      <div className="xs muted">The task runs full screen; leaving it covers the task while the timer keeps running</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <Toggle name="microphone" label="Microphone (audio clips when speech is heard)" on={microphone} onChange={setMicrophone} disabled={locked} />
+                    <div>
+                      <div className="small strong">Microphone (audio clips when speech is heard)</div>
+                      <div className="xs muted">Short clips are saved only when speech is heard</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <Toggle
+                      name="gaze"
+                      label="Gaze check (on-device: facing the screen, number of faces)"
+                      on={gaze}
+                      onChange={setGazeChoice}
+                      disabled={locked || !camera}
+                    />
+                    <div>
+                      <div className="small strong">Gaze check (on-device: facing the screen, number of faces)</div>
+                      <div className="xs muted">Needs the camera; only the result is sent, never the image</div>
                     </div>
                   </div>
                 </div>

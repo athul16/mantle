@@ -22,7 +22,7 @@ function ev(kind: SignalEvent["kind"], seconds: number, payload: SignalEvent["pa
   return { id: nextId++, at: at(seconds), kind, payload };
 }
 const media = (id: number, source: MediaRef["source"], seconds: number): MediaRef => ({ id, source, at: at(seconds) });
-const both = { camera: true, screen: true };
+const both = { camera: true, screen: true, fullscreen: false, microphone: false, gaze: false};
 
 describe("evaluateRules", () => {
   it("raises nothing for a clean attempt", () => {
@@ -101,7 +101,7 @@ describe("evaluateRules", () => {
   });
 
   it("ignores screen and camera signals when the assessment does not use them", () => {
-    const flags = evaluateRules([ev("screen_share_stopped", 100), ev("camera_stopped", 120)], [], { camera: false, screen: false });
+    const flags = evaluateRules([ev("screen_share_stopped", 100), ev("camera_stopped", 120)], [], { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false});
     expect(flags).toEqual([]);
   });
 
@@ -276,6 +276,6 @@ describe("downtime (camera or screen share down, timer running)", () => {
   });
 
   it("ignores sources the assessment does not use", () => {
-    expect(downtime([down("camera", 0, 120)], { camera: false, screen: true })).toBeUndefined();
+    expect(downtime([down("camera", 0, 120)], { camera: false, screen: true, fullscreen: false, microphone: false, gaze: false})).toBeUndefined();
   });
 });

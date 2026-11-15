@@ -23,6 +23,8 @@ const { reviewFlag } = await import("@/app/app/[orgSlug]/candidates/[inviteId]/f
 const signalsRoute = await import("@/app/api/candidate/proctoring/signals/route");
 const uploadRoute = await import("@/app/api/candidate/proctoring/upload/route");
 const consentRoute = await import("@/app/api/candidate/proctoring/consent/route");
+const mediaRoute = await import("@/app/api/candidate/proctoring/media/route");
+const { MAX_MEDIA_PER_ATTEMPT } = await import("@/lib/proctoring/config");
 
 const data = createTestData("proctoring");
 const db = serviceClient();
@@ -37,6 +39,7 @@ let co: TestCompany;
 let scenarioId = "";
 let proctoredJob = "";
 let plainJob = "";
+let micJob = "";
 const clients: Partial<Record<"admin" | "recruiter" | "viewer", Db>> = {};
 
 /** An invite + attempt with a live candidate session. Returns the session token and ids. */
@@ -64,6 +67,15 @@ beforeAll(async () => {
   proctoredJob = (await data.job({ orgId: co.orgId, assessmentId: proctored.assessmentId })).jobId;
   const plain = await data.assessment({ orgId: co.orgId });
   plainJob = (await data.job({ orgId: co.orgId, assessmentId: plain.assessmentId })).jobId;
+  const mic = await data.assessment({ orgId: co.orgId });
+  must(
+    await db
+      .from("assessments")
+      .update({ proctoring: { camera: true, screen: false, fullscreen: true, microphone: true, gaze: true } })
+      .eq("id", mic.assessmentId)
+      .select("id"),
+  );
+  micJob = (await data.job({ orgId: co.orgId, assessmentId: mic.assessmentId })).jobId;
   for (const role of ["admin", "recruiter", "viewer"] as const) {
     clients[role] = await signedInClient(co.users[role].email, co.users[role].password);
   }
@@ -73,7 +85,7 @@ afterAll(async () => {
   const { data: files } = await db.storage.from(BUCKET).list(co.orgId);
   // Objects live under <org>/<attempt>/<source>/; remove everything the tests wrote.
   for (const attemptDir of files ?? []) {
-    for (const source of ["camera", "screen"]) {
+    for (const source of ["camera", "screen", "audio"]) {
       const prefix = `${co.orgId}/${attemptDir.name}/${source}`;
       const { data: objs } = await db.storage.from(BUCKET).list(prefix);
       if (objs?.length) await db.storage.from(BUCKET).remove(objs.map((o) => `${prefix}/${o.name}`));
@@ -259,6 +271,133 @@ describe("snapshots", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(["ok", "path", "token"]);
     expect(JSON.stringify(body)).not.toContain(process.env.SUPABASE_SECRET_KEY!);
+  });
+});
+
+describe("audio clips and capture reasons", () => {
+  // A few bytes are enough: storage checks the declared type, not the content.
+  const CLIP = Buffer.from("1a45dfa3", "hex");
+
+  it("refuses audio when the assessment does not use the microphone", async () => {
+    const c = await candidate(proctoredJob);
+    expect(await proctoring.createMediaUpload(c.session, { source: "audio", contentType: "audio/webm" })).toEqual({
+      ok: false,
+      error: "not_enabled",
+    });
+  });
+
+  it("refuses audio when the microphone is waived for this invite", async () => {
+    const c = await candidate(micJob);
+    must(
+      await db
+        .from("invite_accommodations")
+        .insert({ invite_id: c.inviteId, org_id: co.orgId, waive_microphone: true })
+        .select("invite_id"),
+    );
+    const session = (await getCandidateSession(c.token))!;
+    expect(await proctoring.getProctoringSettings(session)).toMatchObject({ camera: true, microphone: false, fullscreen: true });
+    expect(await proctoring.createMediaUpload(session, { source: "audio", contentType: "audio/webm" })).toEqual({
+      ok: false,
+      error: "not_enabled",
+    });
+  });
+
+  it("refuses an audio type outside the allowed list", async () => {
+    const c = await candidate(micJob);
+    for (const contentType of [undefined, "audio/wav", "image/jpeg", "audio/webm-evil"]) {
+      expect(await proctoring.createMediaUpload(c.session, { source: "audio", contentType })).toEqual({ ok: false, error: "bad_type" });
+    }
+  });
+
+  it("names the file after the audio type", async () => {
+    const c = await candidate(micJob);
+    const ext = async (contentType: string) => {
+      const up = await proctoring.createMediaUpload(c.session, { source: "audio", contentType });
+      if (!up.ok) throw new Error(up.error);
+      expect(up.path.startsWith(`${co.orgId}/${c.attemptId}/audio/`)).toBe(true);
+      return up.path.split(".").at(-1);
+    };
+    expect(await ext("audio/webm")).toBe("webm");
+    expect(await ext("audio/webm;codecs=opus")).toBe("webm");
+    expect(await ext("audio/ogg")).toBe("ogg");
+    expect(await ext("audio/mp4")).toBe("m4a");
+  });
+
+  it("uploads an audio clip straight to storage and records it with its reason", async () => {
+    const c = await candidate(micJob);
+    const up = await proctoring.createMediaUpload(c.session, { source: "audio", reason: "speech", contentType: "audio/webm" });
+    if (!up.ok) throw new Error(up.error);
+    must(await anonClient().storage.from(BUCKET).uploadToSignedUrl(up.path, up.token, CLIP, { contentType: "audio/webm" }));
+    expect(await proctoring.confirmMedia(c.session, { path: up.path, reason: "speech" })).toMatchObject({ ok: true });
+    const rows = must(await db.from("media").select("source, reason, storage_path").eq("attempt_id", c.attemptId));
+    expect(rows).toEqual([{ source: "audio", reason: "speech", storage_path: up.path }]);
+  });
+
+  it("records a camera snapshot's reason, and an unknown reason as none", async () => {
+    const c = await candidate(micJob);
+    const shots: string[] = [];
+    for (const reason of ["away", "nonsense"]) {
+      const up = await proctoring.createMediaUpload(c.session, { source: "camera", reason });
+      if (!up.ok) throw new Error(up.error);
+      expect(up.path).toMatch(/\/camera\/[^/]+\.jpg$/);
+      must(await anonClient().storage.from(BUCKET).uploadToSignedUrl(up.path, up.token, JPEG, { contentType: "image/jpeg" }));
+      expect(await proctoring.confirmMedia(c.session, { path: up.path, reason })).toMatchObject({ ok: true });
+      shots.push(up.path);
+    }
+    const rows = must(await db.from("media").select("reason, storage_path").eq("attempt_id", c.attemptId).order("id"));
+    expect(rows).toEqual([
+      { reason: "away", storage_path: shots[0] },
+      { reason: null, storage_path: shots[1] },
+    ]);
+  });
+
+  it("refuses an audio path with an image extension, or an image path with an audio one", async () => {
+    const c = await candidate(micJob);
+    const prefix = `${co.orgId}/${c.attemptId}`;
+    expect(await proctoring.confirmMedia(c.session, { path: `${prefix}/audio/1-x.jpg` })).toEqual({ ok: false, error: "bad_path" });
+    expect(await proctoring.confirmMedia(c.session, { path: `${prefix}/camera/1-x.webm` })).toEqual({ ok: false, error: "bad_path" });
+    expect(await proctoring.confirmMedia(c.session, { path: `${prefix}/audio/1-never.m4a` })).toEqual({ ok: false, error: "missing" });
+  });
+
+  it("caps media per attempt across every source", async () => {
+    const c = await candidate(micJob);
+    const rows = Array.from({ length: MAX_MEDIA_PER_ATTEMPT }, (_, i) => ({
+      attempt_id: c.attemptId,
+      org_id: co.orgId,
+      source: i % 2 ? "camera" : "audio",
+      storage_path: `${co.orgId}/${c.attemptId}/camera/fake-${i}.jpg`,
+    }));
+    must(await db.from("media").insert(rows).select("id").limit(1));
+    expect(await proctoring.createMediaUpload(c.session, { source: "audio", contentType: "audio/webm" })).toEqual({
+      ok: false,
+      error: "too_many",
+    });
+    expect(await proctoring.createMediaUpload(c.session, { source: "camera" })).toEqual({ ok: false, error: "too_many" });
+  });
+
+  it("the upload route takes source, reason and content type and checks them", async () => {
+    const c = await candidate(micJob);
+    const post = (body: unknown) => uploadRoute.POST(request("/api/candidate/proctoring/upload", c.token, body));
+    const ok = await post({ source: "audio", reason: "speech", contentType: "audio/ogg" });
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as { path: string };
+    expect(Object.keys(body).sort()).toEqual(["ok", "path", "token"]);
+    expect(body.path).toMatch(/\/audio\/[^/]+\.ogg$/);
+    expect((await post({ source: "video" })).status).toBe(400);
+    expect((await post({ source: "audio", contentType: "audio/wav" })).status).toBe(400);
+    expect((await post({ source: "screen" })).status).toBe(409);
+    expect((await uploadRoute.POST(request("/api/candidate/proctoring/upload", null, { source: "audio" }))).status).toBe(401);
+  });
+
+  it("the media route records the reason sent with the path", async () => {
+    const c = await candidate(micJob);
+    const up = await proctoring.createMediaUpload(c.session, { source: "audio", contentType: "audio/mp4" });
+    if (!up.ok) throw new Error(up.error);
+    must(await anonClient().storage.from(BUCKET).uploadToSignedUrl(up.path, up.token, CLIP, { contentType: "audio/mp4" }));
+    const res = await mediaRoute.POST(request("/api/candidate/proctoring/media", c.token, { path: up.path, reason: "returned" }));
+    expect(res.status).toBe(200);
+    const rows = must(await db.from("media").select("source, reason").eq("attempt_id", c.attemptId));
+    expect(rows).toEqual([{ source: "audio", reason: "returned" }]);
   });
 });
 

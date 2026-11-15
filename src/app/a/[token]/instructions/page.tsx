@@ -24,8 +24,14 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
   const minutes = session.invite.timeLimitMinutes;
   const watched = [proctoring.camera ? "Camera" : null, proctoring.screen ? "screen" : null].filter(Boolean).join(" or ");
 
-  const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
-  const waived = [waiveCamera ? "camera" : null, waiveScreen ? "screen share" : null].filter(Boolean).join(" and ");
+  const { extraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone } = session.invite.accommodations;
+  const waivedList = [
+    waiveCamera ? "camera" : null,
+    waiveScreen ? "screen share" : null,
+    waiveFullscreen ? "full screen" : null,
+    waiveMicrophone ? "microphone" : null,
+  ].filter((w): w is string => w !== null);
+  const waived = waivedList.length > 1 ? `${waivedList.slice(0, -1).join(", ")} and ${waivedList.at(-1)}` : (waivedList[0] ?? "");
 
   const facts: [string, string][] = [
     ["Time", `${minutes} min${extraTimePercent ? ` (includes ${extraTimePercent}% extra time)` : ""}, starts when you press Start`],
@@ -35,7 +41,12 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
     ["Saving", "Automatic. Lost connection? Reopen your link."],
   ];
   if (waived) facts.push(["Excused", `${session.invite.companyName} has excused you from the ${waived} for this assessment.`]);
-  if (monitored) facts.push([watched, `If ${proctoring.camera && proctoring.screen ? "either" : "it"} stops, the workspace is covered until it's back. The clock keeps running.`]);
+  if (proctoring.camera || proctoring.screen) {
+    facts.push([watched, `If ${proctoring.camera && proctoring.screen ? "either" : "it"} stops, the workspace is covered until it's back. The clock keeps running.`]);
+  }
+  if (proctoring.fullscreen) facts.push(["Full screen", "Stay in full screen; leaving covers the task and the timer keeps running"]);
+  if (proctoring.microphone) facts.push(["Microphone", "Your microphone is on; short clips are saved when speech is heard"]);
+  if (proctoring.camera && proctoring.gaze) facts.push(["Gaze", "Face the screen; your device checks where you're looking"]);
   facts.push(["At 0:00", "Whatever is saved is submitted"]);
 
   return (

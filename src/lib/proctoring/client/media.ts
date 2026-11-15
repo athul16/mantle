@@ -70,3 +70,33 @@ export async function openScreen(): Promise<ScreenResult> {
   }
   return { ok: true, stream, surface };
 }
+
+export type MicrophoneResult = { ok: true; stream: MediaStream } | { ok: false; reason: "blocked" | "none" | "failed" };
+
+export const MICROPHONE_MESSAGES: Record<Exclude<MicrophoneResult, { ok: true }>["reason"], string> = {
+  blocked: "Microphone access was blocked. Allow it in your browser's site settings, then try again.",
+  none: "No microphone found. Connect one and try again.",
+  failed: "Couldn't start the microphone. Close other apps that use it, then try again.",
+};
+
+/**
+ * Asks for the microphone. Echo cancellation stays on (so the test page's own
+ * sounds aren't heard as speech); noise suppression and auto gain are off so
+ * quiet or background speech isn't filtered out or levelled into the noise
+ * floor. A browser without getUserMedia counts as "failed".
+ */
+export async function openMicrophone(): Promise<MicrophoneResult> {
+  if (typeof navigator.mediaDevices?.getUserMedia !== "function") return { ok: false, reason: "failed" };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+      video: false,
+    });
+    return { ok: true, stream };
+  } catch (err) {
+    const name = (err as { name?: string })?.name;
+    if (name === "NotAllowedError" || name === "SecurityError") return { ok: false, reason: "blocked" };
+    if (name === "NotFoundError" || name === "OverconstrainedError") return { ok: false, reason: "none" };
+    return { ok: false, reason: "failed" };
+  }
+}

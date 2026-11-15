@@ -18,7 +18,7 @@ const row = (over: Partial<CandidateRow> & Pick<CandidateRow, "inviteId" | "emai
   candidateName: null,
   lastSentAt: null,
   sentCount: 1,
-  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false },
+  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false },
   status: "completed",
   needsReview: false,
   points: null,
@@ -187,5 +187,14 @@ describe("ResultsTable", () => {
     render(<ResultsTable rows={rows} reportBase="/x" ctx={{ ...ctx, canManage: false }} />);
     expect(screen.queryByRole("columnheader", { name: "Actions" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Resend|Revoke/ })).toBeNull();
+  });
+
+  it("offers the full screen and microphone waivers in the drawer when the assessment uses them", async () => {
+    const user = userEvent.setup();
+    render(<ResultsTable rows={rows} reportBase="/x" ctx={{ ...ctx, fullscreen: true, microphone: true }} />);
+    await user.click(screen.getByRole("button", { name: "cat@example.test" }));
+    const drawer = screen.getByRole("dialog", { name: "cat@example.test" });
+    expect(within(drawer).getByRole("checkbox", { name: /full screen/i })).toBeVisible();
+    expect(within(drawer).getByRole("checkbox", { name: /microphone/i })).toBeVisible();
   });
 });

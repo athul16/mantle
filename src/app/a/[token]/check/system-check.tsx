@@ -4,15 +4,20 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Icon } from "@/components/icons";
 import { isMonitored, monitoringNotice, type MonitoringSettings, type Proctoring } from "@/lib/proctoring/config";
-import { CAMERA_MESSAGES, SCREEN_MESSAGES, canShareScreen, openCamera, openScreen } from "@/lib/proctoring/client/media";
-import { holdMedia } from "@/lib/proctoring/client/media-store";
+import { createAudioMonitor } from "@/lib/proctoring/client/audio";
+import { createGazeMonitor } from "@/lib/proctoring/client/gaze";
+import { CAMERA_MESSAGES, MICROPHONE_MESSAGES, SCREEN_MESSAGES, canShareScreen, openCamera, openMicrophone, openScreen } from "@/lib/proctoring/client/media";
 import { CameraPreview } from "@/lib/proctoring/client/proctoring";
+import { holdMedia } from "@/lib/proctoring/client/media-store";
 import { makeSignal, sendSignals } from "@/lib/proctoring/client/signals";
 import { takeSnapshot } from "@/lib/proctoring/client/snapshots";
 
 const MIN_WIDTH = 1024;
 const MIN_HEIGHT = 600;
-const OFF: Proctoring = { camera: false, screen: false };
+/** How long the sound check listens before the candidate may continue anyway. */
+const SOUND_CHECK_MS = 10_000;
+const GAZE_NOTE = "Your device couldn't run the facing-the-screen check; your camera is still on.";
+const OFF: Proctoring = { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false};
 
 interface CheckResult {
   desktop: boolean;
@@ -56,6 +61,8 @@ const noSubscribe = () => () => {};
 
 type Device = { state: "idle" | "pending" | "pass" | "fail"; detail?: string; reason?: string };
 type RowState = "pending" | "pass" | "fail" | "warn" | "todo";
+/** `optional`: shown, but doesn't hold back Continue (e.g. the sound check after its wait). */
+type Row = { label: string; detail: string; state: RowState; optional?: boolean };
 
 const record = (kind: Parameters<typeof makeSignal>[0], payload?: Parameters<typeof makeSignal>[1]) =>
   void sendSignals([makeSignal(kind, payload)]).catch(() => {});
@@ -63,10 +70,12 @@ const record = (kind: Parameters<typeof makeSignal>[0], payload?: Parameters<typ
 /**
  * Setup check (prototype vCheck()): browser, screen size and connection, then,
  * when the assessment uses them, a live camera with a start photo and an
- * entire-screen share. Consent to monitoring is normally given on the verify
+ * entire-screen share, and the microphone with a short sound check. Consent to monitoring is normally given on the verify
  * page; if it wasn't recorded (an older session), the notice and an agree box
- * come first. Nothing is requested from the browser before that. The camera
- * and screen streams are kept for the workspace (client navigation).
+ * come first. Nothing is requested from the browser before that. The camera,
+ * screen and microphone streams are kept for the workspace (client
+ * navigation). With the gaze check on, a trial run warms the model and shows a
+ * note early if the device can't run it; it never blocks.
  */
 export function SystemCheck({
   token,
@@ -89,6 +98,11 @@ export function SystemCheck({
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [photo, setPhoto] = useState<"none" | "taking" | "taken" | "failed">("none");
   const [screen, setScreen] = useState<Device>({ state: "idle" });
+  const [mic, setMic] = useState<Device>({ state: "idle" });
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
+  const [sound, setSound] = useState<"listening" | "heard" | "silent">("listening");
+  const [gazeNote, setGazeNote] = useState(false);
+  const micStarted = useRef(false);
   const [online, setOnline] = useState<"pending" | "ok" | "fail">("pending");
   const started = useRef(false);
 
@@ -126,7 +140,22 @@ export function SystemCheck({
   async function takePhoto() {
     if (!cameraStream) return;
     setPhoto("taking");
-    setPhoto((await takeSnapshot("camera", cameraStream)) ? "taken" : "failed");
+    setPhoto((await takeSnapshot("camera", cameraStream, "start")) ? "taken" : "failed");
+  }
+
+  async function testMicrophone() {
+    setMic({ state: "pending" });
+    const r = await openMicrophone();
+    if (!r.ok) {
+      if (r.reason === "blocked") record("microphone_refused");
+      setMic({ state: "fail", detail: MICROPHONE_MESSAGES[r.reason], reason: r.reason });
+      return;
+    }
+    holdMedia("microphone", r.stream);
+    record("microphone_started");
+    setSound("listening");
+    setMicStream(r.stream);
+    setMic({ state: "pass" });
   }
 
   async function shareScreen() {
@@ -161,8 +190,57 @@ export function SystemCheck({
     void Promise.resolve().then(testCamera);
   }, [proctoring.camera, agreed]);
 
+  // The microphone starts on its own once the candidate has agreed, like the camera.
+  useEffect(() => {
+    if (!proctoring.microphone || !agreed || micStarted.current) return;
+    micStarted.current = true;
+    void Promise.resolve().then(testMicrophone);
+  }, [proctoring.microphone, agreed]);
+
+  // Sound check: a throwaway speech monitor (nothing uploaded); hearing speech
+  // passes it, and after SOUND_CHECK_MS the candidate may continue anyway.
+  useEffect(() => {
+    if (!micStream) return;
+    let done = false;
+    const monitor = createAudioMonitor({
+      stream: micStream,
+      upload: async () => true,
+      onSignal: (kind) => {
+        if (kind !== "speech_started" || done) return;
+        done = true;
+        clearTimeout(timer);
+        setSound("heard");
+        void monitor.stop();
+      },
+    });
+    const timer = setTimeout(() => {
+      if (!done) setSound("silent");
+    }, SOUND_CHECK_MS);
+    monitor.start();
+    return () => {
+      done = true;
+      clearTimeout(timer);
+      void monitor.stop();
+    };
+  }, [micStream]);
+
+  // Gaze warm-up: one trial start/stop on the camera loads the model early.
+  useEffect(() => {
+    if (!proctoring.gaze || !cameraStream) return;
+    let cancelled = false;
+    const monitor = createGazeMonitor({ stream: cameraStream, onSignal: () => {} });
+    void monitor.start().then((result) => {
+      monitor.stop();
+      if (!cancelled && result !== "ok") setGazeNote(true);
+    });
+    return () => {
+      cancelled = true;
+      monitor.stop();
+    };
+  }, [proctoring.gaze, cameraStream]);
+
   const unsupported = proctoring.screen && !screenSupported;
-  const rows: { label: string; detail: string; state: RowState }[] = [
+  const rows: Row[] = [
     {
       label: "Browser",
       state: result === null ? "pending" : result.desktop ? "pass" : "fail",
@@ -186,6 +264,26 @@ export function SystemCheck({
       detail: !agreed ? "Waiting for your agreement" : camera.state === "pass" ? "Allowed" : camera.state === "fail" ? camera.detail! : "Checking…",
     });
   }
+  if (proctoring.microphone) {
+    rows.push({
+      label: "Microphone",
+      state: !agreed ? "todo" : mic.state === "idle" ? "pending" : mic.state,
+      detail: !agreed ? "Waiting for your agreement" : mic.state === "pass" ? "Allowed" : mic.state === "fail" ? mic.detail! : "Checking…",
+    });
+    if (mic.state === "pass") {
+      rows.push({
+        label: "Sound check",
+        state: sound === "heard" ? "pass" : sound === "silent" ? "warn" : "todo",
+        optional: sound === "silent",
+        detail:
+          sound === "heard"
+            ? "We heard you"
+            : sound === "silent"
+              ? "We didn't hear anything. Check your microphone isn't muted; you can still continue."
+              : "Say a few words out loud",
+      });
+    }
+  }
   if (proctoring.screen) {
     rows.push({
       label: "Screen sharing",
@@ -208,7 +306,7 @@ export function SystemCheck({
   }
 
   const running = rows.some((r) => r.state === "pending");
-  const left = rows.filter((r) => r.state !== "pass").length;
+  const left = rows.filter((r) => r.state !== "pass" && !r.optional).length;
   const passed = left === 0 && (!monitored || agreed);
   const sub = result === null || running ? "Running checks…" : left === 0 ? "All set. You can continue." : left === 1 ? "Almost there — one item left." : `${left} items left.`;
 
@@ -242,7 +340,7 @@ export function SystemCheck({
                 if (e.target.checked) void agree();
               }}
             />
-            <span className="small strong">I agree to camera and screen monitoring for this test, as described above.</span>
+            <span className="small strong">{consentLabel(proctoring)}</span>
           </label>
           {consentError ? <p className="small badc">{consentError}</p> : null}
         </section>
@@ -275,6 +373,30 @@ export function SystemCheck({
         </ul>
       </div>
 
+      {proctoring.microphone && mic.state === "fail" ? (
+        <section className="card" style={{ padding: "18px 20px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }} aria-label="Microphone">
+          <div style={{ flex: "1 1 280px" }}>
+            <h2 style={{ fontSize: 16 }}>
+              <Icon name="mic" /> Turn on your microphone
+            </h2>
+            <p className="small badc" style={{ marginTop: 4 }} role="alert">
+              {mic.detail}
+            </p>
+          </div>
+          <button type="button" className="btn btn-dark" onClick={() => void testMicrophone()}>
+            <Icon name="refresh" />
+            Turn on microphone
+          </button>
+        </section>
+      ) : null}
+
+      {gazeNote ? (
+        <p role="note" className="row g8 small ink2" style={{ alignItems: "flex-start" }}>
+          <Icon name="info" className="i-sm" />
+          <span>{GAZE_NOTE}</span>
+        </p>
+      ) : null}
+
       {proctoring.screen && screen.state !== "pass" ? (
         <ScreenShare
           state={screen}
@@ -306,6 +428,13 @@ export function SystemCheck({
       </div>
     </>
   );
+}
+
+/** What the candidate agrees to, named from what this assessment actually captures. */
+export function consentLabel(p: Proctoring): string {
+  const parts = [p.camera ? "camera" : null, p.screen ? "screen" : null, p.microphone ? "microphone" : null].filter(Boolean) as string[];
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : (parts[0] ?? "");
+  return `I agree to ${list ? `${list} monitoring` : "monitoring"} for this test, as described above.`;
 }
 
 function StatusIcon({ state }: { state: RowState }) {

@@ -100,7 +100,7 @@ beforeAll(async () => {
   if (lib.error) throw lib.error;
   const asm = await service
     .from("assessments")
-    .insert({ org_id: orgA, scenario_id: lib.data.id, title: "Monitored", time_limit_minutes: 30, proctoring: { camera: true, screen: true } })
+    .insert({ org_id: orgA, scenario_id: lib.data.id, title: "Monitored", time_limit_minutes: 30, proctoring: { camera: true, screen: true, fullscreen: false, microphone: false, gaze: false} })
     .select("id")
     .single();
   if (asm.error) throw asm.error;
@@ -115,29 +115,42 @@ afterAll(async () => {
 });
 
 describe("invite accommodations", () => {
+  it("full screen and microphone waivers are saved and listed", async () => {
+    const inviteId = await makeInvite(`accom-${run}-fm@example.test`);
+    acting = recruiter;
+    const res = await jobsActions.setAccommodationsAction(
+      undefined,
+      form({ orgId: orgA, inviteId, extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: true, waiveMicrophone: true }),
+    );
+    expect(res).toMatchObject({ message: expect.stringContaining("Saved accommodations") });
+    const listed = (await listInvites(orgA, jobId)).find((i) => i.id === inviteId);
+    expect(listed?.accommodations).toMatchObject({ waiveFullscreen: true, waiveMicrophone: true, waiveCamera: false });
+    expect(await getInviteAccommodations(orgA, inviteId)).toMatchObject({ waiveFullscreen: true, waiveMicrophone: true });
+  });
+
   it("a recruiter sets extra time and a camera waiver; it is audited and listed", async () => {
     const inviteId = await makeInvite(`accom-${run}-c1@example.test`);
     acting = recruiter;
     const res = await jobsActions.setAccommodationsAction(
       undefined,
-      form({ orgId: orgA, inviteId, extraTimePercent: 50, waiveCamera: true, waiveScreen: false }),
+      form({ orgId: orgA, inviteId, extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false }),
     );
     expect(res).toMatchObject({ message: expect.stringContaining("Saved accommodations") });
 
     const row = await service.from("invite_accommodations").select("*").eq("invite_id", inviteId).single();
     expect(row.data).toMatchObject({ org_id: orgA, extra_time_percent: 50, waive_camera: true, waive_screen: false, set_by: recruiter.id });
 
-    const audit = await service.from("audit_log").select("actor_id, target").eq("org_id", orgA).eq("action", "set_accommodations");
+    const audit = await service.from("audit_log").select("actor_id, target").eq("org_id", orgA).eq("action", "set_accommodations").like("target", `invite:${inviteId} %`);
     expect(audit.data).toEqual([
       { actor_id: recruiter.id, target: `invite:${inviteId} extra_time=+50% waive_camera=true waive_screen=false` },
     ]);
 
     const listed = (await listInvites(orgA, jobId)).find((i) => i.id === inviteId);
-    expect(listed).toMatchObject({ started: false, accommodations: { extraTimePercent: 50, waiveCamera: true, waiveScreen: false } });
+    expect(listed).toMatchObject({ started: false, accommodations: { extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false } });
 
     // Viewers read it on the report; they can't change it.
     acting = viewer;
-    expect(await getInviteAccommodations(orgA, inviteId)).toEqual({ extraTimePercent: 50, waiveCamera: true, waiveScreen: false });
+    expect(await getInviteAccommodations(orgA, inviteId)).toEqual({ extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false });
     const denied = await jobsActions.setAccommodationsAction(undefined, form({ orgId: orgA, inviteId, extraTimePercent: 0 }));
     expect(denied?.error).toMatch(/permission/);
     const direct = await viewer.client.rpc("set_invite_accommodations", {

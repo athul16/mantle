@@ -90,11 +90,13 @@ export async function startAttempt(session: CandidateSession, now = new Date()):
   if (error) throw new Error(`starting attempt failed: ${error.message}`);
   // Zero rows: a parallel request started it first, which is fine.
   if (data.length) {
-    const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
+    const { extraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone } = session.invite.accommodations;
     await addEvent(attempt, "started_attempt", {
       deadlineAt: deadline.toISOString(),
       timeLimitMinutes: session.invite.timeLimitMinutes,
-      ...(extraTimePercent || waiveCamera || waiveScreen ? { accommodations: { extraTimePercent, waiveCamera, waiveScreen } } : {}),
+      ...(extraTimePercent || waiveCamera || waiveScreen || waiveFullscreen || waiveMicrophone
+        ? { accommodations: { extraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone } }
+        : {}),
     });
   }
   return { ok: true };

@@ -28,7 +28,12 @@ describe("readAccommodations", () => {
       extraTimePercent: 50,
       waiveCamera: true,
       waiveScreen: false,
+      waiveFullscreen: false,
+      waiveMicrophone: false,
     });
+    expect(
+      readAccommodations({ extra_time_percent: 0, waive_camera: false, waive_screen: false, waive_fullscreen: true, waive_microphone: true }),
+    ).toEqual({ extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: true, waiveMicrophone: true });
   });
 
   it("ignores a percent outside the allowed set", () => {
@@ -38,9 +43,21 @@ describe("readAccommodations", () => {
 
 describe("waivers", () => {
   it("turn off only the waived source, and never turn one on", () => {
-    const a = { extraTimePercent: 0, waiveCamera: true, waiveScreen: false } as const;
+    const a = { ...NO_ACCOMMODATIONS, waiveCamera: true };
     expect(applyWaivers({ camera: true, screen: true, retentionDays: 90 }, a)).toEqual({ camera: false, screen: true, retentionDays: 90 });
     expect(applyWaivers({ camera: false, screen: false }, NO_ACCOMMODATIONS)).toEqual({ camera: false, screen: false });
+  });
+
+  const ALL = { camera: true, screen: true, fullscreen: true, microphone: true, gaze: true };
+
+  it("turn off full screen and the microphone when waived", () => {
+    expect(applyWaivers(ALL, { ...NO_ACCOMMODATIONS, waiveFullscreen: true })).toEqual({ ...ALL, fullscreen: false });
+    expect(applyWaivers(ALL, { ...NO_ACCOMMODATIONS, waiveMicrophone: true })).toEqual({ ...ALL, microphone: false });
+    expect(applyWaivers({ ...ALL, microphone: false }, NO_ACCOMMODATIONS)).toEqual({ ...ALL, microphone: false });
+  });
+
+  it("waive gaze together with the camera", () => {
+    expect(applyWaivers(ALL, { ...NO_ACCOMMODATIONS, waiveCamera: true })).toEqual({ ...ALL, camera: false, gaze: false });
   });
 });
 
@@ -48,10 +65,16 @@ describe("describeAccommodations", () => {
   it("lists what was granted", () => {
     expect(describeAccommodations(NO_ACCOMMODATIONS)).toEqual([]);
     expect(hasAccommodations(NO_ACCOMMODATIONS)).toBe(false);
-    const a = { extraTimePercent: 50, waiveCamera: true, waiveScreen: true } as const;
+    const a = { ...NO_ACCOMMODATIONS, extraTimePercent: 50, waiveCamera: true, waiveScreen: true } as const;
     expect(hasAccommodations(a)).toBe(true);
     expect(describeAccommodations(a, 30)).toEqual(["+50% time (30 → 45 min)", "camera waived", "screen share waived"]);
     expect(describeAccommodations(a)).toEqual(["+50% time", "camera waived", "screen share waived"]);
+    expect(hasAccommodations({ ...NO_ACCOMMODATIONS, waiveFullscreen: true })).toBe(true);
+    expect(hasAccommodations({ ...NO_ACCOMMODATIONS, waiveMicrophone: true })).toBe(true);
+    expect(describeAccommodations({ ...NO_ACCOMMODATIONS, waiveFullscreen: true, waiveMicrophone: true })).toEqual([
+      "full screen waived",
+      "microphone waived",
+    ]);
   });
 });
 
@@ -73,9 +96,13 @@ describe("contact email setting", () => {
 
 describe("monitoring notice contact line", () => {
   it("names the contact email when the company set one", () => {
-    const text = monitoringNotice({ camera: true, screen: true, contactEmail: "careers@acme.test" }, "Acme").join("\n");
+    const text = monitoringNotice({ camera: true, screen: true, fullscreen: false, microphone: false, gaze: false, contactEmail: "careers@acme.test" }, "Acme").join("\n");
     expect(text).toContain("Contact Acme at careers@acme.test before you start");
     expect(text).toMatch(/extra time/);
+  });
+
+  it("names the camera, microphone, full screen and screen share", () => {
+    expect(accommodationLine("Acme", null)).toContain("can't use a camera, microphone, full screen or share your screen");
   });
 
   it("falls back to the hiring team without one", () => {

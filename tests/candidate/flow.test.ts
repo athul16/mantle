@@ -429,7 +429,7 @@ describe("accommodations (D9)", () => {
     ).id;
   });
 
-  async function candidateWith(accommodations: { extra_time_percent?: number; waive_camera?: boolean; waive_screen?: boolean }) {
+  async function candidateWith(accommodations: { extra_time_percent?: number; waive_camera?: boolean; waive_screen?: boolean; waive_fullscreen?: boolean; waive_microphone?: boolean }) {
     const invite = await makeInvite(monitoredJob);
     must(await service.from("invite_accommodations").insert({ invite_id: invite.inviteId, org_id: orgId, ...accommodations }));
     expect(await requestCode(invite.token)).toMatchObject({ ok: true });
@@ -463,7 +463,7 @@ describe("accommodations (D9)", () => {
     const started = must(
       await service.from("action_events").select("payload").eq("attempt_id", c.attemptId).eq("kind", "started_attempt").single(),
     );
-    expect(started.payload).toMatchObject({ timeLimitMinutes: 30, accommodations: { extraTimePercent: 50, waiveCamera: false, waiveScreen: false } });
+    expect(started.payload).toMatchObject({ timeLimitMinutes: 30, accommodations: { extraTimePercent: 50, waiveCamera: false, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false } });
   });
 
   it("without accommodations the deadline is the assessment's limit", async () => {
@@ -490,6 +490,17 @@ describe("accommodations (D9)", () => {
     const job = must(await service.from("jobs").select("assessments(proctoring, locked_at)").eq("id", monitoredJob).single());
     expect(job.assessments).toMatchObject({ proctoring: { camera: true, screen: true } });
     expect(job.assessments?.locked_at).not.toBeNull();
+  });
+
+  it("full screen and microphone waivers load for the candidate and are recorded when the attempt starts", async () => {
+    const c = await candidateWith({ waive_fullscreen: true, waive_microphone: true });
+    const session = await fresh(c.sessionToken);
+    expect(session.invite.accommodations).toMatchObject({ waiveFullscreen: true, waiveMicrophone: true, waiveCamera: false });
+    expect(await startAttempt(session)).toMatchObject({ ok: true });
+    const started = must(
+      await service.from("action_events").select("payload").eq("attempt_id", c.attemptId).eq("kind", "started_attempt").single(),
+    );
+    expect(started.payload).toMatchObject({ accommodations: { waiveFullscreen: true, waiveMicrophone: true } });
   });
 
   it("the monitoring notice names the company contact", async () => {

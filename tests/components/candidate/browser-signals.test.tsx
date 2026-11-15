@@ -84,16 +84,29 @@ describe("useBrowserSignals", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("secret answer");
   });
 
-  it("records leaving full screen, but not entering it", async () => {
+  it("records cuts by length only", async () => {
+    render(<Harness />);
+    vi.spyOn(window, "getSelection").mockReturnValue({ toString: () => "cut text" } as Selection);
+    act(() => {
+      document.body.dispatchEvent(new Event("cut", { bubbles: true }));
+    });
+    await flush();
+    expect(sent()).toEqual([{ kind: "cut", at: NOW, chars: 8 }]);
+  });
+
+  it("records entering and leaving full screen", async () => {
     render(<Harness />);
     act(() => {
       Object.defineProperty(document, "fullscreenElement", { value: document.documentElement, configurable: true });
       document.dispatchEvent(new Event("fullscreenchange"));
       Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
       document.dispatchEvent(new Event("fullscreenchange"));
+      Object.defineProperty(document, "fullscreenElement", { value: document.documentElement, configurable: true });
+      document.dispatchEvent(new Event("fullscreenchange"));
     });
     await flush();
-    expect(sent()).toEqual([{ kind: "fullscreen_exited", at: NOW }]);
+    expect(sent().map((s) => s.kind)).toEqual(["fullscreen_entered", "fullscreen_exited", "fullscreen_entered"]);
+    Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
   });
 
   it("batches signals and sends nothing when there is nothing to send", async () => {

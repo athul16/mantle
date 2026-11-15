@@ -187,7 +187,7 @@ export function buildTimeline(
     let text: string;
     switch (e.kind) {
       case "started_attempt": {
-        const a = (e.payload as { accommodations?: { extraTimePercent?: unknown; waiveCamera?: unknown; waiveScreen?: unknown } } | null)
+        const a = (e.payload as { accommodations?: { extraTimePercent?: unknown; waiveCamera?: unknown; waiveScreen?: unknown; waiveFullscreen?: unknown; waiveMicrophone?: unknown } } | null)
           ?.accommodations;
         const applied = a
           ? describeAccommodations(
@@ -195,6 +195,8 @@ export function buildTimeline(
                 extra_time_percent: typeof a.extraTimePercent === "number" ? a.extraTimePercent : 0,
                 waive_camera: a.waiveCamera === true,
                 waive_screen: a.waiveScreen === true,
+                waive_fullscreen: a.waiveFullscreen === true,
+                waive_microphone: a.waiveMicrophone === true,
               }),
             )
           : [];

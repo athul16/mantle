@@ -92,9 +92,16 @@ export function VerifyForm({
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="\d{6}"
-                maxLength={6}
+                maxLength={32}
                 placeholder="······"
                 ref={syncCode}
+                onPaste={(e) => {
+                  // The email shows the code as "123 456"; take the digits from whatever was copied.
+                  e.preventDefault();
+                  const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                  e.currentTarget.value = digits;
+                  setCode(digits);
+                }}
                 onChange={(e) => {
                   const digits = e.currentTarget.value.replace(/\D/g, "").slice(0, 6);
                   if (e.currentTarget.value !== digits) e.currentTarget.value = digits;
