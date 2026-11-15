@@ -1,6 +1,6 @@
 import { requireOrgMembership, requireUser, type Role } from "@/lib/auth";
+import { getProfiles, isPendingInvite } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { ROLES_FOR_UI } from "./roles";
 import { InviteForm, MemberControls } from "./team-forms";
 
@@ -18,21 +18,18 @@ async function loadMembers(orgId: string): Promise<Member[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
 
-  // Emails live in auth.users, which only the service role can read. We only
-  // look up users RLS already showed us, i.e. members of the caller's org.
-  const service = createServiceClient();
-  return Promise.all(
-    data.map(async (m) => {
-      const { data: u } = await service.auth.admin.getUserById(m.user_id);
-      return {
-        userId: m.user_id,
-        role: m.role as Role,
-        email: u.user?.email ?? "(unknown)",
-        joinedAt: m.created_at,
-        pending: Boolean(u.user?.invited_at && !u.user?.last_sign_in_at),
-      };
-    }),
-  );
+  // Emails and invite state come from profiles, also through RLS.
+  const profiles = await getProfiles(supabase, data.map((m) => m.user_id));
+  return data.map((m) => {
+    const profile = profiles.get(m.user_id);
+    return {
+      userId: m.user_id,
+      role: m.role as Role,
+      email: profile?.email ?? "(unknown)",
+      joinedAt: m.created_at,
+      pending: isPendingInvite(profile),
+    };
+  });
 }
 
 export default async function TeamPage({ params }: PageProps<"/app/[orgSlug]/team">) {

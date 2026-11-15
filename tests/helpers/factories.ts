@@ -19,7 +19,7 @@ import { must, serviceClient, signedInClient, type Db } from "./supabase";
 import { enrollTotp, rememberTotpSecret } from "./totp";
 
 export type Role = "admin" | "recruiter" | "viewer";
-/** `totpSecret` is set when the user has a verified authenticator factor (company admins, by default). */
+/** `totpSecret` is set when the user has a verified authenticator factor (company admins and recruiters, by default). */
 export type TestUser = { id: string; email: string; password: string; totpSecret?: string };
 export type TestCompany = { orgId: string; name: string; slug: string; users: Record<Role, TestUser> };
 
@@ -54,10 +54,15 @@ export function createTestData(prefix = "t") {
 
   /**
    * A company created by its admin through `create_organization` (so the slug is generated), plus a recruiter and a viewer.
-   * Admins must use two-factor authentication, so the admin gets a verified authenticator factor
-   * (`users.admin.totpSecret`) unless `adminMfa: false`.
+   * Admins and recruiters must use two-factor authentication, so they get a verified authenticator
+   * factor (`users.<role>.totpSecret`) unless `mfa: false`. Viewers only need one when the company
+   * turns on `viewers_see_media`; pass `viewerMfa: true` to give the viewer one too.
    */
-  async function company({ name, adminMfa = true }: { name?: string; adminMfa?: boolean } = {}): Promise<TestCompany> {
+  async function company({
+    name,
+    mfa = true,
+    viewerMfa = false,
+  }: { name?: string; mfa?: boolean; viewerMfa?: boolean } = {}): Promise<TestCompany> {
     const label = `c${++n}`;
     const orgName = name ?? `Test ${prefix} ${run} ${label}`;
     const admin = await user(`${label}-admin`);
@@ -66,11 +71,13 @@ export function createTestData(prefix = "t") {
     const adminClient = await signedInClient(admin.email, admin.password);
     const orgId = must(await adminClient.rpc("create_organization", { org_name: orgName })) as string;
     orgIds.push(orgId);
-    if (adminMfa) {
-      admin.totpSecret = (await enrollTotp(adminClient)).secret;
-      rememberTotpSecret(admin.email, admin.totpSecret);
-    }
+    if (mfa) await enrol(admin, adminClient);
     await adminClient.auth.signOut();
+    for (const member of [...(mfa ? [recruiter] : []), ...(viewerMfa ? [viewer] : [])]) {
+      const client = await signedInClient(member.email, member.password);
+      await enrol(member, client);
+      await client.auth.signOut();
+    }
     must(
       await db().from("memberships").insert([
         { org_id: orgId, user_id: recruiter.id, role: "recruiter" },
@@ -79,6 +86,11 @@ export function createTestData(prefix = "t") {
     );
     const { slug } = must(await db().from("organizations").select("slug").eq("id", orgId).single());
     return { orgId, name: orgName, slug, users: { admin, recruiter, viewer } };
+  }
+
+  async function enrol(member: TestUser, client: Db) {
+    member.totpSecret = (await enrollTotp(client)).secret;
+    rememberTotpSecret(member.email, member.totpSecret);
   }
 
   /** Id of a published platform-library scenario (org_id null). Run publishDemoScenarios() first. */

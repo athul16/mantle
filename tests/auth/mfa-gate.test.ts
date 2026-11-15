@@ -1,10 +1,11 @@
 /**
- * The admin two-factor rule (docs/02-security-and-integrity.md): a company
- * admin must be at aal2. No factor → enrol; a factor but aal1 → verify.
- * Recruiters and viewers are never forced. Pure logic, no database.
+ * The two-factor rule (docs/02-security-and-integrity.md): company admins and
+ * recruiters must be at aal2, and viewers too when the company lets viewers
+ * see media. No factor → enrol; a factor but aal1 → verify. Pure logic, no
+ * database.
  */
 import { describe, expect, it } from "vitest";
-import { mfaGate, mfaRedirectPath, safeNext } from "@/app/app/account/mfa-gate";
+import { mfaGate, mfaRedirectPath, mfaRequired, safeNext, viewersSeeMedia } from "@/app/app/account/mfa-gate";
 
 const noFactor = { currentLevel: "aal1", nextLevel: "aal1" } as const;
 const factorAtAal1 = { currentLevel: "aal1", nextLevel: "aal2" } as const;
@@ -28,12 +29,46 @@ describe("mfaGate", () => {
     expect(mfaGate("admin", { currentLevel: null, nextLevel: "aal2" })).toBe("verify");
   });
 
-  it.each(["recruiter", "viewer"] as const)("never forces a %s", (role) => {
-    for (const aal of [noFactor, factorAtAal1, atAal2]) expect(mfaGate(role, aal)).toBe("ok");
+  it("forces a recruiter exactly like an admin", () => {
+    expect(mfaGate("recruiter", noFactor)).toBe("enroll");
+    expect(mfaGate("recruiter", factorAtAal1)).toBe("verify");
+    expect(mfaGate("recruiter", atAal2)).toBe("ok");
+  });
+
+  it("does not force a viewer while the company keeps media from viewers", () => {
+    for (const aal of [noFactor, factorAtAal1, atAal2]) expect(mfaGate("viewer", aal)).toBe("ok");
+    expect(mfaGate("viewer", noFactor, { viewersSeeMedia: false })).toBe("ok");
+  });
+
+  it("forces a viewer when the company lets viewers see media", () => {
+    const opts = { viewersSeeMedia: true };
+    expect(mfaGate("viewer", noFactor, opts)).toBe("enroll");
+    expect(mfaGate("viewer", factorAtAal1, opts)).toBe("verify");
+    expect(mfaGate("viewer", atAal2, opts)).toBe("ok");
   });
 
   it("has nothing to say about someone who isn't a member", () => {
     expect(mfaGate(null, noFactor)).toBe("ok");
+  });
+});
+
+describe("mfaRequired", () => {
+  it("covers everyone who can see snapshots or act on candidates", () => {
+    expect(mfaRequired("admin")).toBe(true);
+    expect(mfaRequired("recruiter")).toBe(true);
+    expect(mfaRequired("viewer")).toBe(false);
+    expect(mfaRequired("viewer", true)).toBe(true);
+    expect(mfaRequired(null, true)).toBe(false);
+    expect(mfaRequired("owner", true)).toBe(false);
+  });
+});
+
+describe("viewersSeeMedia", () => {
+  it("is on only when the setting is exactly true", () => {
+    expect(viewersSeeMedia({ viewers_see_media: true })).toBe(true);
+    for (const settings of [{}, { viewers_see_media: false }, { viewers_see_media: "true" }, null, undefined, "x", []]) {
+      expect(viewersSeeMedia(settings)).toBe(false);
+    }
   });
 });
 

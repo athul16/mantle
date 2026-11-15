@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getAssuranceLevels, listMemberships, requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SECURITY_PATH, VERIFY_PATH, safeNext } from "../mfa-gate";
+import { SECURITY_PATH, VERIFY_PATH, mfaRequired, safeNext } from "../mfa-gate";
 import { EnrollPanel } from "./enroll-panel";
 import { RemoveFactorButton } from "./remove-factor-button";
 
@@ -37,13 +37,13 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
   const supabase = await createClient();
   const [{ data: factorData }, memberships] = await Promise.all([supabase.auth.mfa.listFactors(), listMemberships()]);
   const factors = (factorData?.totp ?? []).filter((f) => f.status === "verified");
-  const isAdmin = memberships.some((m) => m.role === "admin");
+  const required = memberships.some((m) => mfaRequired(m.role, m.viewersSeeMedia));
 
   return (
     <div className="space-y-8">
       {next && factors.length === 0 ? (
         <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Company admins must use two-factor authentication. Set up an authenticator app to continue.
+          Your role in this company requires two-factor authentication. Set up an authenticator app to continue.
         </p>
       ) : null}
       {params.error === "remove" ? (
@@ -56,7 +56,9 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
         <p>
           When you sign in, you enter your password and then a 6-digit code from an authenticator app on your phone
           (for example 1Password, Google Authenticator or Microsoft Authenticator).
-          {isAdmin ? " Admins must have it turned on to use their company." : " It's optional for recruiters and viewers, and recommended."}
+          {required
+            ? " Your role requires it: admins and recruiters must have it turned on, and viewers too when their company shows them candidate snapshots."
+            : " It's optional for you, and recommended."}
         </p>
         <p className={muted}>
           Keep your authenticator app safe: lock your phone, turn on the app&apos;s own backup, and never share a code or the
@@ -75,7 +77,7 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
                   <p className="font-medium">{f.friendly_name || "Authenticator app"}</p>
                   <p className={muted}>Added {new Date(f.created_at).toISOString().slice(0, 10)}</p>
                 </div>
-                <RemoveFactorButton factorId={f.id} name={f.friendly_name || "this authenticator app"} last={factors.length === 1} isAdmin={isAdmin} />
+                <RemoveFactorButton factorId={f.id} name={f.friendly_name || "this authenticator app"} last={factors.length === 1} required={required} />
               </li>
             ))}
           </ul>
