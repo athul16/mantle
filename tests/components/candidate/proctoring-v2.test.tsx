@@ -188,8 +188,8 @@ describe("Microphone", () => {
   });
 
   it("reuses the microphone the system check opened and starts listening on it", async () => {
-    const { holdMicrophone } = await import("@/lib/proctoring/client/proctoring");
-    holdMicrophone(audioStream(mic));
+    const { holdMedia } = await import("@/lib/proctoring/client/media-store");
+    holdMedia("microphone", audioStream(mic));
     render(
       <Proctoring settings={{ ...OFF, microphone: true }}>
         <Work />

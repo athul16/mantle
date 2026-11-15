@@ -50,6 +50,12 @@ describe("SystemCheck without recorded consent", () => {
     expect(media.getUserMedia).not.toHaveBeenCalled();
   });
 
+  it("names the microphone in the agree label when it is on", async () => {
+    const SystemCheck = await load();
+    render(<SystemCheck token="t" proctoring={{ ...both, microphone: true }} />);
+    expect(screen.getByRole("checkbox", { name: /I agree to camera, screen and microphone monitoring/ })).toBeVisible();
+  });
+
   it("records consent, then starts the camera", async () => {
     media.getUserMedia.mockResolvedValue(fakeStream(fakeTrack()));
     const SystemCheck = await load();
