@@ -23,13 +23,10 @@ test("company pages", async ({ page, data }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page).toHaveScreenshot("login.png");
 
+  // The company opens on its Jobs list (there is no dashboard).
   await signInViaUi(page, co.users.recruiter);
-  await expect(page.getByRole("heading", { level: 1, name: "Northwind Audit" })).toBeVisible();
-  await expect(page).toHaveScreenshot("dashboard.png", { mask: masks(page, co.users.recruiter.email) });
-
-  await page.getByRole("navigation").getByRole("link", { name: "Jobs" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Jobs" })).toBeVisible();
-  await expect(page).toHaveScreenshot("jobs.png", { mask: [...masks(page, co.users.recruiter.email), page.getByLabel("Invite deadline")] });
+  await expect(page).toHaveScreenshot("jobs.png", { mask: [...masks(page, co.users.recruiter.email), page.locator("time")] });
 
   await page.getByRole("link", { name: "Audit intern" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Audit intern" })).toBeVisible();
@@ -50,16 +47,18 @@ test("candidate pages", async ({ page, data, candidate }) => {
   await expect(page).toHaveScreenshot("verify.png", { mask: masks(page, "We sent a 6-digit code to") });
 
   await candidate.submitCode(code);
-  await page.getByRole("link", { name: "Continue to instructions" }).click();
-  await page.getByRole("button", { name: "Start the 15-minute timer" }).click();
-  await expect(page.getByText("Open a message in the inbox to start.")).toBeVisible();
-  await expect(page).toHaveScreenshot("workspace.png", { mask: [page.getByRole("timer")] });
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Start the 15-minute simulation" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Expected cash in the box" })).toBeVisible();
+  // The timer and the email's arrival time (a wall-clock time) change between runs.
+  await expect(page).toHaveScreenshot("workspace.png", { mask: [page.getByRole("timer"), page.locator("time")] });
 
-  await page.getByRole("link", { name: "Review and submit" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Review and submit" })).toBeVisible();
-  await expect(page).toHaveScreenshot("review.png");
+  await page.getByRole("link", { name: "Submit", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Review before you submit" })).toBeVisible();
+  await expect(page).toHaveScreenshot("review.png", { mask: [page.getByRole("timer")] });
 
-  await page.getByRole("button", { name: "Submit my answers" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Thanks, you're done" })).toBeVisible();
+  await page.getByRole("checkbox", { name: "I understand I can't make changes after submitting." }).check();
+  await page.getByRole("button", { name: "Submit final answers" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /^Submitted\. Thanks/ })).toBeVisible();
   await expect(page).toHaveScreenshot("done.png");
 });

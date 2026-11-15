@@ -1,7 +1,8 @@
 /**
- * Candidate workspace: inbox, opening messages, step switching, the display
- * countdown, polling for scheduled messages and autosave. fetch, the router
- * and timers are mocked; the server stays the source of truth.
+ * Candidate workspace (prototype "workspace B"): task navigation, the brief
+ * column, the inbox drawer, the display countdown, polling for scheduled
+ * messages (and the new-mail toast) and autosave. fetch, the router and timers
+ * are mocked; the server stays the source of truth.
  */
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -71,32 +72,58 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const setup = (initial = view()) => {
+const setup = (initial = view(), props: { openedIds?: string[]; initialTaskId?: string } = {}) => {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  render(<Workspace token="tok" initial={initial} />);
+  render(<Workspace token="tok" initial={initial} companyName="Calder & Finch" {...props} />);
   return user;
 };
 const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 const timer = () => screen.getByRole("timer");
-const inbox = () => screen.getByRole("list");
+const tasks = () => screen.getByRole("navigation", { name: "Tasks" });
+const task = (label: string) => within(tasks()).getByRole("button", { name: new RegExp(label) });
+const inboxButton = () => within(screen.getByRole("banner")).getByRole("button", { name: /^Inbox/ });
+const inbox = () => screen.getByRole("list", { name: "Messages" });
 const messageButton = (subject: string) => within(inbox()).getByRole("button", { name: new RegExp(subject) });
-const saveStatus = () => document.querySelector('[aria-live="polite"]')!;
+const saveStatus = () => screen.getByTestId("save-status");
+const brief = () => screen.getByRole("complementary", { name: "Task details" });
+
+async function openInbox(user: ReturnType<typeof setup>) {
+  if (!screen.queryByRole("list", { name: "Messages" })) await user.click(inboxButton());
+}
 
 describe("Workspace layout", () => {
-  it("shows the title, intro and a prompt to open a message", () => {
+  it("shows the clock, the simulation and company, one tab per task and a Submit link", () => {
     setup();
-    expect(screen.getByRole("heading", { level: 1, name: "Mini month-end close" })).toBeVisible();
-    expect(screen.getByText("You're the new staff accountant at Harbor Lane.")).toBeVisible();
-    expect(screen.getByText("Open a message in the inbox to start.")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Review and submit" })).toHaveAttribute("href", "/a/tok/review");
+    expect(timer()).toHaveTextContent("45:00");
+    expect(screen.getByText("Mini month-end close")).toBeVisible();
+    expect(screen.getByText("Calder & Finch")).toBeVisible();
+    expect(within(tasks()).getAllByRole("button").map((b) => b.textContent)).toEqual(["1Reply to Dana", "2Adjusted balance"]);
+    expect(screen.getByRole("link", { name: "Submit" })).toHaveAttribute("href", "/a/tok/review");
   });
 
-  it("lists every message with sender, subject and arrival, all unread", () => {
+  it("opens on the first task, with its brief and the message that asked for it", () => {
     setup();
-    expect(screen.getByRole("heading", { name: "Inbox · 3 unread" })).toBeVisible();
+    expect(task("Reply to Dana")).toHaveAttribute("aria-current", "step");
+    expect(within(brief()).getByText("Task 1 of 2")).toBeVisible();
+    expect(within(brief()).getByRole("heading", { level: 1, name: "Reply to Dana" })).toBeVisible();
+    expect(within(brief()).getByText("Write back to Dana.")).toBeVisible();
+    expect(within(brief()).getByRole("button", { name: /Dana \(Manager\) · At start.*Bank rec for October/ })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Reply" })).toBeVisible();
+  });
+
+  it("can open on a given task (links from the review page)", () => {
+    setup(view(), { initialTaskId: "num" });
+    expect(task("Adjusted balance")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("textbox", { name: "Adjusted cash balance" })).toBeVisible();
+  });
+
+  it("counts unread messages on the Inbox button and lists them in the drawer", async () => {
+    const user = setup();
+    expect(inboxButton()).toHaveAccessibleName("Inbox 3 unread");
+    await user.click(inboxButton());
     const items = within(inbox()).getAllByRole("button");
     expect(items).toHaveLength(3);
-    expect(items[0]).toHaveTextContent("Priya (Controller)");
+    expect(items[0]).toHaveTextContent("Priya");
     expect(items[0]).toHaveTextContent("Adjusted balance?");
     expect(items[0]).toHaveTextContent("5 min in");
     expect(items[1]).toHaveTextContent("At start");
@@ -104,43 +131,50 @@ describe("Workspace layout", () => {
   });
 });
 
-describe("opening messages", () => {
-  it("shows the message and the task it delivers, and marks it read", async () => {
+describe("tasks and messages", () => {
+  it("opens a message in the drawer, marks it read, and goes to the task it delivers", async () => {
     const user = setup();
+    await openInbox(user);
     await user.click(messageButton("Bank rec for October"));
-    expect(screen.getByRole("heading", { level: 3, name: "Bank rec for October" })).toBeVisible();
-    expect(screen.getByText("From Dana (Manager)")).toBeVisible();
-    expect(screen.getByText("Please finish the rec.")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 4, name: "Reply to Dana" })).toBeVisible();
-    expect(screen.getByRole("textbox", { name: "Reply" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Inbox · 2 unread" })).toBeVisible();
+    const drawer = screen.getByRole("dialog", { name: "Inbox" });
+    expect(within(drawer).getByRole("heading", { level: 3, name: "Bank rec for October" })).toBeVisible();
+    expect(within(drawer).getByText("Please finish the rec.")).toBeVisible();
+    expect(inboxButton()).toHaveAccessibleName("Inbox 2 unread");
+    await user.click(within(screen.getByRole("dialog", { name: "Inbox" })).getByRole("button", { name: "Inbox" }));
     expect(within(messageButton("Bank rec for October")).queryByLabelText("unread")).not.toBeInTheDocument();
-    expect(screen.queryByText("Open a message in the inbox to start.")).not.toBeInTheDocument();
+    await user.click(messageButton("Adjusted balance?"));
+    await user.click(screen.getByRole("button", { name: "Go to adjusted balance" }));
+    expect(screen.queryByRole("dialog", { name: "Inbox" })).not.toBeInTheDocument();
+    expect(task("Adjusted balance")).toHaveAttribute("aria-current", "step");
   });
 
-  it("shows no task for an info-only message", async () => {
+  it("shows no task button for an info-only message", async () => {
     const user = setup();
+    await openInbox(user);
     await user.click(messageButton("Welcome"));
     expect(screen.getByText("Your laptop is ready.")).toBeVisible();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Go to|^Reply$/ })).not.toBeInTheDocument();
   });
 
-  it("logs opened_message once per message and started_step once per step", async () => {
+  it("logs started_step once per task and opened_message once per message", async () => {
     const user = setup();
-    await user.click(messageButton("Bank rec for October"));
+    await user.click(task("Adjusted balance"));
+    await user.click(task("Reply to Dana"));
+    await openInbox(user);
     await user.click(messageButton("Welcome"));
-    await user.click(messageButton("Bank rec for October"));
+    await user.click(within(screen.getByRole("dialog", { name: "Inbox" })).getByRole("button", { name: "Inbox" }));
+    await user.click(messageButton("Welcome"));
     expect(bodiesTo("/api/candidate/event")).toEqual([
-      { kind: "opened_message", messageId: "m1" },
       { kind: "started_step", stepId: "rec" },
+      { kind: "started_step", stepId: "num" },
       { kind: "opened_message", messageId: "m0" },
     ]);
   });
 
   it("starts with messages opened earlier in the attempt marked read, and doesn't log them again", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<Workspace token="tok" initial={view()} openedIds={["m1"]} />);
-    expect(screen.getByRole("heading", { name: "Inbox · 2 unread" })).toBeVisible();
+    const user = setup(view(), { openedIds: ["m1"] });
+    expect(inboxButton()).toHaveAccessibleName("Inbox 2 unread");
+    await openInbox(user);
     expect(within(messageButton("Bank rec for October")).queryByLabelText("unread")).not.toBeInTheDocument();
     await user.click(messageButton("Bank rec for October"));
     expect(bodiesTo("/api/candidate/event")).toEqual([{ kind: "started_step", stepId: "rec" }]);
@@ -149,28 +183,35 @@ describe("opening messages", () => {
   it("keeps working if logging an event fails", async () => {
     replies["/api/candidate/event"] = [new Error("offline")];
     const user = setup();
+    await openInbox(user);
     await user.click(messageButton("Bank rec for October"));
-    expect(screen.getByRole("textbox", { name: "Reply" })).toBeVisible();
+    expect(within(screen.getByRole("dialog", { name: "Inbox" })).getByText("Please finish the rec.")).toBeVisible();
   });
 
-  it("switches between steps and keeps each step's answer", async () => {
+  it("switches between tasks and keeps each task's answer", async () => {
     const user = setup();
-    await user.click(messageButton("Bank rec for October"));
     await user.type(screen.getByRole("textbox", { name: "Reply" }), "On it.");
-    await user.click(messageButton("Adjusted balance?"));
-    expect(screen.getByRole("heading", { level: 4, name: "Adjusted balance" })).toBeVisible();
+    await user.click(task("Adjusted balance"));
+    expect(within(brief()).getByRole("heading", { level: 1, name: "Adjusted balance" })).toBeVisible();
     expect(screen.queryByRole("textbox", { name: "Reply" })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Adjusted cash balance" }), "1,234.56");
-    await user.click(messageButton("Bank rec for October"));
+    await user.click(task("Reply to Dana"));
     expect(screen.getByRole("textbox", { name: "Reply" })).toHaveValue("On it.");
-    await user.click(messageButton("Adjusted balance?"));
+    await user.click(task("Adjusted balance"));
     expect(screen.getByRole("textbox", { name: "Adjusted cash balance" })).toHaveValue("1234.56");
   });
 
-  it("starts from answers the server already has", async () => {
-    const user = setup(view({ answers: { rec: { body: "Saved earlier" } } }));
-    await user.click(messageButton("Bank rec for October"));
+  it("starts from answers the server already has", () => {
+    setup(view({ answers: { rec: { body: "Saved earlier" } } }));
     expect(screen.getByRole("textbox", { name: "Reply" })).toHaveValue("Saved earlier");
+  });
+
+  it("opens the calculator", async () => {
+    const user = setup(view(), { initialTaskId: "num" });
+    await user.click(screen.getByRole("button", { name: "Calculator" }));
+    expect(screen.getByRole("group", { name: "Calculator" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Close calculator" }));
+    expect(screen.queryByRole("group", { name: "Calculator" })).not.toBeInTheDocument();
   });
 });
 
@@ -198,12 +239,21 @@ describe("countdown (display only)", () => {
     expect(timer()).toHaveTextContent("44:59");
   });
 
-  it("turns red under five minutes", async () => {
+  it("turns amber under five minutes", async () => {
     setup(view({ deadlineAt: minutesFrom(SERVER_NOW, 5) }));
-    expect(timer()).not.toHaveClass("text-red-600");
+    expect(timer()).not.toHaveClass("low");
     await advance(1000);
     expect(timer()).toHaveTextContent("4:59");
-    expect(timer()).toHaveClass("text-red-600");
+    expect(timer()).toHaveClass("low");
+  });
+
+  it("warns once a minute is left, and the warning can be dismissed", async () => {
+    const user = setup(view({ deadlineAt: minutesFrom(SERVER_NOW, 61 / 60) }));
+    expect(screen.queryByText(/1 minute left/)).not.toBeInTheDocument();
+    await advance(1000);
+    expect(screen.getByText(/1 minute left/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/1 minute left/)).not.toBeInTheDocument();
   });
 
   it("stops at 0:00 and asks the server, which sends the candidate to the done page", async () => {
@@ -218,23 +268,33 @@ describe("countdown (display only)", () => {
 });
 
 describe("polling", () => {
-  it("asks for new state every 20 seconds and shows messages that have arrived", async () => {
-    const arrived: PublicMessage = { id: "m3", from: "Marcus Lee", subject: "Where did my money go?", body: "Help", arriveAtMinute: 10 };
+  const arrived: PublicMessage = { id: "m3", from: "Marcus Lee, Owner", subject: "Where did my money go?", body: "Help", arriveAtMinute: 10 };
+
+  it("asks for new state every 20 seconds, adds arrived messages and announces them", async () => {
     replies["/api/candidate/state"] = [{ body: { status: "in_progress", view: view({ messages: [arrived, ...messages] }) } }];
-    setup();
+    const user = setup();
     await advance(19_000);
     expect(callsTo("/api/candidate/state")).toHaveLength(0);
     await advance(1000);
     expect(callsTo("/api/candidate/state")).toHaveLength(1);
     expect(callsTo("/api/candidate/state")[0][1]).toEqual({ cache: "no-store" });
-    expect(messageButton("Where did my money go?")).toHaveTextContent("10 min in");
-    expect(screen.getByRole("heading", { name: "Inbox · 4 unread" })).toBeVisible();
+    expect(inboxButton()).toHaveAccessibleName("Inbox 4 unread");
+    expect(screen.getByText("Marcus Lee: Where did my money go?")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Read now" }));
+    expect(screen.getByRole("heading", { level: 3, name: "Where did my money go?" })).toBeVisible();
+    expect(screen.queryByText("Marcus Lee: Where did my money go?")).not.toBeInTheDocument();
+  });
+
+  it("puts a later message without a task under Requested in", async () => {
+    replies["/api/candidate/state"] = [{ body: { status: "in_progress", view: view({ messages: [arrived, ...messages] }) } }];
+    setup();
+    await advance(20_000);
+    expect(within(brief()).getByRole("button", { name: /Marcus Lee · 10 min in.*Where did my money go/ })).toBeVisible();
   });
 
   it("keeps what the candidate typed over the server's copy", async () => {
     replies["/api/candidate/state"] = [{ body: { status: "in_progress", view: view({ answers: { rec: { body: "older server copy" } } }) } }];
     const user = setup();
-    await user.click(messageButton("Bank rec for October"));
     await user.type(screen.getByRole("textbox", { name: "Reply" }), "typed locally");
     await advance(20_000);
     expect(screen.getByRole("textbox", { name: "Reply" })).toHaveValue("typed locally");
@@ -266,22 +326,19 @@ describe("polling", () => {
 });
 
 describe("autosave", () => {
-  async function typeReply(user: ReturnType<typeof setup>, text: string) {
-    await user.click(messageButton("Bank rec for October"));
-    await user.type(screen.getByRole("textbox", { name: "Reply" }), text);
-  }
+  const typeReply = (user: ReturnType<typeof setup>, text: string) => user.type(screen.getByRole("textbox", { name: "Reply" }), text);
 
-  it("says Saving… at once, saves the latest answer after a pause, then says saved", async () => {
+  it("says Saving… at once, saves the latest answer after a pause, then says Saved", async () => {
     replies["/api/candidate/answer"] = [{ status: 200, body: { ok: true } }];
     const user = setup();
-    expect(saveStatus()).toHaveTextContent("");
+    expect(saveStatus()).toHaveTextContent("Saved");
     await typeReply(user, "Hi Dana");
     expect(saveStatus()).toHaveTextContent("Saving…");
     expect(callsTo("/api/candidate/answer")).toHaveLength(0);
     await advance(700);
     expect(bodiesTo("/api/candidate/answer")).toEqual([{ stepId: "rec", answer: { body: "Hi Dana" } }]);
     expect(callsTo("/api/candidate/answer")[0][1]).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json" } });
-    expect(saveStatus()).toHaveTextContent("All changes saved");
+    expect(saveStatus()).toHaveTextContent("Saved");
   });
 
   it("debounces per step: quick typing sends one save", async () => {
@@ -296,7 +353,7 @@ describe("autosave", () => {
   it("saves two steps separately", async () => {
     const user = setup();
     await typeReply(user, "x");
-    await user.click(messageButton("Adjusted balance?"));
+    await user.click(task("Adjusted balance"));
     await user.type(screen.getByRole("textbox", { name: "Adjusted cash balance" }), "9");
     await advance(700);
     expect(bodiesTo("/api/candidate/answer")).toEqual([
@@ -305,13 +362,34 @@ describe("autosave", () => {
     ]);
   });
 
-  it("shows an error when the server rejects the save", async () => {
-    replies["/api/candidate/answer"] = [{ status: 500 }];
+  it("shows an error and a banner when the server rejects the save, and Retry now sends it again", async () => {
+    replies["/api/candidate/answer"] = [{ status: 500 }, { status: 200 }];
     const user = setup();
     await typeReply(user, "x");
     await advance(700);
-    expect(saveStatus()).toHaveTextContent("Couldn't save. Check your connection.");
-    expect(saveStatus()).toHaveClass("text-red-600");
+    expect(saveStatus()).toHaveTextContent("Couldn't save");
+    expect(screen.getByRole("alert")).toHaveTextContent("Your last change didn't save.");
+    await user.click(screen.getByRole("button", { name: "Retry now" }));
+    await advance(0);
+    expect(bodiesTo("/api/candidate/answer")).toEqual([
+      { stepId: "rec", answer: { body: "x" } },
+      { stepId: "rec", answer: { body: "x" } },
+    ]);
+    expect(saveStatus()).toHaveTextContent("Saved");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps retrying a failed save in the background", async () => {
+    replies["/api/candidate/answer"] = [new Error("offline"), new Error("offline"), { status: 200 }];
+    const user = setup();
+    await typeReply(user, "x");
+    await advance(700);
+    expect(saveStatus()).toHaveTextContent("Couldn't save");
+    await advance(5000);
+    expect(callsTo("/api/candidate/answer")).toHaveLength(2);
+    await advance(5000);
+    expect(callsTo("/api/candidate/answer")).toHaveLength(3);
+    expect(saveStatus()).toHaveTextContent("Saved");
   });
 
   it("shows an error when offline, and recovers on the next good save", async () => {
@@ -319,11 +397,11 @@ describe("autosave", () => {
     const user = setup();
     await typeReply(user, "x");
     await advance(700);
-    expect(saveStatus()).toHaveTextContent("Couldn't save. Check your connection.");
-    await user.type(screen.getByRole("textbox", { name: "Reply" }), "y");
+    expect(saveStatus()).toHaveTextContent("Couldn't save");
+    await typeReply(user, "y");
     expect(saveStatus()).toHaveTextContent("Saving…");
     await advance(700);
-    expect(saveStatus()).toHaveTextContent("All changes saved");
+    expect(saveStatus()).toHaveTextContent("Saved");
   });
 
   it("goes to the done page when the attempt was already submitted (409)", async () => {
@@ -344,7 +422,7 @@ describe("autosave", () => {
 
   it("keeps saving a numeric answer typed with commas and a dollar sign as a number", async () => {
     const user = setup();
-    await user.click(messageButton("Adjusted balance?"));
+    await user.click(task("Adjusted balance"));
     fireEvent.change(screen.getByRole("textbox", { name: "Adjusted cash balance" }), { target: { value: "$1,200.50" } });
     await advance(700);
     expect(bodiesTo("/api/candidate/answer")).toEqual([{ stepId: "num", answer: { value: 1200.5 } }]);

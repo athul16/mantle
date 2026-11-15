@@ -1,22 +1,46 @@
-"use client";
+import { Suspense } from "react";
+import { CompanyLogo } from "@/components/brand";
+import { AuthCard } from "@/components/ui";
+import { listMemberships } from "@/lib/auth";
+import { SetPasswordForm } from "./set-password-form";
 
-import { useActionState } from "react";
-import { AuthCard, Button, Field, FormMessage } from "@/components/ui";
-import { setPassword } from "./actions";
+export const metadata = { title: "Set your password · Mantle" };
 
+// First visit for a teammate invited from the Team page (and password
+// recovery). The company and role come from the membership the invite created.
 export default function SetPasswordPage() {
-  const [state, action, pending] = useActionState(setPassword, undefined);
   return (
-    <AuthCard title="Set your password">
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">You were invited to a company account. Choose a password to finish.</p>
-      <form action={action} className="space-y-4">
-        <Field label="Password" name="password" type="password" autoComplete="new-password" required minLength={8} error={state?.fieldErrors?.password?.[0]} />
-        <Field label="Confirm password" name="confirm" type="password" autoComplete="new-password" required error={state?.fieldErrors?.confirm?.[0]} />
-        <FormMessage error={state?.error} />
-        <Button type="submit" disabled={pending} className="w-full">
-          {pending ? "Saving…" : "Save and continue"}
-        </Button>
-      </form>
+    <Suspense fallback={<AuthCard title="Set your password"><p className="small ink2">Loading…</p></AuthCard>}>
+      <SetPassword />
+    </Suspense>
+  );
+}
+
+async function SetPassword() {
+  const memberships = await listMemberships();
+  const org = memberships[0];
+  return (
+    <AuthCard
+      title="Set your password"
+      icon={
+        org ? (
+          <div className="row g10">
+            <CompanyLogo name={org.orgName} size={32} />
+            <span className="strong">{org.orgName}</span>
+          </div>
+        ) : undefined
+      }
+      intro={
+        org ? (
+          <>
+            You were invited to {org.orgName} as a <strong style={{ textTransform: "capitalize" }}>{org.role}</strong>. Choose a password to finish.
+          </>
+        ) : (
+          "You were invited to a company account. Choose a password to finish."
+        )
+      }
+    >
+      <SetPasswordForm />
     </AuthCard>
   );
 }

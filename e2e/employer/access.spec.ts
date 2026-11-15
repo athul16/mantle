@@ -9,32 +9,32 @@ test("a viewer sees jobs, assessments and invites read-only", async ({ page, hir
   const { company, jobId, invite } = hiring;
   await signInViaUi(page, company.users.viewer, `/app/${company.slug}/jobs`);
   await land(/\/jobs$/, "Jobs");
-  await expect(page.getByText("You have read-only access.")).toBeVisible();
+  await expect(page.getByText("You have read-only access to jobs.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create job" })).toHaveCount(0);
 
-  await page.getByRole("link", { name: /Assessments \(1\)/ }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Assessments" }).click();
   await land(/\/assessments$/, "Assessments");
-  await expect(page.getByRole("button", { name: "Create assessment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Use" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Clone" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Edit settings" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Edit settings/ })).toHaveCount(0);
 
   await page.goto(`/app/${company.slug}/jobs/${jobId}`);
   await land(/\/jobs\/[0-9a-f-]{36}$/, "Audit intern");
   await expect(page.getByRole("row").filter({ hasText: invite.email })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send invites" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Invite candidates" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Resend|Revoke/ })).toHaveCount(0);
 });
 
 test("the server rejects an action from someone demoted to viewer mid-session", async ({ page, hiring, data }) => {
   const { company, jobId } = hiring;
-  await signInViaUi(page, company.users.recruiter, `/app/${company.slug}/jobs/${jobId}`);
-  await expect(page.getByRole("button", { name: "Send invites" })).toBeVisible();
+  await signInViaUi(page, company.users.recruiter, `/app/${company.slug}/jobs/${jobId}/invite`);
+  await expect(page.getByRole("button", { name: /^Send( \d+)? invites?$/ })).toBeVisible();
 
   // The form is still on screen, but the user is now a viewer.
   await setRole(company.orgId, company.users.recruiter.id, "viewer");
   const email = data.email("stale");
-  await page.getByLabel("Paste emails").fill(email);
-  await page.getByRole("button", { name: "Send invites" }).click();
+  await page.getByLabel("Email addresses").fill(email);
+  await page.getByRole("button", { name: /^Send( \d+)? invites?$/ }).click();
   await expect(page.getByText("You don't have permission to do that.")).toBeVisible();
   expect((await invitesForJob(jobId)).map((i) => i.email)).not.toContain(email);
 });
@@ -65,7 +65,8 @@ test.describe("another company's URLs", () => {
       await expect(page.getByText("This page could not be found.")).toBeVisible();
       await expect(page.getByText(hiring.company.name)).toHaveCount(0);
     }
+    // My own company still opens (on its Jobs list; there is no dashboard).
     await page.goto(`/app/${other.slug}`);
-    await land(new RegExp(`/app/${other.slug}$`), other.name);
+    await land(new RegExp(`/app/${other.slug}/jobs$`), "Jobs");
   });
 });

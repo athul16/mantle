@@ -4,7 +4,7 @@ import { AuthCard } from "@/components/ui";
 import { login } from "../actions";
 import { CredentialsForm } from "../credentials-form";
 
-export const metadata = { title: "Sign in · Assessment Platform" };
+export const metadata = { title: "Sign in · Mantle" };
 
 export default function LoginPage() {
   return (
@@ -12,7 +12,7 @@ export default function LoginPage() {
       title="Sign in"
       footer={
         <>
-          New here? <Link href="/signup" className="underline">Create a company account</Link>
+          New here? <Link href="/signup" style={{ textDecoration: "underline" }}>Create a company account</Link>
         </>
       }
     >

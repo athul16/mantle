@@ -36,3 +36,14 @@ export function renderStepElement(type: string, props: StepComponentProps<unknow
   const component = clientStepTypes[type];
   return component ? createElement(component, props) : null;
 }
+
+/**
+ * The instructions the page should show next to a step (the workspace's brief
+ * column), or null when the step's own view shows them. A numeric step's
+ * prompt is the question itself, so it stays on the step's card.
+ */
+export function stepBrief(step: { type: string; config: unknown }): string | null {
+  if (step.type === NUMERIC) return null;
+  const prompt = (step.config as { prompt?: unknown } | null)?.prompt;
+  return typeof prompt === "string" && prompt.trim() !== "" ? prompt : null;
+}

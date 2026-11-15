@@ -51,6 +51,77 @@ export type Database = {
           },
         ]
       }
+      ai_shadow_scores: {
+        Row: {
+          attempt_id: string
+          cache_creation_input_tokens: number | null
+          cache_read_input_tokens: number | null
+          created_at: string
+          criteria: Json
+          duration_ms: number | null
+          error: string | null
+          id: number
+          input_tokens: number | null
+          max_points: number | null
+          model: string
+          org_id: string
+          output_tokens: number | null
+          points: number | null
+          prompt_version: string
+          status: string
+          step_id: string
+          stop_reason: string | null
+        }
+        Insert: {
+          attempt_id: string
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          created_at?: string
+          criteria?: Json
+          duration_ms?: number | null
+          error?: string | null
+          id?: never
+          input_tokens?: number | null
+          max_points?: number | null
+          model: string
+          org_id: string
+          output_tokens?: number | null
+          points?: number | null
+          prompt_version: string
+          status: string
+          step_id: string
+          stop_reason?: string | null
+        }
+        Update: {
+          attempt_id?: string
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          created_at?: string
+          criteria?: Json
+          duration_ms?: number | null
+          error?: string | null
+          id?: never
+          input_tokens?: number | null
+          max_points?: number | null
+          model?: string
+          org_id?: string
+          output_tokens?: number | null
+          points?: number | null
+          prompt_version?: string
+          status?: string
+          step_id?: string
+          stop_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_shadow_scores_attempt_id_org_id_fkey"
+            columns: ["attempt_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       assessments: {
         Row: {
           created_at: string
@@ -133,6 +204,7 @@ export type Database = {
       }
       attempts: {
         Row: {
+          auto_score: Json | null
           created_at: string
           deadline_at: string | null
           id: string
@@ -147,6 +219,7 @@ export type Database = {
           submitted_at: string | null
         }
         Insert: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -161,6 +234,7 @@ export type Database = {
           submitted_at?: string | null
         }
         Update: {
+          auto_score?: Json | null
           created_at?: string
           deadline_at?: string | null
           id?: string
@@ -318,6 +392,51 @@ export type Database = {
           },
         ]
       }
+      invite_accommodations: {
+        Row: {
+          extra_time_percent: number
+          invite_id: string
+          org_id: string
+          set_at: string
+          set_by: string | null
+          waive_camera: boolean
+          waive_screen: boolean
+        }
+        Insert: {
+          extra_time_percent?: number
+          invite_id: string
+          org_id: string
+          set_at?: string
+          set_by?: string | null
+          waive_camera?: boolean
+          waive_screen?: boolean
+        }
+        Update: {
+          extra_time_percent?: number
+          invite_id?: string
+          org_id?: string
+          set_at?: string
+          set_by?: string | null
+          waive_camera?: boolean
+          waive_screen?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_accommodations_invite_id_org_id_fkey"
+            columns: ["invite_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "invite_accommodations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite_secrets: {
         Row: {
           code_attempts: number
@@ -362,7 +481,9 @@ export type Database = {
           expires_at: string
           id: string
           job_id: string
+          last_sent_at: string
           org_id: string
+          sent_count: number
           status: string
         }
         Insert: {
@@ -373,7 +494,9 @@ export type Database = {
           expires_at: string
           id?: string
           job_id: string
+          last_sent_at?: string
           org_id: string
+          sent_count?: number
           status?: string
         }
         Update: {
@@ -384,7 +507,9 @@ export type Database = {
           expires_at?: string
           id?: string
           job_id?: string
+          last_sent_at?: string
           org_id?: string
+          sent_count?: number
           status?: string
         }
         Relationships: [
@@ -575,6 +700,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_sign_in_at: string | null
+          id: string
+          invited_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_sign_in_at?: string | null
+          id?: string
+          invited_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           created_at: string
@@ -623,6 +775,7 @@ export type Database = {
         Row: {
           answer: Json
           attempt_id: string
+          auto_score: Json | null
           org_id: string
           score: Json | null
           step_id: string
@@ -631,6 +784,7 @@ export type Database = {
         Insert: {
           answer: Json
           attempt_id: string
+          auto_score?: Json | null
           org_id: string
           score?: Json | null
           step_id: string
@@ -639,6 +793,7 @@ export type Database = {
         Update: {
           answer?: Json
           attempt_id?: string
+          auto_score?: Json | null
           org_id?: string
           score?: Json | null
           step_id?: string
@@ -665,15 +820,39 @@ export type Database = {
         Args: { p_limit?: number; p_now?: string }
         Returns: { invite_id: string; org_id: string; retained_until: string }[]
       }
+      list_media_past_retention: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: { attempt_id: string; org_id: string; retained_until: string }[]
+      }
       purge_candidate_for_retention: {
         Args: { p_invite_id: string; p_now?: string }
+        Returns: string[]
+      }
+      purge_media_for_retention: {
+        Args: { p_attempt_id: string; p_now?: string }
         Returns: string[]
       }
       review_rubric_step: {
         Args: { p_attempt_id: string; p_scores: Json; p_step_id: string }
         Returns: Json
       }
-      set_retention_days: { Args: { p_days: number; p_org_id: string }; Returns: number }
+      set_contact_email: {
+        Args: { p_email: string; p_org_id: string }
+        Returns: string
+      }
+      set_invite_accommodations: {
+        Args: {
+          p_extra_time_percent: number
+          p_invite_id: string
+          p_waive_camera: boolean
+          p_waive_screen: boolean
+        }
+        Returns: undefined
+      }
+      set_retention: {
+        Args: { p_media_days: number; p_org_id: string; p_results_days: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

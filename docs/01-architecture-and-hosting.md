@@ -43,7 +43,7 @@
 | --- | --- | --- |
 | `/` | Anyone | Landing page |
 | `/login`, `/signup` | Signed out | |
-| `/auth/confirm`, `/auth/callback`, `/auth/set-password` | Email links | Where Supabase email links land |
+| `/auth/confirm`, `/auth/set-password` | Email links | Supabase invite and sign-up links land on `/auth/confirm`, a page with a button; the button verifies the token (link scanners can't use it up) |
 | `/onboarding` | Signed in | Create a company |
 | `/app` | Signed in | Redirects to the last-used company |
 | `/app/[orgSlug]` + `/jobs`, `/candidates`, `/team` | Members of that company | Non-members get 404 |

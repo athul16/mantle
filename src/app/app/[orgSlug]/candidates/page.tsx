@@ -2,73 +2,70 @@ import Link from "next/link";
 import * as z from "zod";
 import { requireOrgMembership } from "@/lib/auth";
 import { getJob, listJobs } from "@/lib/jobs/queries";
-import { listJobResults } from "@/lib/results/queries";
-import { ResultsTable } from "./results-table";
+import { isPast } from "@/lib/jobs/status";
+import { listJobCandidates } from "@/lib/results/candidates";
+import { Icon } from "@/components/icons";
+import { CandidatesView } from "./candidates-view";
+import { JobHeading } from "./job-heading";
+import { JobPicker } from "./job-picker";
 
-export const metadata = { title: "Candidates · Assessment Platform" };
+export const metadata = { title: "Candidates · Mantle" };
 
-// Results per job: /candidates lists the jobs, /candidates?job=<id> shows that
-// job's candidates with score, time taken and submit date.
+// The Candidates tab: one job's candidates at a time (?job=<id>), with a job
+// picker. Without ?job it opens the newest job that has candidates.
 export default async function CandidatesPage({ params, searchParams }: PageProps<"/app/[orgSlug]/candidates">) {
   const { orgSlug } = await params;
-  const { orgId } = await requireOrgMembership(orgSlug);
+  const { orgId, role } = await requireOrgMembership(orgSlug);
   const jobParam = (await searchParams).job;
-  const jobId = typeof jobParam === "string" && z.uuid().safeParse(jobParam).success ? jobParam : null;
+  const requested = typeof jobParam === "string" && z.uuid().safeParse(jobParam).success ? jobParam : null;
   const base = `/app/${orgSlug}/candidates`;
 
-  const [jobs, job] = await Promise.all([listJobs(orgId), jobId ? getJob(orgId, jobId) : Promise.resolve(null)]);
+  const jobs = await listJobs(orgId);
+  const total = (j: (typeof jobs)[number]) => Object.values(j.inviteCounts).reduce((a, b) => a + b, 0);
+  const fallback = jobs.find((j) => total(j) > 0) ?? jobs[0];
+  const jobId = requested ?? fallback?.id ?? null;
+  const job = jobId ? await getJob(orgId, jobId) : null;
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{job ? `Candidates · ${job.title}` : "Candidates"}</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {job ? (
-            <>
-              <Link href={`/app/${orgSlug}/jobs/${job.id}`} className="underline">Job details and invites</Link>
-              {job.assessment?.passScore != null ? ` · pass score ${job.assessment.passScore}%` : ""}
-            </>
+  if (!job) {
+    return (
+      <main style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 32px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <h1 style={{ fontSize: 26 }}>Candidates</h1>
+        <div className="card" style={{ padding: "40px 24px", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+          {requested ? (
+            <span className="strong">That job was not found.</span>
           ) : (
-            "Pick a job to see its candidates, scores and reports."
+            <>
+              <span className="strong">No jobs yet</span>
+              <span className="small muted">
+                <Link href={`/app/${orgSlug}/jobs`}>Create a job</Link> and invite candidates first.
+              </span>
+            </>
           )}
-        </p>
-      </div>
+        </div>
+      </main>
+    );
+  }
 
-      {jobs.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm dark:border-neutral-700">
-          No jobs yet. <Link href={`/app/${orgSlug}/jobs`} className="underline">Create a job</Link> and invite candidates first.
-        </p>
-      ) : (
-        <nav aria-label="Jobs" className="flex flex-wrap gap-2">
-          {jobs.map((j) => {
-            const active = j.id === job?.id;
-            const total = Object.values(j.inviteCounts).reduce((a, b) => a + b, 0);
-            return (
-              <Link
-                key={j.id}
-                href={`${base}?job=${j.id}`}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-md border px-3 py-1.5 text-sm ${
-                  active
-                    ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                    : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-                }`}
-              >
-                {j.title} <span className="tabular-nums">({j.inviteCounts.completed}/{total})</span>
-              </Link>
-            );
-          })}
-        </nav>
-      )}
-
-      {jobId && !job ? <p className="text-sm text-red-700 dark:text-red-400">That job was not found.</p> : null}
-      {job ? <JobResults orgId={orgId} jobId={job.id} reportBase={base} /> : null}
-    </div>
+  const rows = await listJobCandidates(orgId, job.id);
+  const picker = jobs.length > 1 ? <JobPicker base={base} current={job.id} jobs={jobs.map((j) => ({ id: j.id, title: j.title, count: total(j) }))} /> : null;
+  return (
+    <CandidatesView
+      orgSlug={orgSlug}
+      orgId={orgId}
+      role={role}
+      job={job}
+      rows={rows}
+      crumbs={
+        <>
+          <span className="muted">Candidates</span>
+          <Icon name="chevR" className="i-sm muted" />
+          <Link href={`/app/${orgSlug}/jobs/${job.id}`} aria-current="page">
+            {job.title}
+          </Link>
+        </>
+      }
+      heading={<JobHeading job={job} count={rows.length} picker={picker} />}
+      deadlinePassed={isPast(job.deadline)}
+    />
   );
-}
-
-async function JobResults({ orgId, jobId, reportBase }: { orgId: string; jobId: string; reportBase: string }) {
-  const rows = await listJobResults(orgId, jobId);
-  if (rows.length === 0) return <p className="text-sm text-neutral-600 dark:text-neutral-400">No one invited to this job yet.</p>;
-  return <ResultsTable rows={rows} reportBase={reportBase} />;
 }

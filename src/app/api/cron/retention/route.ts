@@ -4,8 +4,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 // Daily retention purge (vercel.json crons). Vercel calls it with
 // `Authorization: Bearer ${CRON_SECRET}`; anything else gets 401. Deletes the
-// candidates past their org's retention and their snapshot files, and returns
-// counts only.
+// snapshots past their org's media period, then the candidates past its results
+// period, and returns counts only.
 export const maxDuration = 300;
 
 export async function GET(request: Request) {

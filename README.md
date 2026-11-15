@@ -1,10 +1,14 @@
-# Assessment Platform
+# Mantle
 
-Job simulations that screen applicants for roles usually hired on behavioral interviews. We start with **accounting interns** and **pharmaceutical interns**.
+Mantle (this repo: `assessment-platform`) runs job simulations that screen applicants for roles usually hired on behavioral interviews. We start with **accounting interns** and **pharmaceutical interns**.
 
 Companies send candidates a link. Candidates spend 30 to 45 minutes doing a realistic slice of the job. Companies get a ranked list with scores, evidence, and integrity labels.
 
 **Status:** phase 1 skeleton in progress. See [`docs/10-progress.md`](docs/10-progress.md).
+
+## Design
+
+The app follows the clickable prototype in [`docs/design/prototype.html`](docs/design/prototype.html). Tokens, fonts, components and the screen map are in [`docs/13-design-system.md`](docs/13-design-system.md).
 
 ## Stack
 
@@ -37,6 +41,8 @@ Tests never touch the cloud database; see [`docs/11-testing.md`](docs/11-testing
 ## Layout
 
 ```
+src/app/mantle.css       design tokens + component classes (ported from the prototype)
+src/components/          shared UI: ui.tsx (form pieces), brand.tsx (Mantle mark, logo tile), icons.tsx
 src/app/                 pages: (auth)/ login+signup, auth/ email links, onboarding/, app/[orgSlug]/ company area, dev/ dev-only
 src/lib/auth.ts          current user, memberships, company from URL
 src/lib/supabase/        browser, server, server-only service, and proxy clients
@@ -48,7 +54,7 @@ supabase/tests/          pgTAP tests (pnpm test:db)
 tests/                   Vitest: rls.test.ts, jobs/, candidate/ (local test DB), engine/ (unit), components/ (jsdom), helpers/ (shared fixtures)
 e2e/                     Playwright specs and fixtures
 .github/workflows/       ci (checks, database, e2e), nightly (lighthouse, cloud smoke), e2e-snapshots
-docs/                    product + technical specs; decisions/ holds decision briefs
+docs/                    product + technical specs; decisions/ holds decision briefs; design/ holds the prototype
 ```
 
 ## Docs

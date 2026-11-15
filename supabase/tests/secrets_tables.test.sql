@@ -62,7 +62,9 @@ select is_empty(
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
         and c.relname not in ('invite_secrets', 'attempt_secrets')
         and a.attnum > 0 and not a.attisdropped
-        and a.attname ~ '(hash|token|seed|secret|code)' $$,
+        and a.attname ~ '(hash|token|seed|secret|code)'
+        -- token usage counts of AI shadow scores (server only, see ai_shadow_scores.test.sql)
+        and not (c.relname = 'ai_shadow_scores' and a.attname ~ '_tokens$') $$,
   'no hash, token, seed, secret or code column outside the secret tables'
 );
 
@@ -70,9 +72,11 @@ select is_empty(
 select set_eq(
   $$ select p.proname::text from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef $$,
-  $$ values ('create_organization'), ('review_rubric_step'), ('set_retention_days'), ('delete_candidate_data'),
-            ('list_candidates_past_retention'), ('purge_candidate_for_retention') $$,
-  'only the known security definer functions are in public (signup, rubric review, retention)'
+  $$ values ('create_organization'), ('review_rubric_step'), ('set_retention'), ('delete_candidate_data'),
+            ('list_candidates_past_retention'), ('purge_candidate_for_retention'),
+            ('list_media_past_retention'), ('purge_media_for_retention'),
+            ('set_invite_accommodations'), ('set_contact_email') $$,
+  'only the known security definer functions are in public (signup, rubric review, retention, accommodations, contact email)'
 );
 -- private.purge_candidate deletes a candidate's secret rows (retention); it
 -- never reads or returns them.

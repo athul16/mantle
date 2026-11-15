@@ -9,7 +9,8 @@ import { RUBRIC, REPLY_BODY, miniCloseJob, miniCloseScore, scoredAttempt } from 
 chromiumOnly();
 
 const resultRow = (page: Page, text: string) => page.getByRole("row").filter({ hasText: text });
-const rowNames = (page: Page) => page.getByRole("row").locator("td:first-child a").allTextContents();
+// First cell is the select checkbox; the name is a link (to the report) or a button (opens the invite drawer).
+const rowNames = (page: Page) => page.getByRole("row").locator("td:nth-child(2) > :is(a, button)").allTextContents();
 
 async function setup(data: TestData) {
   const co = await data.company();
@@ -38,23 +39,21 @@ test("a recruiter sorts and filters results, reviews the reply and adds a note",
   await signInViaUi(page, co.users.recruiter, `/app/${co.slug}/jobs/${jobId}`);
   await land(/\/jobs\/[0-9a-f-]{36}$/, "Staff accountant");
 
-  // Job page → results table
-  await page.getByRole("link", { name: "Results and reports" }).click();
-  await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Staff accountant");
+  // The job page is the results table.
   await expect(page.getByText("Showing 3 of 3")).toBeVisible();
   expect(await rowNames(page)).toEqual(["Sam Okafor", "Riley Chen", waiting.email]);
 
   const rileyRow = resultRow(page, "Riley Chen");
-  await expect(rileyRow.getByText("42.1%")).toBeVisible();
-  await expect(rileyRow.getByText("8 / 19 so far")).toBeVisible();
-  await expect(rileyRow.getByText("14 min")).toBeVisible();
-  await expect(rileyRow.getByText("needs review")).toBeVisible();
-  await expect(resultRow(page, "Sam Okafor").getByText("89.5%")).toBeVisible();
-  await expect(resultRow(page, waiting.email).getByText("invited")).toBeVisible();
+  await expect(rileyRow.getByText("42.1", { exact: true })).toBeVisible();
+  await expect(rileyRow.getByTitle("8 / 19 points so far")).toBeVisible();
+  await expect(rileyRow.getByText(/· 14 min$/)).toBeVisible();
+  await expect(rileyRow.getByText("Reply to score")).toBeVisible();
+  await expect(resultRow(page, "Sam Okafor").getByText("89.5", { exact: true })).toBeVisible();
+  await expect(resultRow(page, waiting.email).getByText("Invited", { exact: true })).toBeVisible();
 
   // Sort and filter
-  await page.getByRole("button", { name: /Time taken/ }).click();
-  await expect(page.getByRole("columnheader", { name: /Time taken/ })).toHaveAttribute("aria-sort", "ascending");
+  await page.getByRole("button", { name: "Score", exact: true }).click();
+  await expect(page.getByRole("columnheader", { name: "Score" })).toHaveAttribute("aria-sort", "ascending");
   expect(await rowNames(page)).toEqual(["Riley Chen", "Sam Okafor", waiting.email]);
   await page.getByLabel("Status").selectOption("needs_review");
   await expect(page.getByText("Showing 1 of 3")).toBeVisible();
@@ -67,31 +66,32 @@ test("a recruiter sorts and filters results, reviews the reply and adds a note",
   // Report
   await page.getByRole("link", { name: "Riley Chen" }).click();
   await land(new RegExp(`/candidates/${riley.inviteId}$`), "Riley Chen");
-  await expect(page.getByTestId("final-score")).toHaveText("42.1%");
-  await expect(page.getByText("8 / 19 points · pass 60%")).toBeVisible();
-  await expect(page.getByText("1 task needs review; the score may go up.")).toBeVisible();
+  await expect(page.getByTestId("final-score")).toHaveText("42.1");
+  await expect(page.getByText("8 of 19 points")).toBeVisible();
+  await expect(page.getByText("Needs review · 1 task")).toBeVisible();
+  await expect(page.getByText("60 · Below bar")).toBeVisible();
 
-  const sheet = page.getByRole("article", { name: "October bank reconciliation" });
-  await expect(sheet.getByText("6 / 8")).toBeVisible();
+  const sheet = page.getByRole("region", { name: /October bank reconciliation$/ });
+  await expect(sheet.getByText("6/8")).toBeVisible();
   const book = sheet.getByRole("row").filter({ hasText: "Adjusted book balance" });
   await expect(book.getByRole("cell").nth(1)).toHaveText("10,000.00");
   await expect(book.getByRole("cell").nth(2)).toHaveText(/^\d{1,3}(,\d{3})*\.\d\d$/);
-  await expect(book.getByRole("cell").nth(3)).toHaveText("0 / 2");
+  await expect(book.getByRole("cell").nth(3)).toHaveText("Wrong");
 
-  const numeric = page.getByRole("article", { name: "Quick question from Dana" });
+  const numeric = page.getByRole("region", { name: /Quick question from Dana$/ });
   await expect(numeric.getByRole("columnheader", { name: "Expected" })).toBeVisible();
   await expect(numeric.getByRole("row").filter({ hasText: "Value" }).getByRole("cell").nth(1)).toHaveText("$10,400.00");
 
-  const reply = page.getByRole("article", { name: "Reply to Marcus" });
-  await expect(reply.getByText(REPLY_BODY)).toBeVisible();
-  await expect(reply.getByText("needs review")).toBeVisible();
+  const reply = page.getByRole("region", { name: /Reply to Marcus$/ });
+  await expect(reply.getByText(REPLY_BODY, { exact: false })).toBeVisible();
+  await expect(reply.getByText("Needs review", { exact: true })).toBeVisible();
   await expect(reply.getByText(/Mentions the \$[\d,]+\.\d\d bank service fee/)).toBeVisible();
 
   // Timeline
   const timeline = page.getByRole("region", { name: "Timeline" });
   await expect(timeline.getByText("Started the assessment")).toBeVisible();
   await expect(timeline.getByText('Saved "October bank reconciliation" (2 times)')).toBeVisible();
-  await expect(timeline.getByRole("listitem").filter({ hasText: "Submitted the assessment" })).toContainText("+14:00");
+  await expect(timeline.getByRole("listitem").filter({ hasText: "Submitted the assessment" })).toContainText("14:00");
 
   // Rubric review updates the final score
   const form = reply.getByRole("form", { name: "Review Reply to Marcus" });
@@ -102,57 +102,60 @@ test("a recruiter sorts and filters results, reviews the reply and adds a note",
   await expect(form.getByRole("button", { name: "Saving…" })).toBeDisabled();
   await held.release();
   await expect(form.getByText("Review saved. The final score is updated.")).toBeVisible();
-  await expect(page.getByTestId("final-score")).toHaveText("89.5%");
-  await expect(page.getByText("Scored.", { exact: true })).toBeVisible();
-  await expect(reply.getByText("9 / 9")).toBeVisible();
+  await expect(page.getByTestId("final-score")).toHaveText("89.5");
+  await expect(page.getByText(/^Needs review · /)).toHaveCount(0);
+  await expect(reply.getByText("Reviewed 9/9")).toBeVisible();
   await expect(reply.getByText(/^reviewed /)).toBeVisible();
 
-  // Note with a vote
-  await page.getByLabel("Add a note").fill("Solid rec, clear email.");
-  await page.getByRole("radio", { name: "Hire", exact: true }).check();
-  await page.getByRole("button", { name: "Add note" }).click();
-  await expect(page.getByText("Note added.")).toBeVisible();
-  const notes = page.getByRole("region", { name: /Notes and votes/ });
-  await expect(notes.getByRole("heading", { name: "Notes and votes (1)" })).toBeVisible();
-  const note = notes.getByRole("listitem").filter({ hasText: "Solid rec, clear email." });
+  // A note, then a vote
+  const votes = page.getByRole("region", { name: "Team votes" });
+  await votes.getByLabel("Add a note").fill("Solid rec, clear email.");
+  await votes.getByRole("button", { name: "Post note" }).click();
+  await expect(votes.getByText("Note added.")).toBeVisible();
+  const note = votes.getByRole("list", { name: "Notes" }).getByRole("listitem").filter({ hasText: "Solid rec, clear email." });
   await expect(note.getByText(co.users.recruiter.email)).toBeVisible();
-  await expect(note.getByText("Hire", { exact: true })).toBeVisible();
+  await votes.getByRole("button", { name: "Hire", exact: true }).click();
+  await expect(votes.getByRole("button", { name: "Hire", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(votes.getByRole("list", { name: "Votes" }).getByRole("listitem").filter({ hasText: "You" })).toContainText("Hire");
+  await expect(votes.getByText("1 voted · 1 note")).toBeVisible();
 
   // Back on the table, Riley no longer needs review
-  await page.getByRole("link", { name: "← Staff accountant" }).click();
-  await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Staff accountant");
-  await expect(resultRow(page, "Riley Chen").getByText("89.5%")).toBeVisible();
-  await expect(resultRow(page, "Riley Chen").getByText("needs review")).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Staff accountant" }).click();
+  await land(new RegExp(`/(jobs/${jobId}|candidates\\?job=${jobId})$`), "Staff accountant");
+  await expect(resultRow(page, "Riley Chen").getByText("89.5", { exact: true })).toBeVisible();
+  await expect(resultRow(page, "Riley Chen").getByText("Reply to score")).toHaveCount(0);
 
   // The author can delete their note
   await page.getByRole("link", { name: "Riley Chen" }).click();
   await land(new RegExp(`/candidates/${riley.inviteId}$`), "Riley Chen");
   await page.getByRole("listitem").filter({ hasText: "Solid rec, clear email." }).getByRole("button", { name: "Delete" }).click();
-  await expect(page.getByRole("heading", { name: "Notes and votes (0)" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Team votes" }).getByText("1 voted · 0 notes")).toBeVisible();
 });
 
 test("a viewer sees scores and answers but cannot review; they can add notes", async ({ page, data, land }) => {
   const { co, jobId, riley } = await setup(data);
   await signInViaUi(page, co.users.viewer, `/app/${co.slug}/candidates?job=${jobId}`);
-  await land(new RegExp(`/candidates\\?job=${jobId}$`), "Candidates · Staff accountant");
+  await land(new RegExp(`/candidates\\?job=${jobId}$`), "Staff accountant");
   await page.getByRole("link", { name: "Riley Chen" }).click();
   await land(new RegExp(`/candidates/${riley.inviteId}$`), "Riley Chen");
 
-  await expect(page.getByText("· read-only")).toBeVisible();
-  await expect(page.getByTestId("final-score")).toHaveText("42.1%");
-  const reply = page.getByRole("article", { name: "Reply to Marcus" });
-  await expect(reply.getByText(REPLY_BODY)).toBeVisible();
+  await expect(page.getByText("Read-only", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("final-score")).toHaveText("42.1");
+  const reply = page.getByRole("region", { name: /Reply to Marcus$/ });
+  await expect(reply.getByText(REPLY_BODY, { exact: false })).toBeVisible();
   await expect(reply.getByText("Waiting for a recruiter or admin to score this task.")).toBeVisible();
   await expect(page.getByRole("form", { name: /Review/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Save review" })).toHaveCount(0);
   await expect(page.getByRole("spinbutton")).toHaveCount(0);
 
   // Notes and votes are open to viewers (docs/03).
-  await page.getByLabel("Add a note").fill("Would like to meet her.");
-  await page.getByRole("radio", { name: "Unsure" }).check();
-  await page.getByRole("button", { name: "Add note" }).click();
-  await expect(page.getByText("Note added.")).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Would like to meet her." }).getByText(co.users.viewer.email)).toBeVisible();
+  const votes = page.getByRole("region", { name: "Team votes" });
+  await votes.getByLabel("Add a note").fill("Would like to meet her.");
+  await votes.getByRole("button", { name: "Post note" }).click();
+  await expect(votes.getByText("Note added.")).toBeVisible();
+  await expect(votes.getByRole("listitem").filter({ hasText: "Would like to meet her." }).getByText(co.users.viewer.email)).toBeVisible();
+  await votes.getByRole("button", { name: "Unsure" }).click();
+  await expect(votes.getByRole("list", { name: "Votes" }).getByRole("listitem").filter({ hasText: "You" })).toContainText("Unsure");
 });
 
 test.describe("another company's report", () => {

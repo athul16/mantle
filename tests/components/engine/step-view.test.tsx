@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { StepView } from "@/lib/engine/client/StepView";
-import { clientStepTypes, hasStepComponent } from "@/lib/engine/client/registry";
+import { clientStepTypes, hasStepComponent, stepBrief } from "@/lib/engine/client/registry";
 import type { PublicStep } from "@/lib/engine/types";
 
 const numeric: PublicStep = { id: "s1", type: "numeric", title: "Shortage", config: { prompt: "How much is missing?", decimals: 2 } };
@@ -50,5 +50,21 @@ describe("StepView", () => {
     render(<StepView step={{ id: "x", type: "multiple_choice", title: "MC", config: {} }} onChange={() => {}} />);
     expect(screen.getByText("This task type (multiple_choice) can't be shown. Please contact support.")).toBeVisible();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+});
+
+describe("stepBrief", () => {
+  it("gives the page the prompt of steps that don't show it themselves", () => {
+    expect(stepBrief(reply)).toBe("Answer the client.");
+    expect(stepBrief(sheet)).toBe("Fill it in.");
+  });
+
+  it("leaves a numeric step's prompt on the step (it's the question)", () => {
+    expect(stepBrief(numeric)).toBeNull();
+  });
+
+  it("returns null when there is no prompt", () => {
+    expect(stepBrief({ type: "spreadsheet", config: { columns: [], rows: [] } })).toBeNull();
+    expect(stepBrief({ type: "spreadsheet", config: null })).toBeNull();
   });
 });

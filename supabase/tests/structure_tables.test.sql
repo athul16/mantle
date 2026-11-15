@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(38);
 
 -- (column, type, not null, default expression or '', identity 'a'/'d'/'')
 create function pg_temp.columns_of(tbl text)
@@ -24,7 +24,7 @@ $$;
 
 select tables_are(
   'public',
-  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log'],
+  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles', 'invite_accommodations', 'ai_shadow_scores'],
   'public has exactly the expected tables'
 );
 
@@ -114,7 +114,9 @@ select set_eq(
        ('expires_at', 'timestamp with time zone', true, '', ''),
        ('status', 'text', true, '''invited''::text', ''),
        ('created_by', 'uuid', false, '', ''),
-       ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
+       ('created_at', 'timestamp with time zone', true, 'now()', ''),
+       ('last_sent_at', 'timestamp with time zone', true, 'now()', ''),
+       ('sent_count', 'integer', true, '1', '') $$,
   'invites: columns, types, nullability, defaults'
 );
 select col_is_pk('public', 'invites', array['id'], 'invites: primary key (id)');
@@ -132,6 +134,7 @@ select set_eq(
        ('submit_reason', 'text', false, '', ''),
        ('status', 'text', true, '''not_started''::text', ''),
        ('score', 'jsonb', false, '', ''),
+       ('auto_score', 'jsonb', false, '', ''),
        ('integrity_label', 'text', false, '', ''),
        ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
   'attempts: columns, types, nullability, defaults'
@@ -170,6 +173,7 @@ select set_eq(
        ('step_id', 'text', true, '', ''),
        ('answer', 'jsonb', true, '', ''),
        ('score', 'jsonb', false, '', ''),
+       ('auto_score', 'jsonb', false, '', ''),
        ('updated_at', 'timestamp with time zone', true, 'now()', '') $$,
   'step_responses: columns, types, nullability, defaults'
 );
@@ -260,11 +264,12 @@ select set_eq(
 select col_is_pk('public', 'audit_log', array['id'], 'audit_log: primary key (id)');
 
 -- Every tenant-owned table carries org_id (scenarios: null = platform library).
+-- profiles is per person, not per company (one person can be in several).
 select is_empty(
   $$ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r' and c.relname <> 'organizations'
+      where n.nspname = 'public' and c.relkind = 'r' and c.relname not in ('organizations', 'profiles')
         and not exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'org_id' and not a.attisdropped) $$,
-  'every public table except organizations has an org_id column'
+  'every public table except organizations and profiles has an org_id column'
 );
 select is_empty(
   $$ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -272,6 +277,31 @@ select is_empty(
       where n.nspname = 'public' and c.relkind = 'r' and c.relname <> 'scenarios' and not a.attnotnull $$,
   'org_id is not null everywhere except scenarios (where null means library)'
 );
+
+-- ai_shadow_scores
+select set_eq(
+  $$ select * from pg_temp.columns_of('ai_shadow_scores') $$,
+  $$ values ('id', 'bigint', true, '', 'a'),
+       ('attempt_id', 'uuid', true, '', ''),
+       ('org_id', 'uuid', true, '', ''),
+       ('step_id', 'text', true, '', ''),
+       ('model', 'text', true, '', ''),
+       ('prompt_version', 'text', true, '', ''),
+       ('status', 'text', true, '', ''),
+       ('criteria', 'jsonb', true, '''[]''::jsonb', ''),
+       ('points', 'numeric', false, '', ''),
+       ('max_points', 'numeric', false, '', ''),
+       ('stop_reason', 'text', false, '', ''),
+       ('error', 'text', false, '', ''),
+       ('input_tokens', 'integer', false, '', ''),
+       ('output_tokens', 'integer', false, '', ''),
+       ('cache_read_input_tokens', 'integer', false, '', ''),
+       ('cache_creation_input_tokens', 'integer', false, '', ''),
+       ('duration_ms', 'integer', false, '', ''),
+       ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
+  'ai_shadow_scores: columns, types, nullability, defaults'
+);
+select col_is_pk('public', 'ai_shadow_scores', array['id'], 'ai_shadow_scores: primary key (id)');
 
 select * from finish();
 rollback;

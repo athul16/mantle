@@ -29,6 +29,7 @@ const { startAttempt, saveAnswer, submitAttempt, getWorkspaceView, recordClientE
   "@/lib/candidate/attempt"
 );
 const { SESSION_COOKIE, MAX_CODE_ATTEMPTS } = await import("@/lib/candidate/config");
+const { MONITORING_CONSENT_VERSION } = await import("@/lib/proctoring/config");
 const { demoPettyCash } = await import("@/lib/engine/scenarios/demo-petty-cash");
 const codeRoute = await import("@/app/api/candidate/code/route");
 const answerRoute = await import("@/app/api/candidate/answer/route");
@@ -44,6 +45,7 @@ const OUTBOX = path.join(process.cwd(), ".dev-outbox");
 let orgId = "";
 let jobId = "";
 let assessmentId = "";
+let scenarioId = "";
 let inviteCount = 0;
 const emails: string[] = [];
 
@@ -52,7 +54,7 @@ function must<R extends { data: unknown; error: unknown }>(res: R): NonNullable<
   return res.data as NonNullable<R["data"]>;
 }
 
-async function makeInvite() {
+async function makeInvite(forJob = jobId) {
   inviteCount += 1;
   const email = `cand-${run}-${inviteCount}@example.test`;
   emails.push(email);
@@ -60,7 +62,7 @@ async function makeInvite() {
   const invite = must(
     await service
       .from("invites")
-      .insert({ org_id: orgId, job_id: jobId, email, expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })
+      .insert({ org_id: orgId, job_id: forJob, email, expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })
       .select("id")
       .single(),
   );
@@ -107,7 +109,7 @@ async function seedFor(attemptId: string) {
 }
 
 beforeAll(async () => {
-  const scenarioId = await publishScenario("demo-petty-cash", 1); // shared library row; never deleted here
+  scenarioId = await publishScenario("demo-petty-cash", 1); // shared library row; never deleted here
   orgId = must(await service.from("organizations").insert({ name: `Candidate test ${run}`, slug: `cand-test-${run}` }).select("id").single()).id;
   assessmentId = must(
     await service
@@ -217,6 +219,52 @@ describe("email code", () => {
     const sessionToken = /ap_candidate=([^;]+)/.exec(cookies[0])![1];
     expect(secret.session_token_hash).toBe(hashToken(sessionToken));
     expect(secret.seed.length).toBeGreaterThan(20);
+    // No camera or screen on this assessment, so there is no monitoring consent to record.
+    const consent = must(await service.from("integrity_events").select("id").eq("attempt_id", attempt.id).eq("kind", "consented_to_monitoring"));
+    expect(consent).toEqual([]);
+  });
+
+  it("records monitoring consent with the verify form when the assessment is monitored", async () => {
+    // A monitored assessment of its own: the shared one above is locked once a candidate verifies.
+    const scenario = must(await service.from("assessments").select("scenario_id").eq("id", assessmentId).single());
+    const monitored = must(
+      await service
+        .from("assessments")
+        .insert({ org_id: orgId, scenario_id: scenario.scenario_id, title: "Monitored", time_limit_minutes: 15, proctoring: { camera: true, screen: true } })
+        .select("id")
+        .single(),
+    ).id;
+    const monitoredJob = must(await service.from("jobs").insert({ org_id: orgId, title: "Monitored job", assessment_id: monitored }).select("id").single()).id;
+    const saved = jobId;
+    jobId = monitoredJob;
+    const invite = await makeInvite();
+    jobId = saved;
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+
+    const form = new FormData();
+    form.set("token", invite.token);
+    form.set("code", await readCode(invite.email));
+    form.set("name", "Monitored Candidate");
+    form.set("consent", "on");
+    const res = await verifyRoute.POST(new NextRequest("http://localhost:3102/api/candidate/verify", { method: "POST", body: form }));
+    expect(res.status).toBe(303);
+
+    const attempt = (await findAttemptForInvite(invite.inviteId, orgId))!;
+    const consent = must(await service.from("integrity_events").select("payload").eq("attempt_id", attempt.id).eq("kind", "consented_to_monitoring"));
+    expect(consent).toEqual([{ payload: expect.objectContaining({ camera: true, screen: true, version: MONITORING_CONSENT_VERSION }) }]);
+  });
+
+  it("emails the code as plain text and as the branded HTML card", async () => {
+    const invite = await makeInvite();
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+    const safe = invite.email.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const file = (await readdir(OUTBOX)).filter((f) => f.endsWith(`-${safe}.json`)).sort().at(-1)!;
+    const mail = JSON.parse(await readFile(path.join(OUTBOX, file), "utf8")) as { subject: string; text: string; html: string };
+    const code = await readCode(invite.email);
+    expect(mail.subject).toBe(`${code} is your code for the Audit intern assessment`);
+    expect(mail.html).toContain("Your sign-in code");
+    expect(mail.html).toContain(`${code.slice(0, 3)} ${code.slice(3)}`);
+    expect(mail.html).toContain(`Candidate test ${run}`);
   });
 });
 
@@ -293,13 +341,20 @@ describe("attempt", () => {
     const keys = demoPettyCash.generate(await seedFor(c.attemptId)).keys as Record<string, { value: number }>;
     expect(await saveAnswer(await fresh(c.sessionToken), "expected-cash", { value: keys["expected-cash"].value })).toMatchObject({ ok: true });
 
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
     expect(await submitAttempt(await fresh(c.sessionToken))).toEqual({ ok: true, reason: "candidate" });
+    // D8 shadow scoring is scheduled after submit; with no API key (tests) it skips.
+    expect(info).toHaveBeenCalledWith(expect.stringContaining(`skipping attempt ${c.attemptId}`));
+    info.mockRestore();
 
     const row = await attemptRow(c.attemptId);
     expect(row).toMatchObject({ status: "scored", submit_reason: "candidate" });
     expect(row.score).toMatchObject({ points: 2, maxPoints: 4 });
-    const response = must(await service.from("step_responses").select("score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
+    const response = must(await service.from("step_responses").select("score, auto_score").eq("attempt_id", c.attemptId).eq("step_id", "expected-cash").single());
     expect(response.score).toMatchObject({ points: 2, maxPoints: 2 });
+    // The automatic score is stored next to the final one (D11).
+    expect(response.auto_score).toEqual(response.score);
+    expect(must(await service.from("attempts").select("auto_score").eq("id", c.attemptId).single()).auto_score).toEqual(row.score);
     expect(must(await service.from("invites").select("status").eq("id", c.inviteId).single()).status).toBe("completed");
 
     // Done means done: no more saves, no new code.
@@ -351,4 +406,100 @@ describe("isolation between candidates", () => {
     expect((await stateRoute.GET(cookieRequest("/api/candidate/state", generateToken()))).status).toBe(401);
   });
 
+});
+
+describe("accommodations (D9)", () => {
+  let proctoring: typeof import("@/lib/proctoring/server");
+  let config: typeof import("@/lib/proctoring/config");
+  let monitoredJob = "";
+
+  beforeAll(async () => {
+    proctoring = await import("@/lib/proctoring/server");
+    config = await import("@/lib/proctoring/config");
+    // A monitored assessment of its own: 20 minutes, camera and screen.
+    const monitored = must(
+      await service
+        .from("assessments")
+        .insert({ org_id: orgId, scenario_id: scenarioId, title: "Monitored", time_limit_minutes: 20, proctoring: { camera: true, screen: true } })
+        .select("id")
+        .single(),
+    ).id;
+    monitoredJob = must(
+      await service.from("jobs").insert({ org_id: orgId, title: "Monitored intern", assessment_id: monitored }).select("id").single(),
+    ).id;
+  });
+
+  async function candidateWith(accommodations: { extra_time_percent?: number; waive_camera?: boolean; waive_screen?: boolean }) {
+    const invite = await makeInvite(monitoredJob);
+    must(await service.from("invite_accommodations").insert({ invite_id: invite.inviteId, org_id: orgId, ...accommodations }));
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+    const result = await verifyCode({ token: invite.token, code: await readCode(invite.email), name: "Test Candidate", consent: true });
+    if (!result.ok) throw new Error(`verify failed: ${result.error}`);
+    return { ...invite, sessionToken: result.sessionToken, attemptId: result.attemptId };
+  }
+
+  it("extra time extends the server-enforced deadline", async () => {
+    const c = await candidateWith({ extra_time_percent: 50 });
+    const session = await fresh(c.sessionToken);
+    expect(session.invite).toMatchObject({ baseTimeLimitMinutes: 20, timeLimitMinutes: 30 });
+
+    const startedAt = new Date();
+    expect(await startAttempt(session, startedAt)).toEqual({ ok: true });
+    const row = await attemptRow(c.attemptId);
+    const limitMs = new Date(row.deadline_at!).getTime() - new Date(row.started_at!).getTime();
+    expect(limitMs).toBe(30 * 60_000);
+
+    // Past the assessment's own 20 minutes the attempt is still open...
+    const at25 = new Date(startedAt.getTime() + 25 * 60_000);
+    expect(await getWorkspaceView(await fresh(c.sessionToken), at25)).not.toBeNull();
+    expect((await attemptRow(c.attemptId)).status).toBe("in_progress");
+    // ...and the server closes it at 30.
+    const at31 = new Date(startedAt.getTime() + 31 * 60_000);
+    expect(await getWorkspaceView(await fresh(c.sessionToken), at31)).toBeNull();
+    const done = await attemptRow(c.attemptId);
+    expect(done.submit_reason).toBe("timeout");
+    expect(done.submitted_at).toBe(row.deadline_at);
+
+    const started = must(
+      await service.from("action_events").select("payload").eq("attempt_id", c.attemptId).eq("kind", "started_attempt").single(),
+    );
+    expect(started.payload).toMatchObject({ timeLimitMinutes: 30, accommodations: { extraTimePercent: 50, waiveCamera: false, waiveScreen: false } });
+  });
+
+  it("without accommodations the deadline is the assessment's limit", async () => {
+    const invite = await makeInvite(monitoredJob);
+    expect(await requestCode(invite.token)).toMatchObject({ ok: true });
+    const result = await verifyCode({ token: invite.token, code: await readCode(invite.email), name: "Test Candidate", consent: true });
+    if (!result.ok) throw new Error(result.error);
+    expect(await startAttempt(await fresh(result.sessionToken))).toEqual({ ok: true });
+    const row = await attemptRow(result.attemptId);
+    expect(new Date(row.deadline_at!).getTime() - new Date(row.started_at!).getTime()).toBe(20 * 60_000);
+  });
+
+  it("a camera waiver skips the camera for that candidate only", async () => {
+    const c = await candidateWith({ waive_camera: true });
+    const session = await fresh(c.sessionToken);
+    expect(await proctoring.getProctoringSettings(session)).toMatchObject({ camera: false, screen: true });
+    expect(await proctoring.createSnapshotUpload(session, "camera")).toEqual({ ok: false, error: "not_enabled" });
+    expect(await proctoring.createSnapshotUpload(session, "screen")).toMatchObject({ ok: true });
+
+    // Another candidate on the same assessment is still asked for the camera.
+    const other = await candidateWith({});
+    expect(await proctoring.getProctoringSettings(await fresh(other.sessionToken))).toMatchObject({ camera: true, screen: true });
+    // The assessment itself is unchanged (and locked).
+    const job = must(await service.from("jobs").select("assessments(proctoring, locked_at)").eq("id", monitoredJob).single());
+    expect(job.assessments).toMatchObject({ proctoring: { camera: true, screen: true } });
+    expect(job.assessments?.locked_at).not.toBeNull();
+  });
+
+  it("the monitoring notice names the company contact", async () => {
+    must(await service.from("organizations").update({ settings: { contact_email: "careers@example.test" } }).eq("id", orgId));
+    const c = await candidateWith({});
+    const session = await fresh(c.sessionToken);
+    expect(session.invite.contactEmail).toBe("careers@example.test");
+    const settings = await proctoring.getProctoringSettings(session);
+    const notice = config.monitoringNotice(settings, session.invite.companyName).join("\n");
+    expect(notice).toContain("careers@example.test");
+    must(await service.from("organizations").update({ settings: {} }).eq("id", orgId));
+  });
 });

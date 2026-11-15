@@ -18,6 +18,7 @@ const { getCandidateSession } = await import("@/lib/candidate/session");
 const { SESSION_COOKIE } = await import("@/lib/candidate/config");
 const proctoring = await import("@/lib/proctoring/server");
 const { getFlagsForReport } = await import("@/lib/proctoring/report");
+const { submitAttempt } = await import("@/lib/candidate/attempt");
 const { reviewFlag } = await import("@/app/app/[orgSlug]/candidates/[inviteId]/flag-actions");
 const signalsRoute = await import("@/app/api/candidate/proctoring/signals/route");
 const uploadRoute = await import("@/app/api/candidate/proctoring/upload/route");
@@ -149,6 +150,51 @@ describe("signals", () => {
     );
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ ok: true, recorded: 1 });
+  });
+});
+
+describe("downtime (timer keeps running, D4)", () => {
+  const downRows = async (attemptId: string) =>
+    must(await db.from("integrity_events").select("at, payload").eq("attempt_id", attemptId).eq("kind", "monitoring_down").order("at"));
+
+  it("records a down period when the source comes back, once, and flags a long gap", async () => {
+    const c = await candidate(proctoredJob);
+    // One clock reading for both ends, so the gap is exactly 45 s.
+    const now = Date.now();
+    const at = (msAgo: number) => new Date(now - msAgo).toISOString();
+    await proctoring.recordSignals(c.session, {
+      signals: [
+        { kind: "screen_share_stopped", at: at(120_000) },
+        { kind: "screen_share_started", at: at(75_000), surface: "monitor" },
+      ],
+    });
+    // Another batch must not record the same gap again.
+    await proctoring.recordSignals(c.session, { signals: [{ kind: "copied", at: iso(1000), chars: 1 }] });
+    const rows = await downRows(c.attemptId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload).toMatchObject({ source: "screen", downMs: 45_000, closedBy: "reconnected" });
+
+    const [flag] = must(await db.from("flags").select("reason, evidence").eq("attempt_id", c.attemptId).eq("rule", "downtime"));
+    expect(flag.reason).toBe("Camera or screen share was down 1 time: the task was covered for 45 s in total while the timer kept running");
+
+    const report = await getFlagsForReport(db, co.orgId, c.attemptId);
+    const downtime = report.flags.find((f) => f.rule === "downtime")!;
+    expect(downtime.events[0]).toMatchObject({ kind: "monitoring_down", source: "screen", downMs: 45_000, closedBy: "reconnected" });
+  });
+
+  it("closes a gap still open at submit (tab closed or never reconnected)", async () => {
+    const c = await candidate(proctoredJob);
+    await proctoring.recordSignals(c.session, { signals: [{ kind: "camera_stopped", at: iso(100_000) }] });
+    expect(await downRows(c.attemptId)).toEqual([]);
+
+    const fresh = (await getCandidateSession(c.token))!;
+    expect(await submitAttempt(fresh)).toEqual({ ok: true, reason: "candidate" });
+    const rows = await downRows(c.attemptId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload).toMatchObject({ source: "camera", closedBy: "submitted" });
+    expect((rows[0].payload as { downMs: number }).downMs).toBeGreaterThanOrEqual(100_000);
+    const flags = must(await db.from("flags").select("rule").eq("attempt_id", c.attemptId).order("rule"));
+    expect(flags.map((f) => f.rule)).toEqual(["camera", "downtime"]);
   });
 });
 

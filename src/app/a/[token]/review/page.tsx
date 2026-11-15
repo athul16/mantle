@@ -1,52 +1,111 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getReview } from "@/lib/candidate/attempt";
+import { Icon } from "@/components/icons";
+import { getWorkspaceView } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
-import { CandidateCard, Notice, primaryButton, secondaryButton } from "../../ui";
-import { SubmitButton } from "../submit-button";
+import { hasAnswer, stepKindLabel } from "../workspace/labels";
+import { LiveTimer } from "../workspace/parts";
+import { ReviewSubmit } from "./review-form";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
 export const instant = false;
 
-export const metadata = { title: "Review and submit" };
+export const metadata = { title: "Review before you submit" };
 
+/** Review and submit (prototype "review B"): every task that has arrived, whether it has an answer, and the final submit. */
 export default async function ReviewPage({ params }: PageProps<"/a/[token]/review">) {
   const { token } = await params;
   const { session, attempt } = await requireSessionPage(token, ["in_progress"]);
-  const items = await getReview(session);
-  if (!items) redirect(pageForStatus(token, attempt));
-  const unanswered = items.filter((i) => !i.answered).length;
+  const view = await getWorkspaceView(session);
+  if (!view) redirect(pageForStatus(token, attempt));
+  const rows = view.steps.map((s, i) => ({ step: s, n: i + 1, answered: hasAnswer(view.answers[s.id]) }));
+  const open = rows.filter((r) => !r.answered).length;
+  const company = session.invite.companyName;
 
   return (
-    <CandidateCard title="Review and submit" wide>
-      <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 text-sm dark:divide-neutral-800 dark:border-neutral-800">
-        {items.map((i) => (
-          <li key={i.stepId} className="flex justify-between gap-4 px-4 py-3">
-            <span>{i.title}</span>
-            <span className={i.answered ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"}>
-              {i.answered ? "Answered" : "Not answered"}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <Notice tone={unanswered ? "error" : "info"}>
-        {unanswered
-          ? `${unanswered} ${unanswered === 1 ? "task has" : "tasks have"} no answer. More messages may still arrive before time runs out.`
-          : "All tasks so far have an answer. More messages may still arrive before time runs out."}{" "}
-        After you submit you can&apos;t change your answers.
-      </Notice>
-      <div className="flex gap-3">
-        <Link href={`/a/${token}/workspace`} className={secondaryButton}>
-          Back to the test
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <header className="rv-head">
+        <LiveTimer deadlineAt={view.deadlineAt} serverNow={view.serverNow} />
+        <span className="strong">{view.title}</span>
+        <span className="grow" />
+        <Link href={`/a/${token}/workspace`} className="btn">
+          <Icon name="chevL" />
+          Back to workspace
         </Link>
-        <form action="/api/candidate/submit" method="post">
-          <input type="hidden" name="token" value={token} />
-          <SubmitButton className={primaryButton} pendingText="Submitting…">
-            Submit my answers
-          </SubmitButton>
-        </form>
-      </div>
-    </CandidateCard>
+      </header>
+      <main style={{ maxWidth: 880, margin: "0 auto", padding: "40px 24px 120px", display: "flex", flexDirection: "column", gap: 22 }}>
+        <div className="col g6">
+          <h1 style={{ fontSize: 28 }}>Review before you submit</h1>
+          <p className="ink2">
+            The clock is still running, and more messages may arrive before time runs out.{" "}
+            {open ? `${open === 1 ? "One task looks" : `${open} tasks look`} unfinished. Fix anything you want, or submit now.` : "Every task has an answer."}
+          </p>
+        </div>
+        <section className="card" style={{ overflowX: "auto" }}>
+          <table className="tbl" style={{ fontSize: 14 }}>
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Status</th>
+                <th>
+                  <span className="sr">Action</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ step, n, answered }) => (
+                <tr key={step.id}>
+                  <td>
+                    <span className="strong">
+                      {n} · {step.title}
+                    </span>
+                    <span className="xs muted" style={{ display: "block" }}>
+                      {stepKindLabel(step.type)}
+                    </span>
+                  </td>
+                  <td>
+                    {answered ? (
+                      <span className="badge b-ok">
+                        <Icon name="check" />
+                        Answered
+                      </span>
+                    ) : (
+                      <span className="badge">
+                        <Icon name="circle" />
+                        Not started
+                      </span>
+                    )}
+                  </td>
+                  <td className="r">
+                    <Link
+                      href={`/a/${token}/workspace?task=${encodeURIComponent(step.id)}`}
+                      className={answered ? "btn btn-sm btn-ghost" : "btn btn-sm"}
+                      aria-label={`${answered ? "Open" : "Start"} ${step.title}`}
+                    >
+                      {answered ? "Open" : "Start"}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+        <section style={{ padding: "20px 22px", borderRadius: 12, background: "#fff", border: "1px solid var(--line-2)", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="row g12" style={{ alignItems: "flex-start" }}>
+            <span className="ovicon" style={{ width: 36, height: 36, borderRadius: 9, background: "var(--subtle)", flex: "none" }}>
+              <Icon name="lock" />
+            </span>
+            <div>
+              <div className="strong">Submitting is final</div>
+              <p className="small ink2">
+                You won&apos;t be able to reopen any task. Drafts are submitted as they are, and {company} sees exactly what&apos;s saved.
+              </p>
+            </div>
+          </div>
+          <ReviewSubmit token={token} />
+        </section>
+      </main>
+    </div>
   );
 }

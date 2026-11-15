@@ -1,10 +1,11 @@
--- Retention and delete on request (docs/02 Compliance): the per-org retention
--- setting, private.purge_candidate, the admin-only delete_candidate_data, and
--- the service-only functions the daily cron calls.
+-- Retention and delete on request (docs/02 Compliance): the per-org media and
+-- results retention settings, private.purge_candidate, the admin-only
+-- delete_candidate_data, and the service-only functions the daily cron calls
+-- for each clock.
 begin;
 \ir fixtures/setup.psql
 
-select plan(68);
+select plan(102);
 
 update public.invites set candidate_name = 'Ada Candidate' where id = pg_temp.fx('inv_a');
 insert into storage.objects (bucket_id, name)
@@ -16,20 +17,27 @@ values ('proctoring', pg_temp.fx('org_a')::text || '/' || pg_temp.fx('att_a')::t
 
 select has_function('private', 'purge_candidate', array['uuid'], 'private.purge_candidate(uuid) exists');
 select has_function('public', 'delete_candidate_data', array['uuid'], 'public.delete_candidate_data(uuid) exists');
-select has_function('public', 'set_retention_days', array['uuid', 'integer'], 'public.set_retention_days(uuid, int) exists');
+select has_function('public', 'set_retention', array['uuid', 'integer', 'integer'], 'public.set_retention(uuid, int, int) exists');
+select hasnt_function('public', 'set_retention_days', array['uuid', 'integer'], 'the single-clock setter is gone');
+select hasnt_function('private', 'retention_days', array['uuid'], 'the single-clock reader is gone');
 select has_function('public', 'list_candidates_past_retention', array['timestamp with time zone', 'integer'], 'cron listing exists');
 select has_function('public', 'purge_candidate_for_retention', array['uuid', 'timestamp with time zone'], 'cron purge exists');
-select has_function('private', 'retention_days', array['uuid'], 'private.retention_days(uuid) exists');
+select has_function('public', 'list_media_past_retention', array['timestamp with time zone', 'integer'], 'cron media listing exists');
+select has_function('public', 'purge_media_for_retention', array['uuid', 'timestamp with time zone'], 'cron media purge exists');
+select has_function('private', 'media_retention_days', array['uuid'], 'private.media_retention_days(uuid) exists');
+select has_function('private', 'results_retention_days', array['uuid'], 'private.results_retention_days(uuid) exists');
 
 select is_definer('private', 'purge_candidate', array['uuid'], 'purge_candidate is security definer');
 select is_definer('public', 'delete_candidate_data', array['uuid'], 'delete_candidate_data is security definer');
-select is_definer('public', 'set_retention_days', array['uuid', 'integer'], 'set_retention_days is security definer');
+select is_definer('public', 'set_retention', array['uuid', 'integer', 'integer'], 'set_retention is security definer');
+select is_definer('public', 'list_media_past_retention', array['timestamp with time zone', 'integer'], 'media listing is security definer');
+select is_definer('public', 'purge_media_for_retention', array['uuid', 'timestamp with time zone'], 'media purge is security definer');
 select is_definer('public', 'list_candidates_past_retention', array['timestamp with time zone', 'integer'], 'listing is security definer');
 select is_definer('public', 'purge_candidate_for_retention', array['uuid', 'timestamp with time zone'], 'cron purge is security definer');
 
 select ok(not has_function_privilege('anon', 'public.delete_candidate_data(uuid)', 'execute'), 'anon cannot execute delete_candidate_data');
 select ok(has_function_privilege('authenticated', 'public.delete_candidate_data(uuid)', 'execute'), 'authenticated can execute delete_candidate_data');
-select ok(not has_function_privilege('anon', 'public.set_retention_days(uuid, integer)', 'execute'), 'anon cannot execute set_retention_days');
+select ok(not has_function_privilege('anon', 'public.set_retention(uuid, integer, integer)', 'execute'), 'anon cannot execute set_retention');
 select ok(not has_function_privilege('anon', 'private.purge_candidate(uuid)', 'execute'), 'anon cannot execute purge_candidate');
 select ok(not has_function_privilege('authenticated', 'private.purge_candidate(uuid)', 'execute'), 'authenticated cannot call purge_candidate directly');
 select ok(not has_function_privilege('authenticated', 'public.list_candidates_past_retention(timestamptz, integer)', 'execute'), 'authenticated cannot list for the cron');
@@ -38,46 +46,75 @@ select ok(not has_function_privilege('authenticated', 'public.purge_candidate_fo
 select ok(not has_function_privilege('anon', 'public.purge_candidate_for_retention(uuid, timestamptz)', 'execute'), 'anon cannot run the cron purge');
 select ok(has_function_privilege('service_role', 'public.list_candidates_past_retention(timestamptz, integer)', 'execute'), 'service role can list');
 select ok(has_function_privilege('service_role', 'public.purge_candidate_for_retention(uuid, timestamptz)', 'execute'), 'service role can purge');
+select ok(not has_function_privilege('authenticated', 'public.list_media_past_retention(timestamptz, integer)', 'execute'), 'authenticated cannot list media for the cron');
+select ok(not has_function_privilege('anon', 'public.list_media_past_retention(timestamptz, integer)', 'execute'), 'anon cannot list media for the cron');
+select ok(not has_function_privilege('authenticated', 'public.purge_media_for_retention(uuid, timestamptz)', 'execute'), 'authenticated cannot run the media purge');
+select ok(not has_function_privilege('anon', 'public.purge_media_for_retention(uuid, timestamptz)', 'execute'), 'anon cannot run the media purge');
+select ok(has_function_privilege('service_role', 'public.list_media_past_retention(timestamptz, integer)', 'execute'), 'service role can list media');
+select ok(has_function_privilege('service_role', 'public.purge_media_for_retention(uuid, timestamptz)', 'execute'), 'service role can purge media');
 
 -- ---------------------------------------------------------------------------
--- Retention setting: default and bounds
+-- Retention settings: defaults and bounds
 -- ---------------------------------------------------------------------------
 
-select is(private.retention_days(pg_temp.fx('org_a')), 180, 'default retention is 180 days');
+select is(private.media_retention_days(pg_temp.fx('org_a')), 90, 'default media retention is 90 days');
+select is(private.results_retention_days(pg_temp.fx('org_a')), 365, 'default results retention is 365 days');
 
 select throws_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": 29}' where id = pg_temp.fx('org_a') $$,
-  '23514', null, 'retention below 30 days is rejected by the table');
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 29}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'media retention below 30 days is rejected by the table');
 select throws_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": 731}' where id = pg_temp.fx('org_a') $$,
-  '23514', null, 'retention above 730 days is rejected by the table');
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 366, "results_retention_days": 730}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'media retention above 365 days is rejected by the table');
 select throws_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": "ninety"}' where id = pg_temp.fx('org_a') $$,
-  '23514', null, 'a non-number retention is rejected');
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 30, "results_retention_days": 29}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'results retention below 30 days is rejected by the table');
 select throws_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": 90.5}' where id = pg_temp.fx('org_a') $$,
-  '23514', null, 'a fractional retention is rejected');
+  $$ update public.organizations set settings = settings || '{"results_retention_days": 731}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'results retention above 730 days is rejected by the table');
+select throws_ok(
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 200, "results_retention_days": 100}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'media kept longer than results is rejected by the table');
+select throws_ok(
+  $$ update public.organizations set settings = settings || '{"results_retention_days": 60}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'results shorter than the default media period is rejected');
+select throws_ok(
+  $$ update public.organizations set settings = settings || '{"media_retention_days": "ninety"}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'a non-number media retention is rejected');
+select throws_ok(
+  $$ update public.organizations set settings = settings || '{"results_retention_days": 400.5}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'a fractional results retention is rejected');
+select throws_ok(
+  $$ update public.organizations set settings = settings || '{"retention_days": 180}' where id = pg_temp.fx('org_a') $$,
+  '23514', null, 'the old single retention key is rejected');
 select lives_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": 30}' where id = pg_temp.fx('org_b') $$,
-  '30 days is allowed');
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 30, "results_retention_days": 30}' where id = pg_temp.fx('org_b') $$,
+  '30 days for both is allowed');
 select lives_ok(
-  $$ update public.organizations set settings = settings || '{"retention_days": 730}' where id = pg_temp.fx('org_b') $$,
-  '730 days is allowed');
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 365, "results_retention_days": 730}' where id = pg_temp.fx('org_b') $$,
+  'the maximums are allowed');
+select lives_ok(
+  $$ update public.organizations set settings = settings || '{"media_retention_days": 120, "results_retention_days": 120}' where id = pg_temp.fx('org_b') $$,
+  'media equal to results is allowed');
 update public.organizations set settings = '{"viewers_see_media": true}' where id = pg_temp.fx('org_b');
 
-select is(pg_temp.try_as('a_recruiter', $$ select public.set_retention_days(pg_temp.fx('org_a'), 90) $$), '42501', 'a recruiter cannot change retention');
-select is(pg_temp.try_as('a_viewer',    $$ select public.set_retention_days(pg_temp.fx('org_a'), 90) $$), '42501', 'a viewer cannot change retention');
-select is(pg_temp.try_as('b_admin',     $$ select public.set_retention_days(pg_temp.fx('org_a'), 90) $$), '42501', 'another org''s admin cannot change retention');
-select is(pg_temp.try_as('anon',        $$ select public.set_retention_days(pg_temp.fx('org_a'), 90) $$), '42501', 'anon cannot change retention');
-select is(pg_temp.try_as('a_admin',     $$ select public.set_retention_days(pg_temp.fx('org_a'), 10) $$), '22023', 'set_retention_days rejects out-of-range days');
+select is(pg_temp.try_as('a_recruiter', $$ select public.set_retention(pg_temp.fx('org_a'), 60, 200) $$), '42501', 'a recruiter cannot change retention');
+select is(pg_temp.try_as('a_viewer',    $$ select public.set_retention(pg_temp.fx('org_a'), 60, 200) $$), '42501', 'a viewer cannot change retention');
+select is(pg_temp.try_as('b_admin',     $$ select public.set_retention(pg_temp.fx('org_a'), 60, 200) $$), '42501', 'another org''s admin cannot change retention');
+select is(pg_temp.try_as('anon',        $$ select public.set_retention(pg_temp.fx('org_a'), 60, 200) $$), '42501', 'anon cannot change retention');
+select is(pg_temp.try_as('a_admin',     $$ select public.set_retention(pg_temp.fx('org_a'), 10, 200) $$), '22023', 'set_retention rejects out-of-range media days');
+select is(pg_temp.try_as('a_admin',     $$ select public.set_retention(pg_temp.fx('org_a'), 60, 800) $$), '22023', 'set_retention rejects out-of-range results days');
+select is(pg_temp.try_as('a_admin',     $$ select public.set_retention(pg_temp.fx('org_a'), 200, 100) $$), '22023', 'set_retention rejects media longer than results');
 
 select pg_temp.act_as('b_admin');
-select public.set_retention_days(pg_temp.fx('org_b'), 90);
+select public.set_retention(pg_temp.fx('org_b'), 30, 90);
 select pg_temp.act_as('owner');
 select is((select settings from public.organizations where id = pg_temp.fx('org_b')),
-  '{"viewers_see_media": true, "retention_days": 90}'::jsonb, 'an admin sets retention and other settings are kept');
-select is(private.retention_days(pg_temp.fx('org_b')), 90, 'retention_days reads the setting');
-select ok(exists (select 1 from public.audit_log where org_id = pg_temp.fx('org_b') and action = 'changed_retention' and actor_id = pg_temp.fx('b_admin')),
+  '{"viewers_see_media": true, "media_retention_days": 30, "results_retention_days": 90}'::jsonb, 'an admin sets both periods and other settings are kept');
+select is(private.media_retention_days(pg_temp.fx('org_b')), 30, 'media_retention_days reads the setting');
+select is(private.results_retention_days(pg_temp.fx('org_b')), 90, 'results_retention_days reads the setting');
+select ok(exists (select 1 from public.audit_log where org_id = pg_temp.fx('org_b') and action = 'changed_retention'
+                    and actor_id = pg_temp.fx('b_admin') and target = 'media 30 days, results 90 days'),
   'changing retention is audited');
 
 -- ---------------------------------------------------------------------------
@@ -139,13 +176,13 @@ select is(
   0, 'the audit row holds no candidate PII');
 
 -- ---------------------------------------------------------------------------
--- The cron listing honours each org's retention
+-- The cron listing honours each org's results retention
 -- ---------------------------------------------------------------------------
 
 -- org A: 30 days. inv_a2 expired 40 days ago and was never started: past retention.
-update public.organizations set settings = '{"retention_days": 30}' where id = pg_temp.fx('org_a');
+update public.organizations set settings = '{"media_retention_days": 30, "results_retention_days": 30}' where id = pg_temp.fx('org_a');
 update public.invites set created_at = now() - interval '50 days', expires_at = now() - interval '40 days' where id = pg_temp.fx('inv_a2');
--- org B: 90 days (set above). inv_b expired 40 days ago: still kept.
+-- org B: results 90 days, media 30 (set above). inv_b expired 40 days ago: results still kept.
 update public.invites set created_at = now() - interval '50 days', expires_at = now() - interval '40 days' where id = pg_temp.fx('inv_b');
 update public.attempts set started_at = now() - interval '45 days', deadline_at = now() - interval '45 days' + interval '1 hour', status = 'submitted', submitted_at = now() - interval '45 days' where id = pg_temp.fx('att_b');
 -- org B: an old invite whose attempt was submitted recently is kept (the clock runs from the last activity).
@@ -181,6 +218,54 @@ select is(
   (select count(*)::int from public.audit_log
    where org_id = pg_temp.fx('org_a') and action = 'retention_purge' and actor_id is null and target = 'invite:' || pg_temp.fx('inv_a2')::text),
   1, 'the cron purge is audited with no actor');
+
+-- ---------------------------------------------------------------------------
+-- The media clock: snapshots go first, the results stay
+-- ---------------------------------------------------------------------------
+
+-- att_b_recent has a snapshot from 10 days ago: inside org B's 30 media days.
+insert into public.media (attempt_id, org_id, source, storage_path)
+values (pg_temp.fx('att_b_recent'), pg_temp.fx('org_b'), 'screen', 'org-b/att-b-recent/1.jpg');
+
+select pg_temp.act_as('service');
+select set_config('pgtap.media', (select coalesce(string_agg(attempt_id::text, ',' order by attempt_id), '') from public.list_media_past_retention(now(), 100)), true);
+select pg_temp.act_as('owner');
+
+select ok(pg_temp.fx('att_b')::text = any(string_to_array(current_setting('pgtap.media'), ',')),
+  'lists an attempt past its org''s 30 media days although its results are kept');
+select ok(not pg_temp.fx('att_b_recent')::text = any(string_to_array(current_setting('pgtap.media'), ',')),
+  'keeps an attempt''s media inside the media period');
+select is((select count(*)::int from public.list_media_past_retention(now() - interval '1000 days', 100)), 0, 'no media is past retention in the past');
+
+select is(pg_temp.try_as('service', $$ select public.purge_media_for_retention(pg_temp.fx('att_b_recent'), now()) $$), '22023',
+  'the media purge refuses an attempt inside the media period');
+select is(pg_temp.try_as('service', $$ select public.purge_media_for_retention(gen_random_uuid(), now()) $$), '22023',
+  'the media purge refuses an unknown attempt');
+
+select pg_temp.act_as('service');
+select set_config('pgtap.media_paths', array_to_string(public.purge_media_for_retention(pg_temp.fx('att_b'), now()), ','), true);
+select pg_temp.act_as('owner');
+
+select is(current_setting('pgtap.media_paths'), 'org-b/att-b/1.jpg', 'the media purge returns the snapshot paths to remove');
+select is((select count(*)::int from public.media where attempt_id = pg_temp.fx('att_b')), 0, 'media rows deleted');
+select is((select count(*)::int from public.media where attempt_id = pg_temp.fx('att_b_recent')), 1, 'other attempts'' media kept');
+select is(
+  (select count(*)::int from public.invites where id = pg_temp.fx('inv_b'))
+  + (select count(*)::int from public.attempts where id = pg_temp.fx('att_b'))
+  + (select count(*)::int from public.step_responses where attempt_id = pg_temp.fx('att_b'))
+  + (select count(*)::int from public.integrity_events where attempt_id = pg_temp.fx('att_b'))
+  + (select count(*)::int from public.flags where attempt_id = pg_temp.fx('att_b'))
+  + (select count(*)::int from public.notes where attempt_id = pg_temp.fx('att_b')),
+  6, 'the media purge keeps the invite, attempt, answers, events, flags and notes');
+select is(
+  (select count(*)::int from public.audit_log
+   where org_id = pg_temp.fx('org_b') and action = 'media_retention_purge' and actor_id is null and target = 'attempt:' || pg_temp.fx('att_b')::text),
+  1, 'the media purge is audited with no actor');
+
+select pg_temp.act_as('service');
+select ok(not exists (select 1 from public.list_media_past_retention(now(), 100) where attempt_id = pg_temp.fx('att_b')),
+  'a purged attempt is no longer listed');
+select pg_temp.act_as('owner');
 
 select * from finish();
 rollback;

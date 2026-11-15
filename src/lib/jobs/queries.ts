@@ -1,5 +1,6 @@
 import "server-only";
 
+import { readAccommodations, type Accommodations } from "@/lib/accommodations";
 import { createClient } from "@/lib/supabase/server";
 import { readProctoring, type Proctoring } from "./schemas";
 import { displayStatus, type InviteStatus } from "./status";
@@ -144,19 +145,26 @@ export type InviteRow = {
   candidateName: string | null;
   status: InviteStatus;
   sentAt: string;
+  /** When the link was last emailed (first send or latest resend). */
+  lastSentAt: string;
+  sentCount: number;
   expiresAt: string;
+  accommodations: Accommodations;
+  /** Accommodations can change until the candidate starts. */
+  started: boolean;
 };
 
 export async function listInvites(orgId: string, jobId: string): Promise<InviteRow[]> {
   const db = await createClient();
   const { data, error } = await db
     .from("invites")
-    .select("id, email, candidate_name, status, created_at, expires_at")
+    .select("id, email, candidate_name, status, created_at, last_sent_at, sent_count, expires_at, attempts(started_at)")
     .eq("org_id", orgId)
     .eq("job_id", jobId)
     .order("created_at", { ascending: false })
     .order("email");
   if (error) throw error;
+  const accommodations = await accommodationsFor(orgId, data.map((i) => i.id));
   const now = Date.now();
   return data.map((i) => ({
     id: i.id,
@@ -164,6 +172,38 @@ export async function listInvites(orgId: string, jobId: string): Promise<InviteR
     candidateName: i.candidate_name,
     status: displayStatus(i.status, i.expires_at, now),
     sentAt: i.created_at,
+    lastSentAt: i.last_sent_at,
+    sentCount: i.sent_count,
     expiresAt: i.expires_at,
+    accommodations: accommodations.get(i.id) ?? readAccommodations(null),
+    started: i.status === "started" || i.status === "completed" || startedAt(i.attempts) !== null,
   }));
+}
+
+function startedAt(attempts: { started_at: string | null } | { started_at: string | null }[] | null): string | null {
+  const list = Array.isArray(attempts) ? attempts : attempts ? [attempts] : [];
+  return list.find((a) => a.started_at)?.started_at ?? null;
+}
+
+/** Accommodations by invite id, for invites that have a row (D9). */
+export async function accommodationsFor(orgId: string, inviteIds: string[]): Promise<Map<string, Accommodations>> {
+  const out = new Map<string, Accommodations>();
+  if (!inviteIds.length) return out;
+  const db = await createClient();
+  // Chunked so a long invite list doesn't make an overlong URL.
+  for (let n = 0; n < inviteIds.length; n += 200) {
+    const { data, error } = await db
+      .from("invite_accommodations")
+      .select("invite_id, extra_time_percent, waive_camera, waive_screen")
+      .eq("org_id", orgId)
+      .in("invite_id", inviteIds.slice(n, n + 200));
+    if (error) throw error;
+    for (const row of data) out.set(row.invite_id, readAccommodations(row));
+  }
+  return out;
+}
+
+/** One invite's accommodations, for the candidate report. */
+export async function getInviteAccommodations(orgId: string, inviteId: string): Promise<Accommodations> {
+  return (await accommodationsFor(orgId, [inviteId])).get(inviteId) ?? readAccommodations(null);
 }

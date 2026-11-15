@@ -5,10 +5,10 @@ import { chromiumOnly, expect, test } from "../support/test";
 
 chromiumOnly();
 
-/** The team list row for an email. */
+/** The team table row for an email. */
 const inviteForm = (page: import("@playwright/test").Page) =>
   page.locator("form").filter({ has: page.getByRole("heading", { name: "Invite a teammate" }) });
-const row = (page: import("@playwright/test").Page, email: string) => page.getByRole("listitem").filter({ hasText: email });
+const row = (page: import("@playwright/test").Page, email: string) => page.getByRole("row").filter({ hasText: email });
 
 test("an admin adds an existing user as a viewer", async ({ page, company, data, signInAs, land }) => {
   const existing = await data.user("existing");
@@ -84,7 +84,7 @@ for (const role of ["recruiter", "viewer"] as const) {
   test(`a ${role} sees the team read-only`, async ({ page, company, signInAs, land }) => {
     await signInAs(role, `/app/${company.slug}/team`);
     await land(new RegExp(`/team$`), "Team");
-    await expect(page.getByText("Only admins can change the team.")).toBeVisible();
+    await expect(page.getByText(`You're a ${role}, so you can see the team but not change it.`, { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Send invite" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Remove|Leave/ })).toHaveCount(0);
     await expect(page.getByRole("combobox", { name: "Role" })).toHaveCount(0);

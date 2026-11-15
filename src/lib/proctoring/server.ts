@@ -1,11 +1,12 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { applyWaivers } from "@/lib/accommodations";
 import type { Json } from "@/lib/database.types";
 import { settleAttempt } from "@/lib/candidate/attempt";
-import type { AttemptRow } from "@/lib/candidate/invite";
+import type { AttemptRow, InviteContext } from "@/lib/candidate/invite";
 import type { CandidateSession } from "@/lib/candidate/session";
-import { readRetentionDays } from "@/lib/retention/policy";
+import { readRetention } from "@/lib/retention/policy";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   CONSENT_SIGNAL,
@@ -14,10 +15,10 @@ import {
   PROCTORING_BUCKET,
   readProctoring,
   type MonitoringSettings,
-  type Proctoring,
   type SnapshotSource,
 } from "./config";
-import { evaluateRules, integrityLabel, parseSignalBatch, type MediaRef, type SignalEvent } from "./rules";
+import { recordDownPeriods, refreshFlags } from "./flags";
+import { parseSignalBatch } from "./rules";
 
 /**
  * Proctoring for candidate routes. Every function starts from a verified
@@ -29,16 +30,36 @@ import { evaluateRules, integrityLabel, parseSignalBatch, type MediaRef, type Si
 type AttemptKey = Pick<AttemptRow, "id" | "org_id">;
 const ACTIVE: AttemptRow["status"][] = ["not_started", "in_progress"];
 
-/** The assessment's camera / screen settings for this candidate. */
+/**
+ * The camera / screen settings for this candidate: the assessment's, minus any
+ * waiver set on the invite (D9; the assessment itself stays locked), plus what
+ * the monitoring notice shows (retention, company contact).
+ */
 export async function getProctoringSettings(session: CandidateSession): Promise<MonitoringSettings> {
+  return getInviteProctoringSettings(session.invite);
+}
+
+/**
+ * The same settings for an invite before the candidate has a session (the
+ * verify page shows what will be recorded before they agree).
+ */
+export async function getInviteProctoringSettings(
+  invite: Pick<InviteContext, "assessmentId" | "orgId" | "accommodations" | "contactEmail">,
+): Promise<MonitoringSettings> {
   const db = createServiceClient();
   const [assessment, org] = await Promise.all([
-    db.from("assessments").select("proctoring").eq("id", session.invite.assessmentId).eq("org_id", session.invite.orgId).single(),
-    db.from("organizations").select("settings").eq("id", session.invite.orgId).single(),
+    db.from("assessments").select("proctoring").eq("id", invite.assessmentId).eq("org_id", invite.orgId).single(),
+    db.from("organizations").select("settings").eq("id", invite.orgId).single(),
   ]);
   if (assessment.error) throw new Error(`proctoring settings lookup failed: ${assessment.error.message}`);
   if (org.error) throw new Error(`org settings lookup failed: ${org.error.message}`);
-  return { ...readProctoring(assessment.data.proctoring), retentionDays: readRetentionDays(org.data.settings) };
+  const { mediaDays, resultsDays } = readRetention(org.data.settings);
+  return {
+    ...applyWaivers(readProctoring(assessment.data.proctoring), invite.accommodations),
+    mediaRetentionDays: mediaDays,
+    resultsRetentionDays: resultsDays,
+    contactEmail: invite.contactEmail,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -60,50 +81,12 @@ export async function recordSignals(session: CandidateSession, body: unknown, no
   );
   if (error) throw new Error(`recording signals failed: ${error.message}`);
 
+  await recordDownPeriods(attempt);
   await refreshFlags(attempt, await getProctoringSettings(session));
   return { ok: true, recorded: signals.length };
 }
 
-/**
- * Re-runs the rules over everything recorded for the attempt. New rules get a
- * flag; open flags get the latest reason and evidence; flags a recruiter has
- * already confirmed or cleared are left exactly as reviewed. Also sets the
- * attempt's integrity label.
- */
-export async function refreshFlags(attempt: AttemptKey, settings: Proctoring): Promise<void> {
-  const db = createServiceClient();
-  const [events, media, existing] = await Promise.all([
-    db.from("integrity_events").select("id, at, kind, payload").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
-    db.from("media").select("id, at, source").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
-    db.from("flags").select("id, rule, status").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).not("rule", "is", null),
-  ]);
-  for (const r of [events, media, existing]) if (r.error) throw new Error(`loading proctoring data failed: ${r.error.message}`);
-
-  const drafts = evaluateRules((events.data ?? []) as SignalEvent[], (media.data ?? []) as MediaRef[], settings);
-  const byRule = new Map((existing.data ?? []).map((f) => [f.rule!, f]));
-
-  for (const d of drafts) {
-    const current = byRule.get(d.rule);
-    const evidence = d.evidence as unknown as Json;
-    if (!current) {
-      const { error } = await db
-        .from("flags")
-        .insert({ attempt_id: attempt.id, org_id: attempt.org_id, rule: d.rule, reason: d.reason, evidence });
-      // 23505: a parallel batch raised the same rule first; the next batch updates it.
-      if (error && error.code !== "23505") throw new Error(`raising flag failed: ${error.message}`);
-    } else if (current.status === "open") {
-      const { error } = await db.from("flags").update({ reason: d.reason, evidence }).eq("id", current.id).eq("status", "open");
-      if (error) throw new Error(`updating flag failed: ${error.message}`);
-    }
-  }
-
-  const { error } = await db
-    .from("attempts")
-    .update({ integrity_label: integrityLabel(drafts) })
-    .eq("id", attempt.id)
-    .eq("org_id", attempt.org_id);
-  if (error) throw new Error(`setting integrity label failed: ${error.message}`);
-}
+export { refreshFlags };
 
 // ---------------------------------------------------------------------------
 // Consent

@@ -5,7 +5,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(55);
+select plan(62);
 
 -- ---------------------------------------------------------------------------
 -- organizations: select
@@ -107,10 +107,14 @@ select is(pg_temp.try_as('b_admin', $$update public.memberships set role = 'view
           'memberships: admin of B cannot change org A roles');
 select is(pg_temp.try_as('a_admin', $$update public.memberships set org_id = pg_temp.fx('org_b') where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_viewer')$$), '42501',
           'memberships: admin cannot move a membership into another org');
--- Provisional: the last admin can demote themselves; keeping one admin is
--- checked in app code (open decision Q4).
-select is(pg_temp.try_as('a_admin', $$update public.memberships set role = 'viewer' where user_id = pg_temp.fx('a_admin')$$), '1',
-          'memberships: the database lets an admin demote themselves (Q4: app enforces one admin)');
+-- Every org keeps at least one admin (decision D13 / Q4): a trigger refuses
+-- removing, demoting or moving the last one with 23514, whoever asks.
+select is(pg_temp.try_as('a_admin', $$update public.memberships set role = 'viewer' where user_id = pg_temp.fx('a_admin')$$), '23514',
+          'memberships: the last admin cannot demote themselves');
+select is(pg_temp.try_as('service', $$update public.memberships set role = 'recruiter' where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_admin')$$), '23514',
+          'memberships: not even the service role can demote the last admin');
+select is(pg_temp.try_as('a_admin', $$update public.memberships set role = 'admin' where user_id = pg_temp.fx('a_admin')$$), '1',
+          'memberships: re-saving the last admin as admin is fine');
 
 -- ---------------------------------------------------------------------------
 -- memberships: delete
@@ -125,6 +129,20 @@ select is(pg_temp.try_as('a_viewer', $$delete from public.memberships where user
           'memberships: a viewer cannot remove their own membership');
 select is(pg_temp.try_as('service', $$delete from public.memberships where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_viewer')$$), '1',
           'memberships: service role can delete');
+select is(pg_temp.try_as('a_admin', $$delete from public.memberships where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_admin')$$), '23514',
+          'memberships: the last admin cannot remove themselves');
+select is(pg_temp.try_as('service', $$delete from public.memberships where org_id = pg_temp.fx('org_b') and role = 'admin'$$), '23514',
+          'memberships: not even the service role can remove the last admin');
+select is(pg_temp.try_as('owner', $$delete from public.organizations where id = pg_temp.fx('org_b')$$), '1',
+          'memberships: deleting the whole org still removes its last admin');
+
+-- With a second admin, either one can step down (but not both).
+insert into public.memberships (org_id, user_id, role) values (pg_temp.fx('org_a'), pg_temp.fx('outsider'), 'admin');
+select is(pg_temp.try_as('a_admin', $$update public.memberships set role = 'recruiter' where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_admin')$$), '1',
+          'memberships: with two admins, one can be demoted');
+select is(pg_temp.try_as('a_admin', $$update public.memberships set role = 'recruiter' where org_id = pg_temp.fx('org_a') and role = 'admin'$$), '23514',
+          'memberships: demoting both admins in one statement is refused');
+delete from public.memberships where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('outsider');
 
 -- A removed member loses access immediately.
 delete from public.memberships where org_id = pg_temp.fx('org_a') and user_id = pg_temp.fx('a_viewer');

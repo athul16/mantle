@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { isMonitored, monitoringNotice, type Proctoring } from "@/lib/proctoring/config";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Icon } from "@/components/icons";
+import { isMonitored, monitoringNotice, type MonitoringSettings, type Proctoring } from "@/lib/proctoring/config";
 import { CAMERA_MESSAGES, SCREEN_MESSAGES, canShareScreen, openCamera, openScreen } from "@/lib/proctoring/client/media";
 import { holdMedia } from "@/lib/proctoring/client/media-store";
 import { CameraPreview } from "@/lib/proctoring/client/proctoring";
 import { makeSignal, sendSignals } from "@/lib/proctoring/client/signals";
 import { takeSnapshot } from "@/lib/proctoring/client/snapshots";
-import { primaryButton, secondaryButton } from "../../ui";
 
 const MIN_WIDTH = 1024;
 const MIN_HEIGHT = 600;
@@ -19,6 +19,18 @@ interface CheckResult {
   screenOk: boolean;
   width: number;
   height: number;
+  browser: string;
+}
+
+/** "Chrome 130", "Edge 130", "Firefox 132", "Safari 18", or "Your browser". */
+function browserName(ua: string): string {
+  const m =
+    /Edg\/(\d+)/.exec(ua) ? ["Edge", /Edg\/(\d+)/.exec(ua)![1]] :
+    /Firefox\/(\d+)/.exec(ua) ? ["Firefox", /Firefox\/(\d+)/.exec(ua)![1]] :
+    /Chrome\/(\d+)/.exec(ua) ? ["Chrome", /Chrome\/(\d+)/.exec(ua)![1]] :
+    /Version\/(\d+).*Safari/.exec(ua) ? ["Safari", /Version\/(\d+)/.exec(ua)![1]] :
+    null;
+  return m ? `${m[0]} ${m[1]}` : "Your browser";
 }
 
 function runChecks(): CheckResult {
@@ -26,7 +38,7 @@ function runChecks(): CheckResult {
   const mobile = uaData?.mobile ?? /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const width = window.screen.width;
   const height = window.screen.height;
-  return { desktop: !mobile, screenOk: width >= MIN_WIDTH && height >= MIN_HEIGHT, width, height };
+  return { desktop: !mobile, screenOk: width >= MIN_WIDTH && height >= MIN_HEIGHT, width, height, browser: browserName(navigator.userAgent) };
 }
 
 let cached: CheckResult | null = null;
@@ -42,17 +54,19 @@ const getSnapshot = () => (cached ??= runChecks());
 const getServerSnapshot = () => null;
 const noSubscribe = () => () => {};
 
-type Device = { state: "idle" | "pending" | "pass" | "fail"; detail?: string };
-type RowState = "pending" | "pass" | "fail" | "off" | "todo";
+type Device = { state: "idle" | "pending" | "pass" | "fail"; detail?: string; reason?: string };
+type RowState = "pending" | "pass" | "fail" | "warn" | "todo";
 
 const record = (kind: Parameters<typeof makeSignal>[0], payload?: Parameters<typeof makeSignal>[1]) =>
   void sendSignals([makeSignal(kind, payload)]).catch(() => {});
 
 /**
- * Browser, screen size and, when the assessment uses them, the monitoring
- * notice, a camera check (with a start photo) and an entire-screen share.
- * Nothing is requested from the browser before the candidate agrees. The
- * camera and screen streams are kept for the workspace (client navigation).
+ * Setup check (prototype vCheck()): browser, screen size and connection, then,
+ * when the assessment uses them, a live camera with a start photo and an
+ * entire-screen share. Consent to monitoring is normally given on the verify
+ * page; if it wasn't recorded (an older session), the notice and an agree box
+ * come first. Nothing is requested from the browser before that. The camera
+ * and screen streams are kept for the workspace (client navigation).
  */
 export function SystemCheck({
   token,
@@ -61,7 +75,7 @@ export function SystemCheck({
   companyName = "the company",
 }: {
   token: string;
-  proctoring?: Proctoring;
+  proctoring?: MonitoringSettings;
   consented?: boolean;
   companyName?: string;
 }) {
@@ -73,7 +87,10 @@ export function SystemCheck({
   const [consentError, setConsentError] = useState<string | null>(null);
   const [camera, setCamera] = useState<Device>({ state: "idle" });
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [photo, setPhoto] = useState<"none" | "taking" | "taken" | "failed">("none");
   const [screen, setScreen] = useState<Device>({ state: "idle" });
+  const [online, setOnline] = useState<"pending" | "ok" | "fail">("pending");
+  const started = useRef(false);
 
   async function agree() {
     setSaving(true);
@@ -98,14 +115,18 @@ export function SystemCheck({
     const r = await openCamera();
     if (!r.ok) {
       if (r.reason === "blocked") record("camera_refused");
-      setCamera({ state: "fail", detail: CAMERA_MESSAGES[r.reason] });
+      setCamera({ state: "fail", detail: CAMERA_MESSAGES[r.reason], reason: r.reason });
       return;
     }
     holdMedia("camera", r.stream);
     setCameraStream(r.stream);
-    setCamera({ state: "pass", detail: "Camera works." });
-    // Start photo (docs/04). Best effort; the workspace keeps taking them.
-    void takeSnapshot("camera", r.stream);
+    setCamera({ state: "pass" });
+  }
+
+  async function takePhoto() {
+    if (!cameraStream) return;
+    setPhoto("taking");
+    setPhoto((await takeSnapshot("camera", cameraStream)) ? "taken" : "failed");
   }
 
   async function shareScreen() {
@@ -114,125 +135,355 @@ export function SystemCheck({
     if (!r.ok) {
       if (r.reason === "wrong_surface") record("screen_share_wrong_surface", { surface: r.surface });
       if (r.reason === "cancelled") record("screen_share_refused");
-      setScreen({ state: "fail", detail: SCREEN_MESSAGES[r.reason] });
+      setScreen({ state: "fail", detail: SCREEN_MESSAGES[r.reason], reason: r.reason });
       return;
     }
     holdMedia("screen", r.stream);
     record("screen_share_started", { surface: r.surface });
-    setScreen({ state: "pass", detail: "Entire screen shared. Keep it shared until you submit." });
+    setScreen({ state: "pass" });
   }
 
-  const basicsPassed = result ? result.desktop && result.screenOk : false;
-  const cameraOk = !proctoring.camera || camera.state === "pass";
-  const screenOk = !proctoring.screen || screen.state === "pass";
-  const passed = basicsPassed && (!monitored || agreed) && cameraOk && screenOk;
+  // Connection: one round trip to our own server.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/health", { cache: "no-store" })
+      .then(() => live && setOnline("ok"))
+      .catch(() => live && setOnline("fail"));
+    return () => {
+      live = false;
+    };
+  }, []);
 
-  const unsupported = proctoring.screen && agreed && !screenSupported;
-  const cameraRow: RowState = !proctoring.camera ? "off" : camera.state === "idle" ? "todo" : camera.state;
-  const screenRow: RowState = !proctoring.screen ? "off" : unsupported ? "fail" : screen.state === "idle" ? "todo" : screen.state;
-  const screenDetail = !proctoring.screen
-    ? "Not used in this test."
-    : unsupported
-      ? SCREEN_MESSAGES.unsupported
-      : (screen.detail ?? "You'll be asked what to share. Pick “Entire screen”.");
+  // The camera starts on its own once the candidate has agreed (as in the prototype).
+  useEffect(() => {
+    if (!proctoring.camera || !agreed || started.current) return;
+    started.current = true;
+    void Promise.resolve().then(testCamera);
+  }, [proctoring.camera, agreed]);
+
+  const unsupported = proctoring.screen && !screenSupported;
+  const rows: { label: string; detail: string; state: RowState }[] = [
+    {
+      label: "Browser",
+      state: result === null ? "pending" : result.desktop ? "pass" : "fail",
+      detail: result === null ? "Checking…" : result.desktop ? result.browser : "Phones and tablets can't run the simulation. Reopen the link on a computer.",
+    },
+    {
+      label: "Screen",
+      state: result === null ? "pending" : result.screenOk ? "pass" : "fail",
+      detail: result === null ? "Checking…" : `${result.width} × ${result.height} · at least ${MIN_WIDTH} × ${MIN_HEIGHT} needed`,
+    },
+    {
+      label: "Connection",
+      state: online === "pending" ? "pending" : online === "ok" ? "pass" : "fail",
+      detail: online === "pending" ? "Checking…" : online === "ok" ? "Stable" : "Offline. Check your internet connection.",
+    },
+  ];
+  if (proctoring.camera) {
+    rows.push({
+      label: "Camera",
+      state: !agreed ? "todo" : camera.state === "idle" ? "pending" : camera.state,
+      detail: !agreed ? "Waiting for your agreement" : camera.state === "pass" ? "Allowed" : camera.state === "fail" ? camera.detail! : "Checking…",
+    });
+  }
+  if (proctoring.screen) {
+    rows.push({
+      label: "Screen sharing",
+      state: unsupported ? "fail" : screen.state === "pass" ? "pass" : screen.reason === "wrong_surface" ? "warn" : screen.state === "pending" ? "pending" : "todo",
+      detail: unsupported
+        ? "Not supported in this browser"
+        : screen.state === "pass"
+          ? "Entire screen shared"
+          : screen.reason === "wrong_surface"
+            ? "You shared a window or tab"
+            : "Not shared yet",
+    });
+  }
+  if (proctoring.camera) {
+    rows.push({
+      label: "Start photo",
+      state: photo === "taken" ? "pass" : photo === "taking" ? "pending" : photo === "failed" ? "fail" : "todo",
+      detail: photo === "taken" ? "Taken" : photo === "taking" ? "Saving…" : photo === "failed" ? "Couldn't save it. Take it again." : "Not taken yet",
+    });
+  }
+
+  const running = rows.some((r) => r.state === "pending");
+  const left = rows.filter((r) => r.state !== "pass").length;
+  const passed = left === 0 && (!monitored || agreed);
+  const sub = result === null || running ? "Running checks…" : left === 0 ? "All set. You can continue." : left === 1 ? "Almost there — one item left." : `${left} items left.`;
 
   return (
-    <div className="space-y-6">
-      {monitored ? (
-        <section aria-labelledby="monitoring-heading" className="space-y-3 rounded-lg border border-neutral-200 p-4 text-sm dark:border-neutral-800">
-          <h2 id="monitoring-heading" className="font-semibold">
+    <>
+      <div>
+        <h1 style={{ fontSize: 24 }}>Check your setup</h1>
+        <p className="ink2" style={{ marginTop: 4 }} aria-live="polite">
+          {sub}
+        </p>
+      </div>
+
+      {monitored && !agreed ? (
+        <section aria-labelledby="monitoring-heading" className="card" style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <h2 id="monitoring-heading" style={{ fontSize: 18 }}>
             Monitoring for this test
           </h2>
           {monitoringNotice(proctoring, companyName).map((p) => (
-            <p key={p} className="leading-6 text-neutral-700 dark:text-neutral-300">
+            <p key={p} className="small ink2">
               {p}
             </p>
           ))}
-          <label className="flex items-start gap-2 font-medium">
+          <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
             <input
               type="checkbox"
-              className="mt-1"
-              checked={agreed || saving}
-              disabled={agreed || saving}
+              className="chk"
+              style={{ marginTop: 2 }}
+              checked={saving}
+              disabled={saving}
               onChange={(e) => {
                 if (e.target.checked) void agree();
               }}
             />
-            <span>I agree to camera and screen monitoring for this test, as described above.</span>
+            <span className="small strong">I agree to camera and screen monitoring for this test, as described above.</span>
           </label>
-          {consentError ? <p className="text-red-700 dark:text-red-400">{consentError}</p> : null}
-          <p className="text-neutral-600 dark:text-neutral-400">No webcam, or need another arrangement? Contact {companyName} before you start.</p>
+          {consentError ? <p className="small badc">{consentError}</p> : null}
         </section>
       ) : null}
 
-      <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 text-sm dark:divide-neutral-800 dark:border-neutral-800">
-        <CheckRow
-          label="Desktop or laptop browser"
-          state={result === null ? "pending" : result.desktop ? "pass" : "fail"}
-          detail={result && !result.desktop ? "This test needs a computer. Please reopen the link on a desktop or laptop." : undefined}
-        />
-        <CheckRow
-          label={`Screen at least ${MIN_WIDTH}×${MIN_HEIGHT}`}
-          state={result === null ? "pending" : result.screenOk ? "pass" : "fail"}
-          detail={result ? `Your screen: ${result.width}×${result.height}` : undefined}
-        />
-        <CheckRow
-          label="Camera"
-          state={cameraRow}
-          detail={!proctoring.camera ? "Not used in this test." : (camera.detail ?? "We take a start photo once it works.")}
-          media={cameraStream ? <CameraPreview stream={cameraStream} className="h-24 w-32" /> : null}
-          action={
-            proctoring.camera && camera.state !== "pass" ? (
-              <button type="button" className={secondaryButton} disabled={!agreed || camera.state === "pending"} onClick={() => void testCamera()}>
-                {camera.state === "fail" ? "Try camera again" : "Test camera"}
-              </button>
-            ) : null
-          }
-        />
-        <CheckRow
-          label="Screen share"
-          state={screenRow}
-          detail={screenDetail}
-          action={
-            proctoring.screen && screen.state !== "pass" && !unsupported ? (
-              <button type="button" className={secondaryButton} disabled={!agreed || screen.state === "pending"} onClick={() => void shareScreen()}>
-                Share entire screen
-              </button>
-            ) : null
-          }
-        />
-      </ul>
+      <div className="row g20 wrap" style={{ alignItems: "flex-start" }}>
+        {proctoring.camera ? (
+          <section style={{ flex: "3 1 400px", display: "flex", flexDirection: "column", gap: 12 }} aria-label="Camera">
+            <CameraPanel camera={camera} stream={cameraStream} agreed={agreed} photo={photo} onRetry={() => void testCamera()} />
+            {camera.state === "pass" ? (
+              <div className="row g12 wrap">
+                <button type="button" className="btn" disabled={photo === "taking"} onClick={() => void takePhoto()}>
+                  <Icon name="camera" />
+                  {photo === "taken" ? "Retake photo" : "Take start photo"}
+                </button>
+                <span className="small muted">Used to confirm the same person finishes the simulation.</span>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+        <ul className="card" style={{ flex: "2 1 280px", overflow: "hidden", listStyle: "none", padding: 0, margin: 0 }} aria-label="System checks">
+          {rows.map((r) => (
+            <li key={r.label} className={`chkrow${r.state === "warn" ? " warn" : r.state === "fail" ? " fail" : ""}`}>
+              <StatusIcon state={r.state} />
+              <span style={{ flex: 1 }}>
+                <span className="strong">{r.label}</span> <span className="ink2">· {r.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      {passed ? (
-        <Link href={`/a/${token}/instructions`} className={primaryButton}>
-          Continue to instructions
-        </Link>
+      {proctoring.screen && screen.state !== "pass" ? (
+        <ScreenShare
+          state={screen}
+          unsupported={unsupported}
+          disabled={!agreed || screen.state === "pending"}
+          onShare={() => void shareScreen()}
+        />
+      ) : null}
+
+      <div className="row g16 wrap">
+        {passed ? (
+          <Link href={`/a/${token}/instructions`} className="btn btn-dark btn-lg">
+            Continue
+            <Icon name="arrowR" />
+          </Link>
+        ) : (
+          <>
+            <button type="button" className="btn btn-dark btn-lg" disabled>
+              Continue
+              <Icon name="arrowR" />
+            </button>
+            {result !== null && !running ? (
+              <span className="small muted">
+                {monitored && !agreed ? "Read and agree to the monitoring notice to continue" : "Finish the remaining checks to continue"}
+              </span>
+            ) : null}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function StatusIcon({ state }: { state: RowState }) {
+  if (state === "pass")
+    return (
+      <span className="okc row" aria-label="Passed" role="img">
+        <Icon name="checkc" />
+      </span>
+    );
+  if (state === "fail")
+    return (
+      <span className="badc row" aria-label="Problem" role="img">
+        <Icon name="xc" />
+      </span>
+    );
+  if (state === "warn")
+    return (
+      <span className="warnc row" aria-label="Needs attention" role="img">
+        <Icon name="alert" />
+      </span>
+    );
+  if (state === "pending")
+    return (
+      <span className="muted row" style={{ width: 16, justifyContent: "center" }} aria-label="Checking" role="img">
+        <span className="spin" style={{ width: 13, height: 13 }} />
+      </span>
+    );
+  return (
+    <span className="muted row" aria-label="To do" role="img">
+      <Icon name="circle" />
+    </span>
+  );
+}
+
+function CameraPanel({
+  camera,
+  stream,
+  agreed,
+  photo,
+  onRetry,
+}: {
+  camera: Device;
+  stream: MediaStream | null;
+  agreed: boolean;
+  photo: "none" | "taking" | "taken" | "failed";
+  onRetry: () => void;
+}) {
+  if (camera.state === "pass" && stream) {
+    return (
+      <div className="campanel">
+        <CameraPreview stream={stream} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+        <span className="camoval" style={{ position: "relative" }} aria-hidden="true" />
+        <span className="campill">
+          <span className="dot" style={{ color: "#6FD49B" }} />
+          Camera working
+        </span>
+        {photo === "taken" ? (
+          <span className="campill" style={{ left: "auto", right: 12, background: "rgba(27,106,58,.9)" }}>
+            <Icon name="check" className="i-sm" />
+            Start photo taken
+          </span>
+        ) : null}
+        <span className="small" style={{ position: "absolute", bottom: 14, color: "#E4E8EC", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+          Center your face in the oval
+        </span>
+      </div>
+    );
+  }
+  if (camera.state === "fail") {
+    return (
+      <div className="campanel" style={{ alignItems: "flex-start", justifyContent: "flex-start" }} role="alert">
+        <div className="camblock">
+          <span className="row g8" style={{ color: "#FFB4AC", fontWeight: 600 }}>
+            <Icon name="videoOff" />
+            {camera.reason === "blocked" ? "Your browser blocked the camera" : "Your camera isn't working"}
+          </span>
+          {camera.reason === "blocked" ? (
+            <ol>
+              <li>Click the camera icon at the right end of the address bar.</li>
+              <li>
+                Choose <strong>Always allow</strong>, then <strong>Done</strong>.
+              </li>
+              <li>
+                Press <strong>Try again</strong>.
+              </li>
+            </ol>
+          ) : (
+            <p style={{ color: "#D3D9E0", fontSize: 14 }}>{camera.detail}</p>
+          )}
+          <div className="row g12 wrap">
+            <button type="button" className="btn" onClick={onRetry}>
+              <Icon name="refresh" />
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="campanel">
+      {agreed ? (
+        <span className="row g8 small">
+          <span className="spin" />
+          Starting your camera…
+        </span>
       ) : (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {result === null ? "Checking…" : monitored && !agreed ? "Read and agree to the monitoring notice to continue." : "Fix the items above to continue."}
-        </p>
+        <span className="small" style={{ color: "#AEB7C2" }}>
+          Your camera starts after you agree to monitoring.
+        </span>
       )}
     </div>
   );
 }
 
-function CheckRow({ label, state, detail, action, media }: { label: string; state: RowState; detail?: string; action?: ReactNode; media?: ReactNode }) {
-  const badge = {
-    pending: <span className="text-neutral-600 dark:text-neutral-400">Checking…</span>,
-    pass: <span className="text-green-700 dark:text-green-400">OK</span>,
-    fail: <span className="text-red-700 dark:text-red-400">Problem</span>,
-    off: <span className="text-neutral-600 dark:text-neutral-400">Not used</span>,
-    todo: <span className="text-neutral-600 dark:text-neutral-400">To do</span>,
-  }[state];
+function ScreenShare({ state, unsupported, disabled, onShare }: { state: Device; unsupported: boolean; disabled: boolean; onShare: () => void }) {
+  if (state.reason === "wrong_surface") {
+    return (
+      <section style={{ padding: "18px 20px", border: "1px solid var(--warn-line)", borderRadius: 12, display: "flex", flexDirection: "column", gap: 14 }} aria-label="Screen sharing">
+        <div>
+          <h2 style={{ fontSize: 16 }}>Share your entire screen</h2>
+          <p className="small ink2" style={{ marginTop: 2 }}>
+            You shared a window or tab. In the browser&apos;s picker, choose <strong>Entire screen</strong>:
+          </p>
+        </div>
+        <div className="picker" aria-hidden="true">
+          <div className="yes">
+            <span className="ph" style={{ height: 64 }} />
+            <span className="small strong okc row g6">
+              <Icon name="check" className="i-sm" />
+              Entire screen
+            </span>
+          </div>
+          <div className="no">
+            <span className="ph" style={{ height: 64 }} />
+            <span className="small muted row g6">
+              <Icon name="x" className="i-sm" />
+              Window
+            </span>
+          </div>
+          <div className="no">
+            <span className="ph" style={{ height: 64 }} />
+            <span className="small muted row g6">
+              <Icon name="x" className="i-sm" />
+              Browser tab
+            </span>
+          </div>
+        </div>
+        <div>
+          <button type="button" className="btn btn-dark btn-sm" disabled={disabled} onClick={onShare}>
+            Share again
+          </button>
+        </div>
+      </section>
+    );
+  }
+  const note: ReactNode = unsupported ? SCREEN_MESSAGES.unsupported : state.state === "fail" ? state.detail : null;
   return (
-    <li className="flex items-start justify-between gap-4 px-4 py-3">
-      <div className="space-y-2">
-        <p className="font-medium">{label}</p>
-        {detail ? <p className="text-neutral-600 dark:text-neutral-400">{detail}</p> : null}
-        {media}
-        {action}
+    <section className="card" style={{ padding: "18px 20px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }} aria-label="Screen sharing">
+      <span className="ovicon" style={{ background: "var(--subtle)", color: "var(--ink-2)", width: 40, height: 40 }}>
+        <Icon name="monitor" />
+      </span>
+      <div style={{ flex: "1 1 280px" }}>
+        <h2 style={{ fontSize: 16 }}>Share your entire screen</h2>
+        <p className="small ink2">
+          When your browser asks, choose <strong>Entire screen</strong> — a window or tab won&apos;t work.
+        </p>
+        {note ? (
+          <p className="small badc" style={{ marginTop: 4 }} role="alert">
+            {note}
+          </p>
+        ) : null}
       </div>
-      {badge}
-    </li>
+      {unsupported ? null : (
+        <button type="button" className="btn btn-dark" disabled={disabled} onClick={onShare}>
+          {state.state === "pending" ? "Waiting for your browser…" : "Share entire screen"}
+        </button>
+      )}
+    </section>
   );
 }

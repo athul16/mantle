@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { StepView } from "@/lib/engine/client/StepView";
+import { stepBrief } from "@/lib/engine/client/registry";
 import type { AttemptScore, PublicMessage, PublicStep } from "@/lib/engine/types";
 import { scoreDemoAttempt } from "./actions";
 
@@ -26,18 +27,17 @@ export function DevWorkspace({
   const step = selected?.stepId ? steps.find((s) => s.id === selected.stepId) : undefined;
 
   return (
-    <div className="grid min-h-[480px] grid-cols-1 border border-neutral-200 md:grid-cols-[280px_1fr] dark:border-neutral-800">
-      <aside className="border-b border-neutral-200 md:border-r md:border-b-0 dark:border-neutral-800">
-        <h2 className="px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">Inbox</h2>
-        <ul>
+    <div className="card grid min-h-[480px] grid-cols-1 md:grid-cols-[280px_1fr]" style={{ overflow: "hidden" }}>
+      <aside style={{ borderRight: "1px solid var(--line)", background: "#fff" }}>
+        <h2 className="eyebrow" style={{ padding: "16px 16px 8px", fontFamily: "var(--font)" }}>Inbox</h2>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {messages.map((m) => (
             <li key={m.id}>
               <button
                 type="button"
                 onClick={() => setSelectedId(m.id)}
-                className={`w-full px-4 py-3 text-left text-sm ${
-                  m.id === selectedId ? "bg-neutral-100 dark:bg-neutral-800" : "hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                }`}
+                className="cardbtn inboxrow"
+                style={{ borderRadius: 0, border: 0, borderBottom: "1px solid var(--line)", background: m.id === selectedId ? "var(--subtle)" : undefined }}
               >
                 <div className="font-medium">{m.from}</div>
                 <div className="truncate text-neutral-600 dark:text-neutral-400">{m.subject}</div>
@@ -48,7 +48,7 @@ export function DevWorkspace({
         </ul>
       </aside>
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-6" style={{ background: "var(--bg)", minWidth: 0 }}>
         {selected ? (
           <article className="space-y-2">
             <h3 className="text-base font-semibold">{selected.subject}</h3>
@@ -60,15 +60,21 @@ export function DevWorkspace({
         )}
 
         {step ? (
-          <div className="space-y-3 rounded border border-neutral-200 p-4 dark:border-neutral-800">
-            <h4 className="text-sm font-semibold">{step.title}</h4>
-            <StepView
+          <div className="card" style={{ overflow: "hidden" }}>
+            <div className="col g6" style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
+              <h4 className="strong">{step.title}</h4>
+              {stepBrief(step) ? <p className="small ink2 pre">{stepBrief(step)}</p> : null}
+            </div>
+            {/* Sheet-style steps fill their container, so give them a height here. */}
+            <div style={{ height: step.type === "numeric" || step.type === "inbox_reply" ? "auto" : 520, display: "flex", flexDirection: "column", padding: step.type === "numeric" || step.type === "inbox_reply" ? 16 : 0 }}>
+              <StepView
               key={step.id}
               step={step}
               answer={answers[step.id]}
               onChange={(a) => setAnswers((prev) => ({ ...prev, [step.id]: a }))}
               disabled={pending}
             />
+            </div>
           </div>
         ) : null}
 
@@ -86,7 +92,7 @@ export function DevWorkspace({
                 }
               })
             }
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="btn btn-dark"
           >
             {pending ? "Scoring…" : "Submit and score"}
           </button>

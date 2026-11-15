@@ -5,5 +5,5 @@ import { resolveDefaultMembership } from "@/lib/auth";
 // Links in emails and redirects after login point here.
 export default async function AppIndex() {
   const { orgSlug } = await resolveDefaultMembership();
-  redirect(`/app/${orgSlug}`);
+  redirect(`/app/${orgSlug}/jobs`);
 }

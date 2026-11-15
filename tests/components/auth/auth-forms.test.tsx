@@ -1,4 +1,4 @@
-/** Sign-in/sign-up form, create-company form and set-password page. Server actions mocked. */
+/** Sign-in/sign-up form, create-company form and set-password form. Server actions mocked. */
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ vi.mock("@/app/auth/set-password/actions", () => ({ setPassword: vi.fn() }));
 
 const { CredentialsForm } = await import("@/app/(auth)/credentials-form");
 const { CreateOrgForm } = await import("@/app/onboarding/create-org-form");
-const { default: SetPasswordPage } = await import("@/app/auth/set-password/page");
+const { SetPasswordForm } = await import("@/app/auth/set-password/set-password-form");
 const createOrganization = vi.mocked((await import("@/app/onboarding/actions")).createOrganization);
 const setPassword = vi.mocked((await import("@/app/auth/set-password/actions")).setPassword);
 
@@ -108,10 +108,10 @@ describe("CreateOrgForm", () => {
   });
 });
 
-describe("SetPasswordPage", () => {
+describe("SetPasswordForm", () => {
   it("asks for a new password twice", () => {
-    render(<SetPasswordPage />);
-    expect(screen.getByRole("heading", { name: "Set your password" })).toBeVisible();
+    // The "Set your password" heading is on the server page (covered by E2E).
+    render(<SetPasswordForm />);
     expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "new-password");
     expect(screen.getByLabelText("Password")).toHaveAttribute("minlength", "8");
     expect(screen.getByLabelText("Confirm password")).toBeRequired();
@@ -121,7 +121,7 @@ describe("SetPasswordPage", () => {
     const user = userEvent.setup();
     const pending = deferred<FormState>();
     setPassword.mockReturnValueOnce(pending.promise);
-    render(<SetPasswordPage />);
+    render(<SetPasswordForm />);
     await user.type(screen.getByLabelText("Password"), "longenough1");
     await user.type(screen.getByLabelText("Confirm password"), "longenough2");
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
@@ -135,7 +135,7 @@ describe("SetPasswordPage", () => {
   it("shows a form-level error", async () => {
     const user = userEvent.setup();
     setPassword.mockResolvedValueOnce({ error: "Your invite link expired." });
-    render(<SetPasswordPage />);
+    render(<SetPasswordForm />);
     await user.type(screen.getByLabelText("Password"), "longenough1");
     await user.type(screen.getByLabelText("Confirm password"), "longenough1");
     await user.click(screen.getByRole("button", { name: "Save and continue" }));

@@ -28,7 +28,9 @@ let camera: FakeTrack;
 let shared: FakeTrack;
 
 const Workspace = () => <button type="button">Inbox item</button>;
-const gate = () => screen.queryByRole("dialog", { name: "Turn on monitoring to continue" });
+// The cover's heading names what's wrong ("Screen sharing stopped", "We can't see your camera",
+// or "Turn on monitoring to continue" before anything has started).
+const gate = () => screen.queryByRole("dialog");
 
 beforeEach(() => {
   releaseMedia();
@@ -81,7 +83,7 @@ describe("Proctoring on", () => {
       </Proctoring>,
     );
     expect(gate()).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("The timer is running");
+    expect(gate()).toHaveTextContent("The timer keeps running while this message is open; it does not pause.");
     // The covered workspace can't be reached by keyboard or screen reader.
     expect(screen.getByTestId("proctored-content")).toHaveAttribute("inert");
     await waitFor(() => expect(media.getUserMedia).toHaveBeenCalled());
@@ -119,7 +121,7 @@ describe("Proctoring on", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"], shouldAdvanceTime: true });
     await activate();
     act(() => shared.end());
-    expect(gate()).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Screen sharing stopped" })).toBeInTheDocument();
     expect(gate()).toHaveTextContent("Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.");
     await act(() => vi.advanceTimersByTimeAsync(SIGNAL_FLUSH_MS));
     expect(signalKinds()).toContain("screen_share_stopped");
@@ -133,6 +135,7 @@ describe("Proctoring on", () => {
   it("brings the cover back when the camera turns off", async () => {
     await activate();
     act(() => camera.end());
+    expect(screen.getByRole("dialog", { name: "We can't see your camera" })).toBeInTheDocument();
     expect(gate()).toHaveTextContent("Your camera turned off. Turn it back on to continue. The timer keeps running.");
     expect(screen.getByRole("button", { name: "Turn on camera" })).toBeVisible();
   });
