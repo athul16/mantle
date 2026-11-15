@@ -1,6 +1,8 @@
 import "server-only";
 
+import { readAccommodations } from "@/lib/accommodations";
 import type { ScenarioDefinition } from "@/lib/engine/types";
+import { accommodationsFor } from "@/lib/jobs/queries";
 import { createClient } from "@/lib/supabase/server";
 import { percentiles, type CandidateRow, type IntegrityLabel, type TaskScore } from "./candidate-table";
 import { listJobResults } from "./queries";
@@ -17,24 +19,27 @@ export async function listJobCandidates(orgId: string, jobId: string): Promise<C
   const db = await createClient();
   const [base, invites] = await Promise.all([
     listJobResults(orgId, jobId),
-    db.from("invites").select("id, expires_at, attempts(id, invite_id, started_at, integrity_label, scenario_id, score, status)").eq("org_id", orgId).eq("job_id", jobId),
+    db.from("invites").select("id, expires_at, last_sent_at, sent_count, attempts(id, invite_id, started_at, integrity_label, scenario_id, score, status)").eq("org_id", orgId).eq("job_id", jobId),
   ]);
   if (invites.error) throw invites.error;
 
   const expires = new Map<string, string>();
+  const sends = new Map<string, { lastSentAt: string | null; sentCount: number }>();
   const attempts = new Map<string, AttemptExtra>();
   for (const i of invites.data) {
     expires.set(i.id, i.expires_at);
+    sends.set(i.id, { lastSentAt: i.last_sent_at, sentCount: i.sent_count });
     const a = (Array.isArray(i.attempts) ? i.attempts[0] : i.attempts) as AttemptExtra | null | undefined;
     if (a) attempts.set(i.id, a);
   }
 
   const attemptIds = [...attempts.values()].map((a) => a.id);
   const scenarioIds = [...new Set([...attempts.values()].map((a) => a.scenario_id))];
-  const [flags, notes, scenarios] = await Promise.all([
+  const [flags, notes, scenarios, accommodations] = await Promise.all([
     attemptIds.length ? db.from("flags").select("attempt_id").eq("org_id", orgId).in("attempt_id", attemptIds) : Promise.resolve({ data: [], error: null }),
     attemptIds.length ? db.from("notes").select("attempt_id, vote").eq("org_id", orgId).in("attempt_id", attemptIds) : Promise.resolve({ data: [], error: null }),
     scenarioIds.length ? db.from("scenarios").select("id, definition").in("id", scenarioIds) : Promise.resolve({ data: [], error: null }),
+    accommodationsFor(orgId, invites.data.map((i) => i.id)),
   ]);
   for (const r of [flags, notes, scenarios]) if (r.error) throw r.error;
 
@@ -66,6 +71,9 @@ export async function listJobCandidates(orgId: string, jobId: string): Promise<C
       ...r,
       startedAt: a?.started_at ?? null,
       expiresAt: expires.get(r.inviteId) ?? r.invitedAt,
+      lastSentAt: sends.get(r.inviteId)?.lastSentAt ?? null,
+      sentCount: sends.get(r.inviteId)?.sentCount ?? 1,
+      accommodations: accommodations.get(r.inviteId) ?? readAccommodations(null),
       integrity: label === "clear" || label === "review" || label === "suspicious" ? (label as IntegrityLabel) : null,
       flagCount: a ? (flagCount.get(a.id) ?? 0) : 0,
       hireVotes: a ? (votes.get(a.id)?.hire ?? 0) : 0,

@@ -18,8 +18,7 @@ test("a recruiter invites, the candidate completes, the recruiter sees it", asyn
   await land(/\/assessments\/new\?scenario=/, "Configure assessment");
   await page.getByLabel("Assessment name").fill("Petty cash round");
   // Proctoring has its own journeys (e2e/proctoring); firefox and webkit can't fake a camera or screen share.
-  await page.getByRole("switch", { name: "Camera snapshots" }).click();
-  await page.getByRole("switch", { name: "Entire-screen sharing" }).click();
+  await page.getByRole("radio", { name: "Not monitored" }).check();
   await page.getByRole("button", { name: "Save and attach to a job" }).click();
 
   // Saving opens Create job with the new assessment; creating opens the invite page.

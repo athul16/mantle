@@ -29,7 +29,13 @@ test("a recruiter configures a library simulation, then edits and clones it", as
   await expect(page.getByLabel("Time limit")).toHaveValue("20");
   await page.getByLabel("Assessment name").fill("Close round A");
   await page.getByLabel("Pass score").fill("70");
-  await page.getByRole("switch", { name: "Camera snapshots" }).click();
+  // Proctoring is a required choice with nothing preselected; the sources appear once Monitored is picked.
+  await expect(page.getByRole("switch", { name: "Camera snapshots" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Monitored", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Not monitored" })).not.toBeChecked();
+  await page.getByRole("radio", { name: "Monitored", exact: true }).check();
+  await expect(page.getByRole("switch", { name: "Camera snapshots" })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("switch", { name: "Entire-screen sharing" }).click();
   const held = await hold(page, isServerAction);
   await page.getByRole("button", { name: "Save and attach to a job" }).click();
   await held.arrived;
@@ -105,6 +111,14 @@ test("a recruiter creates a job and its invites expire at the deadline", async (
   const jobRow = page.getByRole("row").filter({ hasText: "Audit intern 2027" });
   await expect(jobRow.getByRole("cell")).toHaveText(["Audit intern 2027", /^Demo: petty cash count · \d+ min$/, "1", /.*/, shortDay(deadline)]);
   await expect(jobRow.getByRole("img", { name: "0 done, 0 in progress, 1 not started" })).toBeVisible();
+
+  // The invite drawer on the job page shows when the link was last sent and until when it works.
+  await jobRow.getByRole("link", { name: "Audit intern 2027" }).click();
+  await land(/\/jobs\/[0-9a-f-]{36}$/, "Audit intern 2027");
+  await page.getByRole("row").filter({ hasText: email }).getByRole("button", { name: email }).click();
+  const drawer = page.getByRole("dialog", { name: email });
+  await expect(drawer).toContainText(`last sent ${shortDay(new Date())}`);
+  await expect(drawer).toContainText(`link works until ${shortDay(deadline)}`);
 });
 
 test("a job whose deadline has passed takes no new invites", async ({ page, data, company, signInAs }) => {

@@ -1,5 +1,5 @@
 /** Configure assessment screen (create from the library, edit, locked, read-only) and the clone button. */
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssessmentSummary } from "@/lib/jobs/queries";
@@ -44,7 +44,7 @@ const toggle = (label: string) => screen.getByRole("switch", { name: label });
 beforeEach(() => vi.clearAllMocks());
 
 describe("ConfigureAssessmentForm: from the library", () => {
-  it("starts from the simulation's name and recommended length, with monitoring on", () => {
+  it("starts from the simulation's name and recommended length", () => {
     render(<ConfigureAssessmentForm {...base} mode={create} />);
     expect(name()).toHaveValue("Petty cash count");
     expect(name()).toBeRequired();
@@ -54,11 +54,61 @@ describe("ConfigureAssessmentForm: from the library", () => {
     expect(passScore()).toHaveValue(null);
     expect(passScore()).toHaveAttribute("min", "0");
     expect(passScore()).toHaveAttribute("max", "100");
-    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "true");
-    expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "true");
     // The activity log is always recorded.
     expect(toggle("Activity log (always on)")).toBeDisabled();
     expect(screen.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "/app/acme/jobs/assessments");
+  });
+
+  it("asks Monitored or Not monitored with nothing preselected, and explains each", () => {
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    const group = screen.getByRole("group", { name: "Proctoring" });
+    const monitored = within(group).getByRole("radio", { name: "Monitored" });
+    const notMonitored = within(group).getByRole("radio", { name: "Not monitored" });
+    expect(monitored).not.toBeChecked();
+    expect(notMonitored).not.toBeChecked();
+    expect(monitored).toBeRequired();
+    expect(monitored).toHaveAccessibleDescription(/camera photos and\/or screen screenshots/);
+    expect(notMonitored).toHaveAccessibleDescription(/No camera or screen capture/);
+    expect(screen.queryByRole("switch", { name: "Camera snapshots" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Entire-screen sharing" })).not.toBeInTheDocument();
+  });
+
+  it("shows camera and screen options, off, only once Monitored is picked", async () => {
+    const user = userEvent.setup();
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "false");
+    expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "false");
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
+    expect(screen.queryByRole("switch", { name: "Camera snapshots" })).not.toBeInTheDocument();
+  });
+
+  it("submits Not monitored with no camera or screen fields", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ message: "Created.", id: "as-9" });
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    await user.click(toggle("Camera snapshots"));
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
+    await waitFor(() => expect(createAssessment).toHaveBeenCalled());
+    expect(formDataOf(createAssessment)).toEqual({
+      orgId: "org-1",
+      scenarioId: "sc-1",
+      title: "Petty cash count",
+      timeLimitMinutes: "30",
+      passScore: "",
+      monitoring: "not_monitored",
+    });
+  });
+
+  it("shows the server's proctoring error on the group", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ fieldErrors: { monitoring: ["Choose whether candidates are monitored."] } });
+    const { container } = render(<ConfigureAssessmentForm {...base} mode={create} />);
+    container.querySelector("form")?.setAttribute("novalidate", "");
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
+    expect(await screen.findByRole("group", { name: "Proctoring" })).toHaveAccessibleDescription("Choose whether candidates are monitored.");
   });
 
   it("saves, shows Saving… while it runs, then opens Create job with the new assessment", async () => {
@@ -70,8 +120,9 @@ describe("ConfigureAssessmentForm: from the library", () => {
     await user.type(name(), "Junior AP screen");
     await user.selectOptions(timeLimit(), "40");
     await user.type(passScore(), "65");
-    await user.click(toggle("Camera snapshots"));
-    expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "false");
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    await user.click(toggle("Entire-screen sharing"));
+    expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "true");
     await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
 
     expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
@@ -81,6 +132,7 @@ describe("ConfigureAssessmentForm: from the library", () => {
       title: "Junior AP screen",
       timeLimitMinutes: "40",
       passScore: "65",
+      monitoring: "monitored",
       screen: "on",
     });
     await act(async () => pending.resolve({ message: 'Created "Junior AP screen".', id: "as-9" }));
@@ -97,6 +149,7 @@ describe("ConfigureAssessmentForm: from the library", () => {
       },
     });
     render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
     await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
     await waitFor(() => expect(name()).toHaveAccessibleDescription("Give the assessment a title."));
     expect(timeLimit()).toHaveAccessibleDescription("At most 240 minutes.");
@@ -108,6 +161,7 @@ describe("ConfigureAssessmentForm: from the library", () => {
     const user = userEvent.setup();
     createAssessment.mockResolvedValueOnce({ error: "Viewers can't create assessments." });
     render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("radio", { name: "Not monitored" }));
     await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
     expect(await screen.findByText("Viewers can't create assessments.")).toBeVisible();
   });
@@ -123,6 +177,17 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
     expect(toggle("Camera snapshots")).toHaveAttribute("aria-checked", "false");
     expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("button", { name: "Clone" })).toBeEnabled();
+  });
+
+  it("opens a monitored assessment with Monitored chosen", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit()} />);
+    expect(screen.getByRole("radio", { name: "Monitored" })).toBeChecked();
+  });
+
+  it("opens an unmonitored assessment with Not monitored chosen", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false } })} />);
+    expect(screen.getByRole("radio", { name: "Not monitored" })).toBeChecked();
+    expect(screen.queryByRole("switch", { name: "Entire-screen sharing" })).not.toBeInTheDocument();
   });
 
   it("leaves the pass score empty when there is none", () => {
@@ -146,6 +211,7 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
       title: "Senior screen",
       timeLimitMinutes: "50",
       passScore: "70",
+      monitoring: "monitored",
       screen: "on",
     });
     await act(async () => pending.resolve({ message: "Saved." }));

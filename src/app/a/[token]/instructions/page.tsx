@@ -24,13 +24,17 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
   const minutes = session.invite.timeLimitMinutes;
   const watched = [proctoring.camera ? "Camera" : null, proctoring.screen ? "screen" : null].filter(Boolean).join(" or ");
 
+  const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
+  const waived = [waiveCamera ? "camera" : null, waiveScreen ? "screen share" : null].filter(Boolean).join(" and ");
+
   const facts: [string, string][] = [
-    ["Time", `${minutes} min, starts when you press Start`],
+    ["Time", `${minutes} min${extraTimePercent ? ` (includes ${extraTimePercent}% extra time)` : ""}, starts when you press Start`],
     ["Tasks", `${stepCount}, delivered through the inbox — some may arrive while you work`],
     ["Allowed", "A calculator, scratch paper"],
     ["Not allowed", "Other tabs or apps, phone, AI tools, other people"],
     ["Saving", "Automatic. Lost connection? Reopen your link."],
   ];
+  if (waived) facts.push(["Excused", `${session.invite.companyName} has excused you from the ${waived} for this assessment.`]);
   if (monitored) facts.push([watched, `If ${proctoring.camera && proctoring.screen ? "either" : "it"} stops, the workspace is covered until it's back. The clock keeps running.`]);
   facts.push(["At 0:00", "Whatever is saved is submitted"]);
 

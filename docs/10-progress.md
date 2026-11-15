@@ -2,7 +2,7 @@
 
 Where the phase 1 build stands. Update this file whenever a build step lands.
 
-_Last updated: 2026-11-14._
+_Last updated: 2026-11-15._
 
 ## Skeleton build order (from `08-roadmap-and-open-questions.md`)
 
@@ -116,6 +116,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 | --- | --- |
 | 2026-11-12 | Mantle UI from the prototype (`docs/design/prototype.html`, `13-design-system.md`): design tokens and components ported (`src/app/mantle.css`, `src/components/`), every company and candidate screen and both emails restyled. Behaviour changes: `/app/<slug>` opens Jobs (no dashboard); invite form moved to `/jobs/<id>/invite`; assessment configure screens at `/jobs/assessments/new` and `/jobs/assessments/<id>`; monitoring consent moved to the verify page (consent version `2026-11-11.verify-table`); explicit start photo and a connection check on the system check; task-centred workspace with calculator, new-mail toast and one-minute warning; report shows percentile, votes and integrity signal counts |
 | 2026-11-14 | CI fixes for the Mantle UI (PR #36): `/app/<slug>` now redirects to Jobs over HTTP in `src/proxy.ts` (no client-side jump); the verify form keeps a name, code and consent typed before hydration; account-menu links no longer prefetch (404s after sign-out); screenshot baselines regenerated |
+| 2026-11-15 | Main (PRs #32, #35, #33, #37) merged into the Mantle UI (PR #36): Configure assessment asks Monitored / Not monitored with nothing preselected (camera and screen switches appear only when Monitored); Settings has the two retention fields and the candidate contact email; the job page shows last sent date and send count, and the invite drawer sets accommodations (extra time, camera / screen waivers), shown on the row and the report; the report shows the automatic score next to the final one; the verify page states both retention periods and the contact line, and the instructions show extra time and waivers. Consent version `2026-11-15.verify-table.contact` |
 | 2026-11-10 | Batch 3 (stage E): PR #24 launch hardening and pilot runbook; PR #25 retention and delete on request (migration `20261110200000_retention`); PR #27 admin MFA and candidate report 404; PR #26 pilot decisions brief. All test-first |
 | 2026-11-10 | Batch 2: PR #21 report rows for journal entries and document review, contrast, real 404 for foreign job ids; PR #22 `harbor-lane-bank-rec` (docs/07 Example 4); PR #23 proctoring with migration `20261110160000_proctoring`. All test-first |
 | 2026-11-10 | Batch 1: PR #17 fixes 5 app bugs (Safari hydration, candidate button pending state, revoke confirmation, read state on reload, cross-company 404); PR #18 `journal_entry` + `document_review` and `demo-entries-review`; PR #19 results table, candidate report, rubric review migration. All work test-driven from here on (`11-testing.md`) |

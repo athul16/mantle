@@ -67,7 +67,16 @@ export function CandidatesView({
         <ResultsTable
           rows={rows}
           reportBase={`/app/${orgSlug}/candidates`}
-          ctx={{ orgId, canManage, deadlinePassed, passScore: job.assessment?.passScore ?? null, jobTitle: job.title }}
+          ctx={{
+            orgId,
+            canManage,
+            deadlinePassed,
+            passScore: job.assessment?.passScore ?? null,
+            jobTitle: job.title,
+            timeLimitMinutes: job.assessment?.timeLimitMinutes,
+            camera: job.assessment?.proctoring.camera ?? false,
+            screen: job.assessment?.proctoring.screen ?? false,
+          }}
           heading={heading}
           actions={actions}
         />

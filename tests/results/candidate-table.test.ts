@@ -5,6 +5,9 @@ import { buildCsv, filterExtra, formatScore, ordinal, percentiles, type Candidat
 const row = (over: Partial<CandidateRow> & Pick<CandidateRow, "inviteId">): CandidateRow => ({
   email: `${over.inviteId}@example.test`,
   candidateName: null,
+  lastSentAt: null,
+  sentCount: 1,
+  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false },
   status: "completed",
   needsReview: false,
   points: null,

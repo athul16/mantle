@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const runRetentionPurge = vi.fn(async () => ({ checked: 1, purged: 1, failed: 0, objectsRemoved: 3 }));
+const SUMMARY = {
+  media: { checked: 2, purged: 2, failed: 0, objectsRemoved: 5 },
+  results: { checked: 1, purged: 1, failed: 0, objectsRemoved: 3 },
+};
+const runRetentionPurge = vi.fn(async () => SUMMARY);
 vi.mock("@/lib/retention/purge", () => ({ runRetentionPurge }));
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({}) }));
 
@@ -59,7 +63,7 @@ describe("GET /api/cron/retention", () => {
     const res = await GET(req(`Bearer ${SECRET}`));
     expect(res.status).toBe(200);
     expect(runRetentionPurge).toHaveBeenCalledTimes(1);
-    expect(await res.json()).toEqual({ checked: 1, purged: 1, failed: 0, objectsRemoved: 3 });
+    expect(await res.json()).toEqual(SUMMARY);
   });
 
   it("returns 500 when the purge throws", async () => {

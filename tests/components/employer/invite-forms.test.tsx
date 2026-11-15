@@ -1,4 +1,4 @@
-/** Invite page client form (emails as chips, or a CSV) and the resend / revoke row actions. */
+/** Invite page client form (emails as chips, or a CSV), the resend / revoke row actions and accommodations. */
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,13 +8,15 @@ vi.mock("@/app/app/[orgSlug]/jobs/actions", () => ({
   inviteCandidates: vi.fn(),
   resendInviteAction: vi.fn(),
   revokeInviteAction: vi.fn(),
+  setAccommodationsAction: vi.fn(),
 }));
 
 const actions = await import("@/app/app/[orgSlug]/jobs/actions");
-const { InviteCandidatesForm, InviteRowActions } = await import("@/app/app/[orgSlug]/jobs/[jobId]/invite-forms");
+const { AccommodationsForm, InviteCandidatesForm, InviteRowActions } = await import("@/app/app/[orgSlug]/jobs/[jobId]/invite-forms");
 const inviteCandidates = vi.mocked(actions.inviteCandidates);
 const resendInviteAction = vi.mocked(actions.resendInviteAction);
 const revokeInviteAction = vi.mocked(actions.revokeInviteAction);
+const setAccommodationsAction = vi.mocked(actions.setAccommodationsAction);
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.unstubAllGlobals());
@@ -273,5 +275,57 @@ describe("InviteRowActions", () => {
     render(<InviteRowActions orgId="o" inviteId="i" email="a@b.co" canResend={false} canRevoke />);
     await user.click(screen.getByRole("button", { name: "Revoke" }));
     expect(revokeInviteAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("AccommodationsForm", () => {
+  const none = { extraTimePercent: 0, waiveCamera: false, waiveScreen: false } as const;
+
+  it("offers the extra time choices and a waiver per monitored source", () => {
+    render(<AccommodationsForm orgId="org-1" inviteId="inv-1" email="jane@example.com" current={none} camera screen={false} />);
+    const select = screen.getByRole("combobox", { name: /Extra time for jane@example.com/ });
+    expect([...(select as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["None", "+25%", "+50%", "+100%"]);
+    expect(screen.getByRole("checkbox", { name: "No camera for this candidate" })).not.toBeChecked();
+    // The assessment doesn't share the screen, so there is nothing to waive.
+    expect(screen.queryByRole("checkbox", { name: "No screen share for this candidate" })).toBeNull();
+    expect(screen.getByText(/recorded in the audit log/)).toBeVisible();
+  });
+
+  it("starts from the current accommodations and saves the change", async () => {
+    const user = userEvent.setup();
+    setAccommodationsAction.mockResolvedValueOnce({ message: "Saved accommodations for jane@example.com." });
+    render(
+      <AccommodationsForm
+        orgId="org-1"
+        inviteId="inv-1"
+        email="jane@example.com"
+        current={{ extraTimePercent: 25, waiveCamera: false, waiveScreen: true }}
+        camera
+        screen
+      />,
+    );
+    expect(screen.getByRole("combobox")).toHaveValue("25");
+    expect(screen.getByRole("checkbox", { name: "No screen share for this candidate" })).toBeChecked();
+
+    await user.selectOptions(screen.getByRole("combobox"), "+100%");
+    await user.click(screen.getByRole("checkbox", { name: "No camera for this candidate" }));
+    await user.click(screen.getByRole("button", { name: "Save accommodations" }));
+
+    expect(await screen.findByText("Saved accommodations for jane@example.com.")).toBeVisible();
+    expect(formDataOf(setAccommodationsAction)).toMatchObject({
+      orgId: "org-1",
+      inviteId: "inv-1",
+      extraTimePercent: "100",
+      waiveCamera: "on",
+      waiveScreen: "on",
+    });
+  });
+
+  it("shows an error from the server", async () => {
+    const user = userEvent.setup();
+    setAccommodationsAction.mockResolvedValueOnce({ error: "The candidate has started, so accommodations can no longer change." });
+    render(<AccommodationsForm orgId="org-1" inviteId="inv-1" email="jane@example.com" current={none} camera screen />);
+    await user.click(screen.getByRole("button", { name: "Save accommodations" }));
+    expect(await screen.findByText(/can no longer change/)).toBeVisible();
   });
 });

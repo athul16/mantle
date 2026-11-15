@@ -17,7 +17,9 @@ select set_eq(
         and tgrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace) $$,
   $$ values ('assessments', 'assessments_locked',                 'prevent_locked_assessment_edits'),
             ('scenarios',   'scenarios_immutable_when_published', 'prevent_published_scenario_edits'),
-            ('memberships', 'memberships_keep_one_admin',         'private.keep_one_admin') $$,
+            ('memberships', 'memberships_keep_one_admin',         'private.keep_one_admin'),
+            ('attempts',    'attempts_keep_auto_score',           'private.keep_auto_score'),
+            ('step_responses', 'step_responses_keep_auto_score',  'private.keep_auto_score') $$,
   'public has exactly the expected triggers (the last-admin guard is in policies_organizations)'
 );
 

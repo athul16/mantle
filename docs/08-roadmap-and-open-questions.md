@@ -31,6 +31,6 @@ Technical and design questions from the build are researched in `decisions/` (e.
 - **Pricing:** free first pilot, then per completed candidate? Per seat? Per job?
 - **Simulation length:** target 30 to 45 minutes; validate drop-off in pilots.
 - **Rubric scoring model:** which LLM, and how to show reasoning so recruiters trust it.
-- **Accessibility:** accommodation flow for candidates without webcams or needing extra time.
+- **Accessibility:** per-invite extra time and camera / screen waivers are built (D9, option B). Open: a candidate request form on the verify page (option C) if pilot candidates struggle to reach the company; screen-reader support.
 - **Legal review:** consent language, retention defaults, biometric and automated-hiring rules.
 - **Expert reviewers:** find an accountant and a pharmacist to review scenarios.

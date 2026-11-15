@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { CLIENT_EVENT_KINDS, type ClientEventKind } from "./config";
 import { ATTEMPT_COLUMNS, type AttemptRow } from "./invite";
 import { loadScenario } from "./scenario";
+import { scheduleShadowScoring } from "./shadow-score";
 import type { CandidateSession } from "./session";
 
 /**
@@ -76,6 +77,8 @@ export async function startAttempt(session: CandidateSession, now = new Date()):
   if (attempt.status !== "not_started") return { ok: false, error: "already_submitted" };
   if (now > session.invite.startBy) return { ok: false, error: "expired" };
 
+  // timeLimitMinutes already includes any extra time set on the invite (D9),
+  // so the server-enforced deadline carries it; the browser only displays it.
   const deadline = new Date(now.getTime() + session.invite.timeLimitMinutes * 60_000);
   const { data, error } = await createServiceClient()
     .from("attempts")
@@ -86,7 +89,14 @@ export async function startAttempt(session: CandidateSession, now = new Date()):
     .select("id");
   if (error) throw new Error(`starting attempt failed: ${error.message}`);
   // Zero rows: a parallel request started it first, which is fine.
-  if (data.length) await addEvent(attempt, "started_attempt", { deadlineAt: deadline.toISOString() });
+  if (data.length) {
+    const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
+    await addEvent(attempt, "started_attempt", {
+      deadlineAt: deadline.toISOString(),
+      timeLimitMinutes: session.invite.timeLimitMinutes,
+      ...(extraTimePercent || waiveCamera || waiveScreen ? { accommodations: { extraTimePercent, waiveCamera, waiveScreen } } : {}),
+    });
+  }
   return { ok: true };
 }
 
@@ -282,17 +292,25 @@ async function finalizeAttempt(session: CandidateSession, reason: "candidate" | 
 
   await addEvent(attempt, "submitted_attempt", { reason });
   await scoreAndStore(session);
+  // D8 shadow mode: AI rubric scores, stored server-side only, after the response.
+  // Only schedules work; never throws or delays the submit.
+  scheduleShadowScoring(attempt);
   // A camera / screen gap still open (tab closed, never reconnected) ends here (D4).
-  await closeDowntimeAtEnd(attempt, session.invite.assessmentId, {
-    at: submittedAt,
-    closedBy: reason === "timeout" ? "deadline" : "submitted",
-  });
+  await closeDowntimeAtEnd(
+    attempt,
+    session.invite.assessmentId,
+    { at: submittedAt, closedBy: reason === "timeout" ? "deadline" : "submitted" },
+    session.invite.accommodations,
+  );
 }
 
 /**
  * Scores every step on the server and stores per-step scores on
- * step_responses and the total on attempts. Safe to re-run: a crash between
- * "submitted" and "scored" is finished by the next request.
+ * step_responses and the total on attempts, twice: as `score` (the final
+ * score, which reviewers may change later) and as `auto_score` (kept as
+ * computed; a trigger refuses to change it). Safe to re-run: a crash between
+ * "submitted" and "scored" is finished by the next request, and scoring is
+ * deterministic, so auto_score gets the same value again.
  */
 async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
   const { attempt, invite } = session;
@@ -308,7 +326,7 @@ async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
     Object.keys(answers).map((stepId) =>
       db
         .from("step_responses")
-        .update({ score: (score.steps[stepId] ?? null) as unknown as Json })
+        .update({ score: (score.steps[stepId] ?? null) as unknown as Json, auto_score: (score.steps[stepId] ?? null) as unknown as Json })
         .eq("attempt_id", attempt.id)
         .eq("org_id", attempt.org_id)
         .eq("step_id", stepId),
@@ -319,7 +337,7 @@ async function scoreAndStore(session: CandidateSession): Promise<AttemptScore> {
   const [attemptUpdate, inviteUpdate] = await Promise.all([
     db
       .from("attempts")
-      .update({ score: score as unknown as Json, status: "scored" })
+      .update({ score: score as unknown as Json, auto_score: score as unknown as Json, status: "scored" })
       .eq("id", attempt.id)
       .eq("org_id", attempt.org_id)
       .in("status", ["submitted", "scored"]),

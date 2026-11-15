@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Accommodations } from "@/lib/accommodations";
 import type { Database } from "@/lib/database.types";
 import { sendEmail } from "@/lib/email";
 import { inviteEmailHtml } from "@/lib/email/templates";
@@ -16,6 +17,11 @@ import { canResend, canRevoke, displayStatus, inviteExpiry } from "./status";
 // memory and in the email; they're never stored or logged.
 
 type Db = SupabaseClient<Database>;
+
+/** Statuses covered by the unique index invites_job_email_live_key. */
+const LIVE_STATUSES = ["invited", "started", "completed"];
+const UNIQUE_VIOLATION = "23505";
+const MAX_INSERT_RETRIES = 3;
 
 export class InviteError extends Error {
   constructor(message: string) {
@@ -127,36 +133,64 @@ export async function createInvites(args: {
     throw new InviteError("This job's invite deadline has passed.");
   }
 
-  const { data: existing, error: existingError } = await db
+  // Invites still marked "invited" after their expiry are shown as expired;
+  // mark the rows too, so they leave the unique index and can be re-invited (J3).
+  const { error: expireError } = await db
     .from("invites")
-    .select("email")
+    .update({ status: "expired" })
     .eq("org_id", orgId)
     .eq("job_id", jobId)
-    .in("status", ["invited", "started", "completed"]);
-  if (existingError) throw existingError;
-  const live = new Set(existing.map((r) => r.email.toLowerCase()));
+    .eq("status", "invited")
+    .lte("expires_at", new Date().toISOString());
+  if (expireError) throw expireError;
 
-  const alreadyInvited = args.recipients.filter((r) => live.has(r.email)).map((r) => r.email);
-  const fresh = args.recipients.filter((r) => !live.has(r.email));
-  if (fresh.length > MAX_INVITES_PER_BATCH) {
-    throw new InviteError(`That's ${fresh.length} new candidates. Invite at most ${MAX_INVITES_PER_BATCH} at a time.`);
+  // The app check skips emails that already have a live invite. Another batch
+  // can insert one of them between the check and the insert; the unique index
+  // invites_job_email_live_key then rejects the whole insert (23505), nothing
+  // is written, and the check runs again with the new rows.
+  let alreadyInvited: string[] = [];
+  let rows: { id: string; email: string; candidate_name: string | null }[] = [];
+  for (let attempt = 0; ; attempt++) {
+    const { data: existing, error: existingError } = await db
+      .from("invites")
+      .select("email")
+      .eq("org_id", orgId)
+      .eq("job_id", jobId)
+      .in("status", LIVE_STATUSES);
+    if (existingError) throw existingError;
+    const live = new Set(existing.map((r) => r.email.toLowerCase()));
+
+    alreadyInvited = args.recipients.filter((r) => live.has(r.email)).map((r) => r.email);
+    const fresh = args.recipients.filter((r) => !live.has(r.email));
+    if (fresh.length > MAX_INVITES_PER_BATCH) {
+      throw new InviteError(`That's ${fresh.length} new candidates. Invite at most ${MAX_INVITES_PER_BATCH} at a time.`);
+    }
+    if (fresh.length === 0) return { invited: [], alreadyInvited, failedToSend: [] };
+
+    const { data, error: insertError } = await db
+      .from("invites")
+      .insert(
+        fresh.map((r) => ({
+          org_id: orgId,
+          job_id: jobId,
+          email: r.email,
+          candidate_name: r.name,
+          expires_at: expiresAt.toISOString(),
+          created_by: createdBy,
+        })),
+      )
+      .select("id, email, candidate_name");
+    if (!insertError) {
+      rows = data;
+      break;
+    }
+    if (insertError.code !== UNIQUE_VIOLATION || attempt >= MAX_INSERT_RETRIES) {
+      if (insertError.code === UNIQUE_VIOLATION) {
+        throw new InviteError("Another invite for some of these candidates was sent at the same time. Nothing was sent; try again.");
+      }
+      throw insertError;
+    }
   }
-  if (fresh.length === 0) return { invited: [], alreadyInvited, failedToSend: [] };
-
-  const { data: rows, error: insertError } = await db
-    .from("invites")
-    .insert(
-      fresh.map((r) => ({
-        org_id: orgId,
-        job_id: jobId,
-        email: r.email,
-        candidate_name: r.name,
-        expires_at: expiresAt.toISOString(),
-        created_by: createdBy,
-      })),
-    )
-    .select("id, email, candidate_name");
-  if (insertError) throw insertError;
   const names = new Map(rows.map((row) => [row.id, row.candidate_name]));
 
   const tokens = new Map(rows.map((row) => [row.id, generateToken()]));
@@ -188,7 +222,7 @@ export async function createInvites(args: {
 async function loadInvite(db: Db, orgId: string, inviteId: string) {
   const { data, error } = await db
     .from("invites")
-    .select("id, email, status, expires_at, job_id, candidate_name")
+    .select("id, email, status, expires_at, job_id, candidate_name, sent_count")
     .eq("id", inviteId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -216,14 +250,29 @@ export async function resendInvite(args: { db: Db; orgId: string; orgName: strin
 
   // The RLS-checked update comes first: it proves the caller may manage this
   // invite before the service client touches its secret.
+  // sent_count in the filter makes two resends at once count as two attempts:
+  // the second matches no row and asks the user to reload.
   const { data: updated, error: updateError } = await db
     .from("invites")
-    .update({ status: "invited", expires_at: expiresAt.toISOString() })
+    .update({
+      status: "invited",
+      expires_at: expiresAt.toISOString(),
+      last_sent_at: new Date().toISOString(),
+      sent_count: invite.sent_count + 1,
+    })
     .eq("id", inviteId)
     .eq("org_id", orgId)
+    .eq("sent_count", invite.sent_count)
     .in("status", ["invited", "expired"])
     .select("id");
-  if (updateError) throw updateError;
+  if (updateError) {
+    // An expired invite whose email was invited again since: reviving it
+    // would make two live invites (unique index).
+    if (updateError.code === UNIQUE_VIOLATION) {
+      throw new InviteError(`${invite.email} already has a newer invite for this job. Resend that one instead.`);
+    }
+    throw updateError;
+  }
   if (updated.length !== 1) throw new InviteError("That invite changed in the meantime. Reload and try again.");
 
   const token = generateToken();
@@ -240,6 +289,35 @@ export async function resendInvite(args: { db: Db; orgId: string; orgName: strin
   } catch (err) {
     console.error("invite email failed", { inviteId, message: err instanceof Error ? err.message : String(err) });
     throw new InviteError(`A new link was created but the email to ${invite.email} failed. Try resending again.`);
+  }
+  return { email: invite.email };
+}
+
+/**
+ * Sets an invite's accommodations (D9): extra time and camera / screen
+ * waivers. Goes through set_invite_accommodations(), which checks the caller
+ * manages the invite's company, refuses once the candidate has started, and
+ * writes the audit log; the table has no write policies of its own.
+ */
+export async function setAccommodations(args: {
+  db: Db;
+  orgId: string;
+  inviteId: string;
+  accommodations: Accommodations;
+}): Promise<{ email: string }> {
+  const { db, orgId, inviteId, accommodations: a } = args;
+  const invite = await loadInvite(db, orgId, inviteId);
+  const { error } = await db.rpc("set_invite_accommodations", {
+    p_invite_id: inviteId,
+    p_extra_time_percent: a.extraTimePercent,
+    p_waive_camera: a.waiveCamera,
+    p_waive_screen: a.waiveScreen,
+  });
+  if (error) {
+    if (error.code === "55000") throw new InviteError("The candidate has started, so accommodations can no longer change.");
+    if (error.code === "42501") throw new InviteError("You don't have permission to change accommodations.");
+    if (error.code === "22023") throw new InviteError("Pick +0%, +25%, +50% or +100% extra time.");
+    throw error;
   }
   return { email: invite.email };
 }

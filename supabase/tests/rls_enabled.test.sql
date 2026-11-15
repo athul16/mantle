@@ -5,7 +5,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(57);
+select plan(58);
 
 -- ---------------------------------------------------------------------------
 -- RLS enabled, table by table (so a failure names the table)
@@ -17,7 +17,7 @@ select ok(
 )
 from unnest(array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites',
                   'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events',
-                  'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles']) t;
+                  'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles', 'ai_shadow_scores']) t;
 
 -- ---------------------------------------------------------------------------
 -- Exactly these policies
@@ -49,6 +49,7 @@ select set_eq(
        ('flags',            'members read flags',                'SELECT', 'PERMISSIVE'),
        ('flags',            'managers review flags',             'UPDATE', 'PERMISSIVE'),
        ('notes',            'members read notes',                'SELECT', 'PERMISSIVE'),
+       ('invite_accommodations', 'members read accommodations',  'SELECT', 'PERMISSIVE'),
        ('notes',            'members add own notes',             'INSERT', 'PERMISSIVE'),
        ('notes',            'authors edit own notes',            'UPDATE', 'PERMISSIVE'),
        ('notes',            'authors delete own notes',          'DELETE', 'PERMISSIVE'),
@@ -91,8 +92,8 @@ select set_eq(
         and not exists (select 1 from pg_policies p
                          where p.schemaname = 'public' and p.tablename = c.relname
                            and p.cmd in ('SELECT', 'ALL')) $$,
-  $$ values ('invite_secrets'), ('attempt_secrets') $$,
-  'only the two secret tables have no read policy (so nobody but the server reads them)'
+  $$ values ('invite_secrets'), ('attempt_secrets'), ('ai_shadow_scores') $$,
+  'only the secret tables and AI shadow scores have no read policy (so nobody but the server reads them)'
 );
 
 select set_eq(
@@ -102,8 +103,8 @@ select set_eq(
                          where p.schemaname = 'public' and p.tablename = c.relname
                            and p.cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')) $$,
   $$ values ('invite_secrets'), ('attempt_secrets'), ('attempts'), ('step_responses'),
-            ('action_events'), ('integrity_events'), ('media'), ('profiles') $$,
-  'candidate data and profiles have no write policy: only the server and the auth.users trigger write them'
+            ('action_events'), ('integrity_events'), ('media'), ('profiles'), ('invite_accommodations'), ('ai_shadow_scores') $$,
+  'candidate data, AI shadow scores, accommodations and profiles have no write policy: only the server, set_invite_accommodations and the auth.users trigger write them'
 );
 
 -- ---------------------------------------------------------------------------

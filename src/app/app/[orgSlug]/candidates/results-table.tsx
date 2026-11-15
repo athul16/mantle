@@ -29,7 +29,8 @@ import {
   type SortKey,
   type StatusFilter,
 } from "@/lib/results/summary";
-import { InviteRowActions } from "../jobs/[jobId]/invite-forms";
+import { describeAccommodations, hasAccommodations } from "@/lib/accommodations";
+import { AccommodationsForm, InviteRowActions } from "../jobs/[jobId]/invite-forms";
 import { Ago, ShortDate } from "./dates";
 import { ExportDialog } from "./export-dialog";
 import { IntegrityBadge, StatusBadge } from "./status-badge";
@@ -48,6 +49,10 @@ export type TableContext = {
   deadlinePassed: boolean;
   passScore: number | null;
   jobTitle: string;
+  /** The assessment's time limit and monitoring, for the accommodations controls (D9). */
+  timeLimitMinutes?: number;
+  camera: boolean;
+  screen: boolean;
 };
 
 /**
@@ -279,6 +284,12 @@ function Row({
   else if (r.status === "expired") sub = <>Invite expired <ShortDate iso={r.expiresAt} /></>;
   else if (r.status === "revoked") sub = <>Invited <ShortDate iso={r.invitedAt} /> · revoked</>;
   else sub = <>Invited <ShortDate iso={r.invitedAt} /></>;
+  const resent = r.status === "invited" && r.sentCount > 1 && r.lastSentAt ? (
+    <>
+      {" "}
+      · last sent <ShortDate iso={r.lastSentAt} /> ({r.sentCount} sends)
+    </>
+  ) : null;
 
   return (
     <tr className={selected ? "sel" : undefined}>
@@ -295,7 +306,15 @@ function Row({
             {name}
           </button>
         )}
-        <div className="xs muted">{sub}</div>
+        <div className="xs muted">
+          {sub}
+          {resent}
+        </div>
+        {hasAccommodations(r.accommodations) ? (
+          <div className="xs" style={{ color: "var(--accent-ink)" }} data-testid="invite-accommodations">
+            Accommodations: {describeAccommodations(r.accommodations, ctx?.timeLimitMinutes).join(", ")}
+          </div>
+        ) : null}
       </td>
       <td>
         <StatusBadge status={r.status} needsReview={r.needsReview} replyToScore={r.replyToScore} />
@@ -407,6 +426,13 @@ function InviteDrawer({ row, ctx, onClose }: { row: CandidateRow; ctx?: TableCon
           {row.candidateName ? <span className="small muted">{row.email}</span> : null}
           <span className="xs muted">
             Invited <ShortDate iso={row.invitedAt} />
+            {row.lastSentAt ? (
+              <>
+                {" "}
+                · last sent <ShortDate iso={row.lastSentAt} />
+                {row.sentCount > 1 ? ` (${row.sentCount} sends)` : ""}
+              </>
+            ) : null}
             {row.status === "invited" ? (
               <>
                 {" "}
@@ -446,6 +472,26 @@ function InviteDrawer({ row, ctx, onClose }: { row: CandidateRow; ctx?: TableCon
             : "Resend sends a new link and the current one stops working. Revoke stops the link; the candidate sees “Invitation withdrawn”. Both only work before the candidate starts."}
           {ctx?.canManage && ctx.deadlinePassed && row.status !== "revoked" ? " The job's invite deadline has passed, so no new links can be sent." : ""}
         </p>
+      </section>
+      <section style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--line)" }}>
+        <span className="eyebrow">Accommodations</span>
+        {hasAccommodations(row.accommodations) ? (
+          <span className="small" data-testid="drawer-accommodations">
+            {describeAccommodations(row.accommodations, ctx?.timeLimitMinutes).join(", ")}
+          </span>
+        ) : (
+          <span className="small muted">None</span>
+        )}
+        {ctx?.canManage && row.status === "invited" ? (
+          <AccommodationsForm
+            orgId={ctx.orgId}
+            inviteId={row.inviteId}
+            email={row.email}
+            current={row.accommodations}
+            camera={ctx.camera}
+            screen={ctx.screen}
+          />
+        ) : null}
       </section>
     </aside>
   );

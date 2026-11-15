@@ -1,3 +1,4 @@
+import type { Accommodations } from "@/lib/accommodations";
 import { candidateLabel, formatDuration, type ResultRow } from "./summary";
 
 // Pure helpers for the job candidates table (screen 6): the extra columns the
@@ -12,6 +13,11 @@ export type TaskScore = { stepId: string; title: string; points: number; maxPoin
 export type CandidateRow = ResultRow & {
   startedAt: string | null;
   expiresAt: string;
+  /** When the latest link was emailed (invites.last_sent_at) and how many times one was (D12). */
+  lastSentAt: string | null;
+  sentCount: number;
+  /** Extra time and monitoring waivers for this invite (D9). */
+  accommodations: Accommodations;
   /** attempts.integrity_label, set by the proctoring rules when the attempt ends. */
   integrity: IntegrityLabel | null;
   /** Flags raised on the attempt, any review status. */

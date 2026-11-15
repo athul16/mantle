@@ -65,7 +65,7 @@ test("a candidate consents, passes the camera and screen checks and is monitored
   const notice = page.getByRole("table");
   await expect(notice).toContainText("Camera snapshots");
   await expect(notice).toContainText("Your entire screen");
-  await expect(page.getByText(/Deleted \d+ days after it ends/)).toBeVisible();
+  await expect(page.getByText(/Photos and screenshots deleted after \d+ days\. Answers and results deleted after \d+ days\./)).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /agree to camera snapshots, screen sharing and activity recording/ })).toBeVisible();
   await a11y();
   await candidate.submitCode(code);

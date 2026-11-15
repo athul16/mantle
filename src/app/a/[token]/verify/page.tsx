@@ -4,7 +4,7 @@ import { maskEmail } from "@/lib/candidate/code";
 import { CODE_TTL_MINUTES, MAX_CODE_ATTEMPTS, consentLabel } from "@/lib/candidate/config";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
 import { getInviteProctoringSettings } from "@/lib/proctoring/server";
-import { DEFAULT_RETENTION_DAYS } from "@/lib/retention/policy";
+import { DEFAULT_MEDIA_RETENTION_DAYS, DEFAULT_RESULTS_RETENTION_DAYS } from "@/lib/retention/policy";
 import { LocalTime } from "../../local-time";
 import { BrandAside, ERROR_TEXT, MessageBox, SplitPage } from "../../ui";
 import { VerifyForm } from "./verify-form";
@@ -33,7 +33,8 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
 
   const { invite } = state;
   const settings = await getInviteProctoringSettings(invite);
-  const days = settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  const mediaDays = settings.mediaRetentionDays ?? DEFAULT_MEDIA_RETENTION_DAYS;
+  const resultsDays = settings.resultsRetentionDays ?? DEFAULT_RESULTS_RETENTION_DAYS;
   const company = invite.companyName;
   const error = typeof query.error === "string" ? query.error : undefined;
   const left = typeof query.left === "string" ? Number(query.left) : undefined;
@@ -113,7 +114,11 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
         <div style={{ padding: "14px 16px", borderRadius: 10, background: "var(--subtle)", display: "flex", gap: 10 }}>
           <Icon name="trash" />
           <span className="small">
-            <span className="strong">Deleted {days} days after it ends.</span> {company} can delete it sooner on request.
+            <span className="strong">
+              {settings.camera || settings.screen ? `Photos and screenshots deleted after ${mediaDays} days.` : null} Answers and results
+              deleted after {resultsDays} days.
+            </span>{" "}
+            {company} can delete them sooner on request.
             {settings.camera ? " Photos are never used to identify you." : ""}
           </span>
         </div>
@@ -124,6 +129,17 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
           </span>
         </div>
       </div>
+      <p className="small ink2" data-testid="accommodation-contact">
+        Need extra time, or can&apos;t use a camera or share your screen? Contact{" "}
+        {settings.contactEmail ? (
+          <>
+            {company} at <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
+          </>
+        ) : (
+          `${company}'s hiring team`
+        )}{" "}
+        before you start.
+      </p>
     </>
   );
 

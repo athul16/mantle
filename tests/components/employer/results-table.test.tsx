@@ -9,12 +9,16 @@ vi.mock("@/app/app/[orgSlug]/jobs/actions", () => ({
   inviteCandidates: vi.fn(),
   resendInviteAction: vi.fn(),
   revokeInviteAction: vi.fn(),
+  setAccommodationsAction: vi.fn(),
 }));
 
 const { ResultsTable } = await import("@/app/app/[orgSlug]/candidates/results-table");
 
 const row = (over: Partial<CandidateRow> & Pick<CandidateRow, "inviteId" | "email">): CandidateRow => ({
   candidateName: null,
+  lastSentAt: null,
+  sentCount: 1,
+  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false },
   status: "completed",
   needsReview: false,
   points: null,
@@ -70,7 +74,7 @@ const rows: CandidateRow[] = [
   row({ inviteId: "i-cat", email: "cat@example.test", status: "invited" }),
 ];
 
-const ctx = { orgId: "org-1", canManage: true, deadlinePassed: false, passScore: 60, jobTitle: "Audit intern" };
+const ctx = { orgId: "org-1", canManage: true, deadlinePassed: false, passScore: 60, camera: false, screen: false, jobTitle: "Audit intern" };
 
 const names = () =>
   screen

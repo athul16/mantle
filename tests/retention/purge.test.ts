@@ -42,9 +42,13 @@ describe("removeCandidateObjects", () => {
 
 describe("runRetentionPurge", () => {
   const now = new Date("2026-11-10T03:00:00Z");
+  const ATT_1 = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const empty = { checked: 0, purged: 0, failed: 0, objectsRemoved: 0 };
 
-  it("lists candidates past retention, purges each and removes their files", async () => {
+  it("purges media past the media period, then candidates past the results period", async () => {
     const { client, rpc, remove } = fakeClient(async (fn, args) => {
+      if (fn === "list_media_past_retention") return { data: [{ attempt_id: ATT_1, org_id: ORG_A }], error: null };
+      if (fn === "purge_media_for_retention") return { data: [`${ORG_A}/${ATT_1}/camera/1.jpg`, `${ORG_A}/${ATT_1}/screen/1.jpg`], error: null };
       if (fn === "list_candidates_past_retention") {
         return { data: [{ invite_id: INV_1, org_id: ORG_A }, { invite_id: INV_2, org_id: ORG_B }], error: null };
       }
@@ -57,15 +61,28 @@ describe("runRetentionPurge", () => {
 
     const result = await runRetentionPurge(client, { now, limit: 50 });
 
+    expect(rpc.mock.calls.map((c) => c[0])).toEqual([
+      "list_media_past_retention",
+      "purge_media_for_retention",
+      "list_candidates_past_retention",
+      "purge_candidate_for_retention",
+      "purge_candidate_for_retention",
+    ]);
+    expect(rpc).toHaveBeenCalledWith("list_media_past_retention", { p_now: now.toISOString(), p_limit: 50 });
+    expect(rpc).toHaveBeenCalledWith("purge_media_for_retention", { p_attempt_id: ATT_1, p_now: now.toISOString() });
     expect(rpc).toHaveBeenCalledWith("list_candidates_past_retention", { p_now: now.toISOString(), p_limit: 50 });
     expect(rpc).toHaveBeenCalledWith("purge_candidate_for_retention", { p_invite_id: INV_1, p_now: now.toISOString() });
     expect(rpc).toHaveBeenCalledWith("purge_candidate_for_retention", { p_invite_id: INV_2, p_now: now.toISOString() });
-    expect(remove).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ checked: 2, purged: 2, failed: 0, objectsRemoved: 2 });
+    expect(remove).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({
+      media: { checked: 1, purged: 1, failed: 0, objectsRemoved: 2 },
+      results: { checked: 2, purged: 2, failed: 0, objectsRemoved: 2 },
+    });
   });
 
   it("keeps going when one candidate fails, and reports it without PII", async () => {
     const { client } = fakeClient(async (fn, args) => {
+      if (fn === "list_media_past_retention") return { data: [], error: null };
       if (fn === "list_candidates_past_retention") {
         return { data: [{ invite_id: INV_1, org_id: ORG_A }, { invite_id: INV_2, org_id: ORG_A }, { invite_id: INV_3, org_id: ORG_A }], error: null };
       }
@@ -73,17 +90,32 @@ describe("runRetentionPurge", () => {
       return { data: [], error: null };
     });
     const result = await runRetentionPurge(client, { now });
-    expect(result).toEqual({ checked: 3, purged: 2, failed: 1, objectsRemoved: 0 });
+    expect(result).toEqual({ media: empty, results: { checked: 3, purged: 2, failed: 1, objectsRemoved: 0 } });
   });
 
-  it("throws when the listing itself fails", async () => {
+  it("keeps going to the results clock when one media purge fails", async () => {
+    const { client } = fakeClient(async (fn) => {
+      if (fn === "list_media_past_retention") return { data: [{ attempt_id: ATT_1, org_id: ORG_A }], error: null };
+      if (fn === "purge_media_for_retention") return { data: null, error: { message: "boom" } };
+      if (fn === "list_candidates_past_retention") return { data: [{ invite_id: INV_1, org_id: ORG_A }], error: null };
+      return { data: [], error: null };
+    });
+    const result = await runRetentionPurge(client, { now });
+    expect(result).toEqual({
+      media: { checked: 1, purged: 0, failed: 1, objectsRemoved: 0 },
+      results: { checked: 1, purged: 1, failed: 0, objectsRemoved: 0 },
+    });
+  });
+
+  it("throws when a listing itself fails", async () => {
     const { client } = fakeClient(async () => ({ data: null, error: { message: "db down" } }));
     await expect(runRetentionPurge(client, { now })).rejects.toThrow(/db down/);
   });
 
-  it("defaults to a batch of 200", async () => {
+  it("defaults to a batch of 200 for both clocks", async () => {
     const { client, rpc } = fakeClient(async () => ({ data: [], error: null }));
     await runRetentionPurge(client, { now });
+    expect(rpc).toHaveBeenCalledWith("list_media_past_retention", { p_now: now.toISOString(), p_limit: 200 });
     expect(rpc).toHaveBeenCalledWith("list_candidates_past_retention", { p_now: now.toISOString(), p_limit: 200 });
   });
 });

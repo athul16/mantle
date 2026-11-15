@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import * as z from "zod";
 import { Avatar } from "@/components/brand";
+import { applyWaivers, describeAccommodations, hasAccommodations, type Accommodations } from "@/lib/accommodations";
 import { Icon } from "@/components/icons";
 import { requireOrgMembership, requireUser } from "@/lib/auth";
+import { getInviteAccommodations } from "@/lib/jobs/queries";
 import { getFlagsForReport, getInviteProctoring, type FlagsReport, type ReportFlag } from "@/lib/proctoring/report";
-import type { StepDetail } from "@/lib/results/answer-key";
 import { getCandidateReport, listJobResults, type CandidateReport, type ReportNote } from "@/lib/results/queries";
 import { VOTE_LABELS } from "@/lib/results/schemas";
 import { scorePercent } from "@/lib/results/summary";
@@ -67,12 +68,15 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
   const canReview = role === "admin" || role === "recruiter";
   const score = attempt.score;
   const db = await createClient();
-  const [flags, proctoring, counts, jobRows] = await Promise.all([
+  const [flags, assessmentProctoring, counts, jobRows, accommodations] = await Promise.all([
     getFlagsForReport(db, orgId, attempt.id),
     getInviteProctoring(db, orgId, inviteId),
     getSignalCounts(db, orgId, attempt.id),
     listJobResults(orgId, report.job.id),
+    getInviteAccommodations(orgId, inviteId),
   ]);
+  // What this candidate was actually monitored with (D9 waivers apply per invite).
+  const proctoring = applyWaivers(assessmentProctoring, accommodations);
 
   // Rank by score within the job: the pager walks candidates best first, then the unscored.
   const ranked = [...jobRows.filter((r) => r.percent !== null).sort((a, b) => b.percent! - a.percent!), ...jobRows.filter((r) => r.percent === null)];
@@ -111,7 +115,7 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
 
       <div style={{ maxWidth: 1360, margin: "0 auto", padding: "24px 32px 120px", display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
         <aside aria-label="Candidate" style={{ flex: "1 1 340px", maxWidth: 360, display: "flex", flexDirection: "column", gap: 16 }}>
-          <Identity report={report} name={name} score={score ? scorePercent(score.points, score.maxPoints) : null} />
+          <Identity report={report} name={name} score={score ? scorePercent(score.points, score.maxPoints) : null} accommodations={accommodations} />
           <FlagsSection
             orgId={orgId}
             startedAt={attempt.startedAt}
@@ -171,7 +175,7 @@ function clock(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function Identity({ report, name, score }: { report: CandidateReport; name: string; score: number | null }) {
+function Identity({ report, name, score, accommodations }: { report: CandidateReport; name: string; score: number | null; accommodations: Accommodations }) {
   const a = report.attempt!;
   const pass = report.assessment?.passScore ?? null;
   const limit = report.assessment ? report.assessment.timeLimitMinutes * 60 : null;
@@ -232,6 +236,12 @@ function Identity({ report, name, score }: { report: CandidateReport; name: stri
           </div>
         ))}
       </dl>
+      {hasAccommodations(accommodations) ? (
+        <p className="small" style={{ padding: "10px 12px", borderRadius: 8, background: "var(--accent-soft)" }} data-testid="report-accommodations">
+          <span className="strong">Accommodations:</span> {describeAccommodations(accommodations, report.assessment?.timeLimitMinutes).join(", ")}. Set by the
+          hiring team before the candidate started; logged in the audit log.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -323,6 +333,8 @@ function Overview({
 }) {
   const a = report.attempt!;
   const score = a.score;
+  // The automatic score is kept next to the final one (D11); shown once a reviewer changed it.
+  const autoScore = a.autoScore ?? null;
   const percent = score ? scorePercent(score.points, score.maxPoints) : null;
   const others = scored.filter((s) => s.id !== report.inviteId);
   const below = percent === null ? 0 : others.filter((s) => s.percent < percent).length;
@@ -349,6 +361,11 @@ function Overview({
             <span className="small muted tnum">
               {fmt(score!.points)} of {fmt(score!.maxPoints)} points
             </span>
+            {autoScore && autoScore.points !== score!.points ? (
+              <span className="xs muted tnum" data-testid="auto-score">
+                Automatic before review: {fmt(autoScore.points)} / {fmt(autoScore.maxPoints)}
+              </span>
+            ) : null}
             {pct !== null ? (
               <>
                 <span style={{ fontSize: 18, fontWeight: 600 }}>{ordinal(pct)} percentile</span>
@@ -464,7 +481,9 @@ function ScoreStrip({ me, others, pass, label }: { me: number; others: number[];
   );
 }
 
-function StepBadge({ step, short = false }: { step: StepDetail; short?: boolean }) {
+type ReportStep = CandidateReport["steps"][number];
+
+function StepBadge({ step, short = false }: { step: ReportStep; short?: boolean }) {
   const s = step.score;
   if (!s) return null;
   if (s.needsReview && !s.review)
@@ -497,7 +516,7 @@ function StepSection({
   canReview,
 }: {
   n: number;
-  step: StepDetail;
+  step: ReportStep;
   first: string;
   orgId: string;
   attemptId: string;
@@ -531,6 +550,11 @@ function StepSection({
           </span>
         ) : s?.needsReview ? (
           <span className="xs muted">Not yet reviewed by your team</span>
+        ) : null}
+        {s?.review && step.autoScore ? (
+          <span className="xs muted tnum" data-testid={`auto-score-${step.id}`}>
+            automatic {fmt(step.autoScore.points)} / {fmt(step.autoScore.maxPoints)}
+          </span>
         ) : null}
       </div>
 

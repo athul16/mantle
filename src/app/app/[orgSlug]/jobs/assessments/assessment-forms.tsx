@@ -42,6 +42,48 @@ function SettingRow({ title, hint, children, last = false }: { title: string; hi
   );
 }
 
+type Monitoring = "monitored" | "not_monitored";
+
+/** One Monitored / Not monitored radio with its one-line explanation (outside the label, so not part of its name). */
+function MonitoringChoice({
+  value,
+  label,
+  help,
+  checked,
+  onChange,
+}: {
+  value: Monitoring;
+  label: string;
+  help: string;
+  checked: boolean;
+  onChange: (value: Monitoring) => void;
+}) {
+  const id = `ca-mon-${value}`;
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+      <input
+        type="radio"
+        id={id}
+        name="monitoring"
+        value={value}
+        required
+        checked={checked}
+        onChange={() => onChange(value)}
+        aria-describedby={`${id}-help`}
+        style={{ marginTop: 3, accentColor: "var(--ink)" }}
+      />
+      <div>
+        <label htmlFor={id} className="small strong">
+          {label}
+        </label>
+        <div id={`${id}-help`} className="xs muted">
+          {help}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** An on/off switch (.toggle) that submits "on" under `name` when on. */
 function Toggle({ name, label, on, onChange, disabled }: { name?: string; label: string; on: boolean; onChange?: (on: boolean) => void; disabled?: boolean }) {
   return (
@@ -92,8 +134,12 @@ export function ConfigureAssessmentForm({
   const state = editing ? updateState : createState;
   const pending = editing ? saving : creating;
   const router = useRouter();
-  const [camera, setCamera] = useState(editing ? editing.proctoring.camera : true);
-  const [screenShare, setScreenShare] = useState(editing ? editing.proctoring.screen : true);
+  // D5: a new assessment needs an explicit Monitored / Not monitored choice, with nothing preselected.
+  const [monitoring, setMonitoring] = useState<Monitoring | null>(
+    editing ? (editing.proctoring.camera || editing.proctoring.screen ? "monitored" : "not_monitored") : null,
+  );
+  const [camera, setCamera] = useState(editing ? editing.proctoring.camera : false);
+  const [screenShare, setScreenShare] = useState(editing ? editing.proctoring.screen : false);
   const errors = state?.fieldErrors;
   const created = !editing ? createState?.id : undefined;
 
@@ -170,21 +216,44 @@ export function ConfigureAssessmentForm({
             </div>
           </SettingRow>
           <SettingRow title="Monitoring" hint="Candidates see exactly this list before they agree" last>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", gap: 12 }}>
-                <Toggle name="camera" label="Camera snapshots" on={camera} onChange={setCamera} disabled={locked} />
-                <div>
-                  <div className="small strong">Camera snapshots</div>
-                  <div className="xs muted">Occasional photos of the candidate while they work</div>
+            <fieldset
+              style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}
+              aria-describedby={errors?.monitoring ? "ca-mon-err" : undefined}
+              aria-invalid={errors?.monitoring ? true : undefined}
+            >
+              <legend className="sr-only">Proctoring</legend>
+              <MonitoringChoice
+                value="monitored"
+                label="Monitored"
+                help="Candidates agree to camera photos and/or screen screenshots while they work."
+                checked={monitoring === "monitored"}
+                onChange={setMonitoring}
+              />
+              {monitoring === "monitored" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingLeft: 26 }}>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <Toggle name="camera" label="Camera snapshots" on={camera} onChange={setCamera} disabled={locked} />
+                    <div>
+                      <div className="small strong">Camera snapshots</div>
+                      <div className="xs muted">Occasional photos of the candidate while they work</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <Toggle name="screen" label="Entire-screen sharing" on={screenShare} onChange={setScreenShare} disabled={locked} />
+                    <div>
+                      <div className="small strong">Entire-screen sharing</div>
+                      <div className="xs muted">The workspace locks if sharing stops, until it&apos;s restored</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                <Toggle name="screen" label="Entire-screen sharing" on={screenShare} onChange={setScreenShare} disabled={locked} />
-                <div>
-                  <div className="small strong">Entire-screen sharing</div>
-                  <div className="xs muted">The workspace locks if sharing stops, until it&apos;s restored</div>
-                </div>
-              </div>
+              ) : null}
+              <MonitoringChoice
+                value="not_monitored"
+                label="Not monitored"
+                help="No camera or screen capture. Leaving the window and copy/paste are still noted."
+                checked={monitoring === "not_monitored"}
+                onChange={setMonitoring}
+              />
               <div style={{ display: "flex", gap: 12 }}>
                 <Toggle label="Activity log (always on)" on disabled />
                 <div>
@@ -192,7 +261,8 @@ export function ConfigureAssessmentForm({
                   <div className="xs muted">Timestamped opens, edits and sends · always on</div>
                 </div>
               </div>
-            </div>
+              <FieldError id="ca-mon-err" text={errors?.monitoring?.[0]} />
+            </fieldset>
           </SettingRow>
         </section>
       </fieldset>

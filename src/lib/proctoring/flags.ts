@@ -1,5 +1,6 @@
 import "server-only";
 
+import { applyWaivers, type Accommodations } from "@/lib/accommodations";
 import type { Json } from "@/lib/database.types";
 import type { AttemptRow } from "@/lib/candidate/invite";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -102,6 +103,7 @@ export async function closeDowntimeAtEnd(
   attempt: AttemptKey,
   assessmentId: string,
   end: { at: string; closedBy: "submitted" | "deadline" },
+  accommodations: Accommodations,
 ): Promise<void> {
   const { data, error } = await createServiceClient()
     .from("assessments")
@@ -110,7 +112,8 @@ export async function closeDowntimeAtEnd(
     .eq("org_id", attempt.org_id)
     .single();
   if (error) throw new Error(`proctoring settings lookup failed: ${error.message}`);
-  const settings = readProctoring(data.proctoring);
+  // The candidate's own settings: a waived camera or screen (D9) is not monitored.
+  const settings = applyWaivers(readProctoring(data.proctoring), accommodations);
   if (!settings.camera && !settings.screen) return;
   if (await recordDownPeriods(attempt, end)) await refreshFlags(attempt, settings);
 }

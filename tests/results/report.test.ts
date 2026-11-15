@@ -187,7 +187,16 @@ describe("reviewRubricStep", () => {
     expect(score.steps["client-reply"]).toMatchObject({ points: 7.5, review: { by: co.users.recruiter.id } });
     expect(score.steps["client-reply"].needsReview).toBeUndefined();
 
+    // The automatic score stays as computed at submit (D11).
+    const auto = must(await serviceClient().from("attempts").select("auto_score").eq("id", scored.attemptId).single()).auto_score as ReturnType<typeof miniCloseScore>;
+    expect(auto.points).toBe(8);
+    expect(auto.steps["client-reply"]).toMatchObject({ points: 0, needsReview: true });
+
     as("viewer");
+    const report = (await getCandidateReport(co.orgId, scored.inviteId))!;
+    expect(report.attempt).toMatchObject({ score: { points: 15.5 }, autoScore: { points: 8 } });
+    expect(report.steps.find((s) => s.id === "client-reply")).toMatchObject({ score: { points: 7.5 }, autoScore: { points: 0 } });
+
     const rows = await listJobResults(co.orgId, jobId);
     expect(rows.find((r) => r.inviteId === scored.inviteId)).toMatchObject({ needsReview: false, points: 15.5, percent: 81.6 });
   });
