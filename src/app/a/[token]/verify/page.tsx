@@ -66,8 +66,19 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
           <input type="checkbox" name="consent" required className="mt-1" />
           <span>{CONSENT_TEXT}</span>
         </label>
-        <p className="text-xs text-neutral-500">
-          Need extra time or another accommodation? Contact {invite.companyName} before you start.
+        <p className="text-xs text-neutral-500" data-testid="accommodation-contact">
+          Need extra time, or can&apos;t use a camera or share your screen? Contact{" "}
+          {invite.contactEmail ? (
+            <>
+              {invite.companyName} at{" "}
+              <a href={`mailto:${invite.contactEmail}`} className="underline">
+                {invite.contactEmail}
+              </a>
+            </>
+          ) : (
+            `${invite.companyName}'s hiring team`
+          )}{" "}
+          before you start.
         </p>
         <SubmitButton className={primaryButton} pendingText="Verifying…">
           Verify and continue

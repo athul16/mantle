@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useId, useState } from "react";
 import { Button, Field, FormMessage } from "@/components/ui";
 import type { AssessmentSummary } from "@/lib/jobs/queries";
 import { cloneAssessment, createAssessment, updateAssessment } from "../actions";
@@ -13,25 +13,75 @@ function SettingsFields({
   defaults,
 }: {
   errors: FieldErrors;
-  defaults: { title?: string; minutes: number; passScore: number | null; camera: boolean; screen: boolean };
+  defaults: { title?: string; minutes: number; passScore: number | null };
 }) {
   return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Title" name="title" required defaultValue={defaults.title} error={errors?.title?.[0]} />
-        <Field label="Time limit (minutes)" name="timeLimitMinutes" type="number" min={1} max={240} required defaultValue={defaults.minutes} error={errors?.timeLimitMinutes?.[0]} />
-        <Field label="Pass score (%)" name="passScore" type="number" min={0} max={100} step="any" placeholder="optional" defaultValue={defaults.passScore ?? undefined} error={errors?.passScore?.[0]} />
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Field label="Title" name="title" required defaultValue={defaults.title} error={errors?.title?.[0]} />
+      <Field label="Time limit (minutes)" name="timeLimitMinutes" type="number" min={1} max={240} required defaultValue={defaults.minutes} error={errors?.timeLimitMinutes?.[0]} />
+      <Field label="Pass score (%)" name="passScore" type="number" min={0} max={100} step="any" placeholder="optional" defaultValue={defaults.passScore ?? undefined} error={errors?.passScore?.[0]} />
+    </div>
+  );
+}
+
+type Monitoring = "monitored" | "not_monitored";
+
+/**
+ * Proctoring is a required choice with nothing preselected for a new
+ * assessment (the server rejects a missing choice too). Camera and screen
+ * options only appear once Monitored is picked.
+ */
+function ProctoringFields({
+  errors,
+  defaults,
+}: {
+  errors: FieldErrors;
+  defaults: { monitoring: Monitoring | null; camera: boolean; screen: boolean };
+}) {
+  const [monitoring, setMonitoring] = useState<Monitoring | null>(defaults.monitoring);
+  const id = useId();
+  const error = errors?.monitoring?.[0];
+  const choice = (value: Monitoring, label: string, help: string) => (
+    // The help line sits outside the <label> so it isn't part of the radio's name.
+    <div className="flex items-start gap-2">
+      <input
+        type="radio"
+        id={`${id}-${value}`}
+        name="monitoring"
+        value={value}
+        required
+        className="mt-1"
+        checked={monitoring === value}
+        onChange={() => setMonitoring(value)}
+        aria-describedby={`${id}-${value}-help`}
+      />
+      <div>
+        <label htmlFor={`${id}-${value}`} className="font-medium">{label}</label>
+        <p id={`${id}-${value}-help`} className="text-neutral-600 dark:text-neutral-400">{help}</p>
       </div>
-      <fieldset className="flex flex-wrap gap-6 text-sm">
-        <legend className="mb-1 font-medium">Proctoring</legend>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="camera" defaultChecked={defaults.camera} /> Camera snapshots
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="screen" defaultChecked={defaults.screen} /> Screen share
-        </label>
-      </fieldset>
-    </>
+    </div>
+  );
+  return (
+    <fieldset className="space-y-2 text-sm" aria-describedby={error ? `${id}-error` : undefined} aria-invalid={error ? true : undefined}>
+      <legend className="mb-1 font-medium">Proctoring</legend>
+      {choice("monitored", "Monitored", "Candidates agree to camera photos and/or screen screenshots while they work.")}
+      {choice("not_monitored", "Not monitored", "No camera or screen capture. Leaving the window and copy/paste are still noted.")}
+      {monitoring === "monitored" ? (
+        <div className="flex flex-wrap gap-6 pl-6">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="camera" defaultChecked={defaults.camera} /> Camera snapshots
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="screen" defaultChecked={defaults.screen} /> Screen share
+          </label>
+        </div>
+      ) : null}
+      {error ? (
+        <span id={`${id}-error`} className="block text-red-600">
+          {error}
+        </span>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -55,8 +105,9 @@ export function CreateAssessmentForm({ orgId, scenarios }: { orgId: string; scen
       </label>
       {/* Remount when the scenario changes so the suggested time limit updates. */}
       <div key={scenarioId} className="space-y-3">
-        <SettingsFields errors={state?.fieldErrors} defaults={{ minutes, passScore: null, camera: true, screen: true }} />
+        <SettingsFields errors={state?.fieldErrors} defaults={{ minutes, passScore: null }} />
       </div>
+      <ProctoringFields errors={state?.fieldErrors} defaults={{ monitoring: null, camera: false, screen: false }} />
       <Button type="submit" disabled={pending}>{pending ? "Creating…" : "Create assessment"}</Button>
       <FormMessage error={state?.error} message={state?.message} />
     </form>
@@ -83,6 +134,12 @@ export function EditAssessmentForm({ orgId, assessment }: { orgId: string; asses
           title: assessment.title,
           minutes: assessment.timeLimitMinutes,
           passScore: assessment.passScore,
+        }}
+      />
+      <ProctoringFields
+        errors={state?.fieldErrors}
+        defaults={{
+          monitoring: assessment.proctoring.camera || assessment.proctoring.screen ? "monitored" : "not_monitored",
           camera: assessment.proctoring.camera,
           screen: assessment.proctoring.screen,
         }}

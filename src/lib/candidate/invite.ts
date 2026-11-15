@@ -1,5 +1,7 @@
 import "server-only";
 
+import { effectiveTimeLimitMinutes, readAccommodations, type Accommodations } from "@/lib/accommodations";
+import { readContactEmail } from "@/lib/org-settings";
 import { hashToken } from "@/lib/tokens";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -18,10 +20,16 @@ export interface InviteContext {
   /** Last moment the candidate may start: the earlier of the invite expiry and the job deadline. */
   startBy: Date;
   companyName: string;
+  /** Whom to ask about accommodations (organizations.settings.contact_email), if the company set one. */
+  contactEmail: string | null;
   jobTitle: string;
   assessmentId: string;
   scenarioId: string;
+  /** This candidate's limit: the assessment's, plus any extra time (D9). The deadline is set from this. */
   timeLimitMinutes: number;
+  /** The assessment's own limit, before extra time. */
+  baseTimeLimitMinutes: number;
+  accommodations: Accommodations;
 }
 
 export interface AttemptRow {
@@ -70,12 +78,20 @@ export async function loadInvite(inviteId: string): Promise<InviteContext | null
   if (error) throw new Error(`invite lookup failed: ${error.message}`);
   if (!invite) return null;
 
-  const [org, job] = await Promise.all([
-    db.from("organizations").select("name").eq("id", invite.org_id).single(),
+  const [org, job, accommodation] = await Promise.all([
+    db.from("organizations").select("name, settings").eq("id", invite.org_id).single(),
     db.from("jobs").select("title, deadline, assessment_id").eq("id", invite.job_id).eq("org_id", invite.org_id).single(),
+    db
+      .from("invite_accommodations")
+      .select("extra_time_percent, waive_camera, waive_screen")
+      .eq("invite_id", invite.id)
+      .eq("org_id", invite.org_id)
+      .maybeSingle(),
   ]);
   if (org.error) throw new Error(`organization lookup failed: ${org.error.message}`);
   if (job.error) throw new Error(`job lookup failed: ${job.error.message}`);
+  if (accommodation.error) throw new Error(`accommodations lookup failed: ${accommodation.error.message}`);
+  const accommodations = readAccommodations(accommodation.data);
 
   const assessment = await db
     .from("assessments")
@@ -97,10 +113,13 @@ export async function loadInvite(inviteId: string): Promise<InviteContext | null
     status: invite.status as InviteContext["status"],
     startBy,
     companyName: org.data.name,
+    contactEmail: readContactEmail(org.data.settings),
     jobTitle: job.data.title,
     assessmentId: assessment.data.id,
     scenarioId: assessment.data.scenario_id,
-    timeLimitMinutes: assessment.data.time_limit_minutes,
+    timeLimitMinutes: effectiveTimeLimitMinutes(assessment.data.time_limit_minutes, accommodations.extraTimePercent),
+    baseTimeLimitMinutes: assessment.data.time_limit_minutes,
+    accommodations,
   };
 }
 

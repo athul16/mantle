@@ -20,6 +20,8 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
   const monitored = isMonitored(proctoring);
   const watched = [proctoring.camera ? "camera" : null, proctoring.screen ? "entire screen" : null].filter(Boolean).join(" and ");
   const minutes = session.invite.timeLimitMinutes;
+  const { extraTimePercent, waiveCamera, waiveScreen } = session.invite.accommodations;
+  const waived = [waiveCamera ? "camera" : null, waiveScreen ? "screen share" : null].filter(Boolean).join(" and ");
 
   return (
     <CandidateCard title="Before you start" wide>
@@ -30,7 +32,7 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
 
       <Facts
         items={[
-          ["Time limit", `${minutes} minutes`],
+          ["Time limit", extraTimePercent ? `${minutes} minutes (includes ${extraTimePercent}% extra time)` : `${minutes} minutes`],
           ["Tasks", `${stepCount}, delivered through the inbox`],
         ]}
       />
@@ -44,6 +46,7 @@ export default async function InstructionsPage({ params }: PageProps<"/a/[token]
           <li>A calculator and notes on paper are fine. Do the work yourself.</li>
           <li>The timer runs on our server. Closing the tab doesn&apos;t pause it; reopen your link to continue.</li>
           <li>When time runs out, whatever you&apos;ve saved is submitted automatically.</li>
+          {waived ? <li>{session.invite.companyName} has excused you from the {waived} for this assessment.</li> : null}
           {monitored ? (
             <li>
               Your {watched} {proctoring.camera && proctoring.screen ? "are" : "is"} monitored until you submit. If{" "}

@@ -5,7 +5,7 @@
 begin;
 \ir fixtures/setup.psql
 
-select plan(54);
+select plan(58);
 
 -- ---------------------------------------------------------------------------
 -- RLS enabled, table by table (so a failure names the table)
@@ -17,7 +17,7 @@ select ok(
 )
 from unnest(array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites',
                   'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events',
-                  'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'ai_shadow_scores']) t;
+                  'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles', 'ai_shadow_scores']) t;
 
 -- ---------------------------------------------------------------------------
 -- Exactly these policies
@@ -49,11 +49,13 @@ select set_eq(
        ('flags',            'members read flags',                'SELECT', 'PERMISSIVE'),
        ('flags',            'managers review flags',             'UPDATE', 'PERMISSIVE'),
        ('notes',            'members read notes',                'SELECT', 'PERMISSIVE'),
+       ('invite_accommodations', 'members read accommodations',  'SELECT', 'PERMISSIVE'),
        ('notes',            'members add own notes',             'INSERT', 'PERMISSIVE'),
        ('notes',            'authors edit own notes',            'UPDATE', 'PERMISSIVE'),
        ('notes',            'authors delete own notes',          'DELETE', 'PERMISSIVE'),
        ('audit_log',        'admins read audit log',             'SELECT', 'PERMISSIVE'),
-       ('audit_log',        'members append audit log',          'INSERT', 'PERMISSIVE') $$,
+       ('audit_log',        'members append audit log',          'INSERT', 'PERMISSIVE'),
+       ('profiles',         'read own and teammates'' profiles',  'SELECT', 'PERMISSIVE') $$,
   'every public policy, with its command (a new or dropped policy fails here)'
 );
 
@@ -66,9 +68,16 @@ select is_empty(
 select is_empty(
   $$ select tablename || '.' || policyname from pg_policies
       where schemaname = 'public'
+        and tablename <> 'profiles'
         and coalesce(qual, '') !~ 'private\.(is_org_member|can_manage_org|has_org_role)'
         and coalesce(with_check, '') !~ 'private\.(is_org_member|can_manage_org|has_org_role)' $$,
   'every policy checks org membership through the private helpers'
+);
+
+select is(
+  (select qual from pg_policies where schemaname = 'public' and tablename = 'profiles'),
+  '((id = ( SELECT auth.uid() AS uid)) OR private.shares_org_with(id))',
+  'profiles: the one policy not scoped to an org reads your own profile or a teammate''s'
 );
 
 select is_empty(
@@ -94,8 +103,8 @@ select set_eq(
                          where p.schemaname = 'public' and p.tablename = c.relname
                            and p.cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')) $$,
   $$ values ('invite_secrets'), ('attempt_secrets'), ('attempts'), ('step_responses'),
-            ('action_events'), ('integrity_events'), ('media'), ('ai_shadow_scores') $$,
-  'candidate data has no write policy: only the server (service role) writes it'
+            ('action_events'), ('integrity_events'), ('media'), ('profiles'), ('invite_accommodations'), ('ai_shadow_scores') $$,
+  'candidate data, AI shadow scores, accommodations and profiles have no write policy: only the server, set_invite_accommodations and the auth.users trigger write them'
 );
 
 -- ---------------------------------------------------------------------------
@@ -111,6 +120,9 @@ from unnest(array['organizations', 'memberships', 'scenarios', 'assessments', 'j
                   'attempts', 'step_responses', 'action_events', 'integrity_events', 'media',
                   'flags', 'notes', 'audit_log']) t;
 
+select is(pg_temp.try_as('anon', 'select 1 from public.profiles'), '42501',
+          'profiles: anonymous visitors cannot read profiles at all');
+
 select is(
   pg_temp.count_as('outsider', 'select 1 from public.' || t),
   0,
@@ -119,6 +131,12 @@ select is(
 from unnest(array['organizations', 'memberships', 'assessments', 'jobs', 'invites',
                   'attempts', 'step_responses', 'action_events', 'integrity_events', 'media',
                   'flags', 'notes', 'audit_log']) t;
+
+select is(
+  pg_temp.count_as('outsider', $$select id from public.profiles where id <> pg_temp.fx('outsider')$$),
+  0,
+  'profiles: a signed-in user with no membership reads only their own profile'
+);
 
 select is(
   pg_temp.count_as('outsider', $$select 1 from public.scenarios where slug like 'pgtap-%'$$),

@@ -8,7 +8,7 @@ The company side turns a pile of applicants into a short ranked list. The candid
 | --- | --- | --- | --- |
 | 1 | Sign up / org setup | Company name, logo, invite teammates with roles | MVP |
 | 2 | Assessment library | Ready-made simulations (Accounting Intern, Pharma Intern); preview as candidate | MVP |
-| 3 | Configure assessment | Time limit, pass score, proctoring toggles (camera, screen, phone) | MVP |
+| 3 | Configure assessment | Time limit, pass score, a required Monitored / Not monitored choice with nothing preselected (decision D5); if Monitored, camera and/or screen (phone later). The server rejects a missing choice | MVP |
 | 4 | Create job | Role name, linked assessment, invite deadline | MVP |
 | 5 | Invite candidates | Paste emails, CSV upload, or public link for a job posting | MVP |
 | 6 | Candidates table | Status (invited, started, completed, expired), score, percentile, integrity label; sort, filter, bulk advance/reject, reminders | MVP |
@@ -17,7 +17,7 @@ The company side turns a pile of applicants into a short ranked list. The candid
 | 9 | Analytics | Invited → completed funnel, score distribution, pass rates | Later |
 | 10 | Scenario builder | Companies author or customize simulations | Later |
 | 11 | Integrations | ATS sync (Greenhouse, Lever, Workday) | Later |
-| 12 | Settings and billing | Branding, email templates, retention, Stripe, SSO | Later |
+| 12 | Settings and billing | Retention: media and results periods (built, see docs/02). Branding, email templates, Stripe, SSO | Later |
 
 For pilots, our team can run screens 1 to 3 for the client.
 
@@ -45,3 +45,6 @@ Example summary:
 - Screen 6 (candidates table), per job: `/app/<slug>/candidates?job=<id>`, linked from the job page ("Results and reports"). Columns: candidate, status (with a "needs review" badge), score (% and points), time taken, submitted. Sort by any column, filter by status or "needs review", search by name or email. Percentile, integrity label, bulk actions and reminders are not built yet.
 - Screen 7 (candidate report): `/app/<slug>/candidates/<inviteId>`. Summary (final score, pass mark, time taken, start and submit times); per task, the candidate's answer next to the expected answer rebuilt on the server from the attempt's seed, with points and the scoring note; for `inbox_reply` tasks, the reply, what to look for per criterion, and a rubric form; the attempt timeline from action events; notes with a hire / no hire / unsure vote.
 - Rubric review: admins and recruiters enter points per criterion; the database function `review_rubric_step` checks the role and ranges, records who reviewed and when, recomputes the attempt total and writes the audit log. A reviewed task can be changed later. Viewers see everything read-only, but can add notes and votes (`03-roles-and-permissions.md`).
+- Job page invite list: email, status, first invited, last sent (with the number of sends after a resend), expiry. Two batches sent at the same moment can't invite the same email twice (database unique index); the later batch reports it as already invited.
+- Accommodations (decision D9): each unstarted invite has an "Accommodations" control on the job page for extra time (+25/50/100%) and a camera or screen-share waiver, for that candidate only; the assessment's locked settings don't change. Every change goes to the audit log, and the candidate report shows the accommodations in its summary and the timeline's start line. Admins set the contact email candidates see in Settings.
+

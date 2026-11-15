@@ -24,7 +24,7 @@ $$;
 
 select tables_are(
   'public',
-  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'ai_shadow_scores'],
+  array['organizations', 'memberships', 'scenarios', 'assessments', 'jobs', 'invites', 'attempts', 'invite_secrets', 'attempt_secrets', 'step_responses', 'action_events', 'integrity_events', 'media', 'flags', 'notes', 'audit_log', 'profiles', 'invite_accommodations', 'ai_shadow_scores'],
   'public has exactly the expected tables'
 );
 
@@ -114,7 +114,9 @@ select set_eq(
        ('expires_at', 'timestamp with time zone', true, '', ''),
        ('status', 'text', true, '''invited''::text', ''),
        ('created_by', 'uuid', false, '', ''),
-       ('created_at', 'timestamp with time zone', true, 'now()', '') $$,
+       ('created_at', 'timestamp with time zone', true, 'now()', ''),
+       ('last_sent_at', 'timestamp with time zone', true, 'now()', ''),
+       ('sent_count', 'integer', true, '1', '') $$,
   'invites: columns, types, nullability, defaults'
 );
 select col_is_pk('public', 'invites', array['id'], 'invites: primary key (id)');
@@ -262,11 +264,12 @@ select set_eq(
 select col_is_pk('public', 'audit_log', array['id'], 'audit_log: primary key (id)');
 
 -- Every tenant-owned table carries org_id (scenarios: null = platform library).
+-- profiles is per person, not per company (one person can be in several).
 select is_empty(
   $$ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r' and c.relname <> 'organizations'
+      where n.nspname = 'public' and c.relkind = 'r' and c.relname not in ('organizations', 'profiles')
         and not exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'org_id' and not a.attisdropped) $$,
-  'every public table except organizations has an org_id column'
+  'every public table except organizations and profiles has an org_id column'
 );
 select is_empty(
   $$ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace

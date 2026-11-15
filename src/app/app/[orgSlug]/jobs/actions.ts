@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import * as z from "zod";
 import type { FormState } from "@/components/ui";
+import type { ExtraTimePercent } from "@/lib/accommodations";
 import { AuthorizationError, requireMembership, type Role } from "@/lib/auth";
 import { MAX_CSV_BYTES, MAX_INVITES_PER_BATCH, mergeRecipients, parseCsvEmails, parsePastedEmails } from "@/lib/jobs/emails";
-import { InviteError, createInvites, resendInvite, revokeInvite } from "@/lib/jobs/invites";
+import { InviteError, createInvites, resendInvite, revokeInvite, setAccommodations } from "@/lib/jobs/invites";
 import {
+  accommodationsSchema,
   cloneAssessmentSchema,
   createAssessmentSchema,
   createJobSchema,
@@ -238,6 +240,26 @@ export async function resendInviteAction(_state: FormState, formData: FormData):
     const { email } = await resendInvite({ db: await createClient(), orgId, orgName: membership.orgName, inviteId });
     refreshJobs();
     return { message: `New link sent to ${email}.` };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function setAccommodationsAction(_state: FormState, formData: FormData): Promise<FormState> {
+  const parsed = accommodationsSchema.safeParse(fields(formData));
+  if (!parsed.success) return { error: "Invalid request." };
+  const { orgId, inviteId, extraTimePercent, waiveCamera, waiveScreen } = parsed.data;
+
+  try {
+    await requireMembership(orgId, MANAGERS);
+    const { email } = await setAccommodations({
+      db: await createClient(),
+      orgId,
+      inviteId,
+      accommodations: { extraTimePercent: extraTimePercent as ExtraTimePercent, waiveCamera, waiveScreen },
+    });
+    refreshJobs();
+    return { message: `Saved accommodations for ${email}.` };
   } catch (err) {
     return fail(err);
   }

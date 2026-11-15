@@ -7,7 +7,7 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 | # | Screen | Contents | Phase |
 | --- | --- | --- | --- |
 | 1 | Invite email | Company name and logo, role, time needed, deadline, start link | MVP |
-| 2 | Verify | Name, email code, consent to monitoring, accommodations link | MVP |
+| 2 | Verify | Name, email code, consent to monitoring, whom to contact for accommodations (the company's contact email) | MVP |
 | 3 | System check | Browser, screen size, connection; camera permission, entire-screen share, start photo (if enabled); phone QR pairing (phase 2) | MVP |
 | 4 | Instructions | Scenario intro, time limit, allowed tools, rules, one untimed practice step | MVP |
 | 5 | Simulation workspace | See layout below | MVP |
@@ -22,10 +22,16 @@ No account, no download. Desktop/laptop only for MVP; phones get a "please switc
 - **Left:** inbox. Messages can arrive over time (scheduled by the scenario). Unread counts, timestamps.
 - **Right:** workspace. Opens whatever the current message or task needs: spreadsheet grid, PDF/document viewer, journal entry builder, reply composer, multiple choice.
 - **Built-in calculator** for accounting.
-- **Banners:** shown immediately if camera or screen share drops; the test pauses until restored.
+- **Banners:** shown immediately if camera or screen share drops. The task area is covered until it is back, but the **timer keeps running** (decision D4, 2026-11-10); the message tells the candidate so. Each down period (start, end, camera or screen) is recorded, and the report shows the gaps and the total so the recruiter can judge it (see `docs/02-security-and-integrity.md`). A refresh or closed tab during a gap ends it when the source is back, or at submit or the deadline if it never is.
 
 ## Behavior
 
 - Every change autosaves.
 - Candidates can move between open tasks freely unless the scenario locks a step.
 - All actions are timestamped (opened message, started task, submitted step) for process signals in the report.
+
+## Accommodations (as built, decision D9)
+
+- The verify page and the monitoring notice tell candidates whom to ask for extra time or to take the test without a camera or screen share: the company's contact email (Settings), or "the hiring team" when none is set.
+- A recruiter or admin sets accommodations per invite before the candidate starts: +25%, +50% or +100% time, and/or no camera / no screen share. The instructions page shows the longer limit ("45 minutes (includes 50% extra time)") and which monitoring is excused. The extra time is part of the server deadline; the browser timer only displays it.
+

@@ -6,7 +6,8 @@ import { MAX_INVITES_PER_BATCH } from "@/lib/jobs/emails";
 import { getJob, listInvites } from "@/lib/jobs/queries";
 import { canResend, canRevoke, isPast, type InviteStatus } from "@/lib/jobs/status";
 import { LocalDate } from "../local-date";
-import { InviteCandidatesForm, InviteRowActions } from "./invite-forms";
+import { describeAccommodations, hasAccommodations } from "@/lib/accommodations";
+import { AccommodationsForm, InviteCandidatesForm, InviteRowActions } from "./invite-forms";
 
 export const metadata = { title: "Job · Assessment Platform" };
 
@@ -74,6 +75,7 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
                   <th className="px-4 py-2 font-medium">Email</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Invited</th>
+                  <th className="px-4 py-2 font-medium">Last sent</th>
                   <th className="px-4 py-2 font-medium">Expires</th>
                   {canManage ? <th className="px-4 py-2 font-medium"><span className="sr-only">Actions</span></th> : null}
                 </tr>
@@ -84,11 +86,20 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
                     <td className="px-4 py-2">
                       {i.email}
                       {i.candidateName ? <span className="ml-2 text-xs text-neutral-500">{i.candidateName}</span> : null}
+                      {hasAccommodations(i.accommodations) ? (
+                        <span className="mt-0.5 block text-xs text-violet-700 dark:text-violet-300" data-testid="invite-accommodations">
+                          Accommodations: {describeAccommodations(i.accommodations, a?.timeLimitMinutes).join(", ")}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2">
                       <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_STYLES[i.status]}`}>{i.status}</span>
                     </td>
                     <td className="px-4 py-2"><LocalDate iso={i.sentAt} /></td>
+                    <td className="px-4 py-2">
+                      <LocalDate iso={i.lastSentAt} />
+                      {i.sentCount > 1 ? <span className="ml-1 text-xs text-neutral-500">({i.sentCount} sends)</span> : null}
+                    </td>
                     <td className="px-4 py-2"><LocalDate iso={i.expiresAt} /></td>
                     {canManage ? (
                       <td className="px-4 py-2 text-right">
@@ -99,6 +110,16 @@ export default async function JobPage({ params }: PageProps<"/app/[orgSlug]/jobs
                           canResend={canResend(i.status) && !deadlinePassed}
                           canRevoke={canRevoke(i.status)}
                         />
+                        {!i.started && i.status !== "revoked" ? (
+                          <AccommodationsForm
+                            orgId={orgId}
+                            inviteId={i.id}
+                            email={i.email}
+                            current={i.accommodations}
+                            camera={a?.proctoring.camera ?? false}
+                            screen={a?.proctoring.screen ?? false}
+                          />
+                        ) : null}
                       </td>
                     ) : null}
                   </tr>

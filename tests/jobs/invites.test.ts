@@ -122,6 +122,8 @@ beforeAll(async () => {
   orgIds.push(orgB);
   // The outsider is org B's admin, so their actions need two-factor (aal2).
   await enrollTotp(outsider.client);
+  // Recruiters must use two-factor too.
+  await enrollTotp(recruiter.client);
 
   const m = await service.from("memberships").insert([
     { org_id: orgA, user_id: recruiter.id, role: "recruiter" },
@@ -151,11 +153,22 @@ afterAll(async () => {
 });
 
 describe("assessments and jobs", () => {
+  it("the server refuses an assessment with no proctoring choice", async () => {
+    acting = recruiter;
+    const res = await actions.createAssessment(
+      undefined,
+      form({ orgId: orgA, scenarioId, title: "No choice", timeLimitMinutes: 20, camera: true, screen: true }),
+    );
+    expect(res?.fieldErrors?.monitoring).toEqual(["Choose whether candidates are monitored."]);
+    const { count } = await service.from("assessments").select("id", { count: "exact", head: true }).eq("org_id", orgA);
+    expect(count).toBe(0);
+  });
+
   it("recruiter creates an assessment and a job", async () => {
     acting = recruiter;
     const created = await actions.createAssessment(
       undefined,
-      form({ orgId: orgA, scenarioId, title: "Petty cash round", timeLimitMinutes: 20, passScore: 70, camera: true, screen: false }),
+      form({ orgId: orgA, scenarioId, title: "Petty cash round", timeLimitMinutes: 20, passScore: 70, monitoring: "monitored", camera: true, screen: false }),
     );
     expect(created).toMatchObject({ message: expect.stringContaining("Created") });
 
@@ -173,7 +186,7 @@ describe("assessments and jobs", () => {
     acting = viewer;
     const res = await actions.createAssessment(
       undefined,
-      form({ orgId: orgA, scenarioId, title: "Nope", timeLimitMinutes: 20 }),
+      form({ orgId: orgA, scenarioId, title: "Nope", timeLimitMinutes: 20, monitoring: "not_monitored" }),
     );
     expect(res?.error).toMatch(/permission/);
     const { count } = await service.from("assessments").select("id", { count: "exact", head: true }).eq("org_id", orgA);
@@ -186,7 +199,7 @@ describe("assessments and jobs", () => {
     acting = recruiter;
     const res = await actions.updateAssessment(
       undefined,
-      form({ orgId: orgA, assessmentId: a!.id, title: "Petty cash round", timeLimitMinutes: 30 }),
+      form({ orgId: orgA, assessmentId: a!.id, title: "Petty cash round", timeLimitMinutes: 30, monitoring: "not_monitored" }),
     );
     expect(res?.error).toMatch(/locked/);
     await service.from("assessments").update({ locked_at: null }).eq("id", a!.id).select();
@@ -291,8 +304,17 @@ describe("invites", () => {
       .update({ code_hash: "pending-code", code_attempts: 2 })
       .eq("invite_id", row.id);
 
+    expect(row.sent_count).toBe(1);
+    expect(row.last_sent_at).toBe(row.created_at);
+
     const res = await actions.resendInviteAction(undefined, form({ orgId: orgA, inviteId: row.id }));
     expect(res?.message).toMatch(/New link sent/);
+
+    // S1: the list shows when the link was last sent, and how many times.
+    const after = await inviteRow(candidate("c1"));
+    expect(after.sent_count).toBe(2);
+    expect(new Date(after.last_sent_at).getTime()).toBeGreaterThan(new Date(row.created_at).getTime());
+    expect(after.created_at).toBe(row.created_at);
 
     const newToken = await latestToken(candidate("c1"));
     expect(newToken).not.toBe(oldToken);
@@ -325,5 +347,52 @@ describe("invites", () => {
     await service.from("invites").update({ status: "started" }).eq("id", row.id);
     expect((await actions.resendInviteAction(undefined, form({ orgId: orgA, inviteId: row.id })))?.error).toMatch(/started/);
     expect((await actions.revokeInviteAction(undefined, form({ orgId: orgA, inviteId: row.id })))?.error).toMatch(/started/);
+  });
+
+  it("concurrent batches can't invite the same email twice (unique index)", async () => {
+    acting = recruiter;
+    const shared = [candidate("race1"), candidate("race2"), candidate("race3")];
+    const batches = Array.from({ length: 5 }, (_, n) => [...shared, candidate(`race-only${n}`)].join("\n"));
+    const results = await Promise.all(batches.map((emails) => actions.inviteCandidates(undefined, form({ orgId: orgA, jobId, emails }))));
+
+    for (const r of results) expect(r?.error).toBeUndefined();
+    for (const email of shared) {
+      const { count } = await service.from("invites").select("id", { count: "exact", head: true }).eq("job_id", jobId).eq("email", email);
+      expect(count).toBe(1);
+      // Exactly one batch invited it; every other batch reports it as already invited.
+      expect(results.filter((r) => r?.invited?.includes(email))).toHaveLength(1);
+      expect(results.filter((r) => r?.alreadyInvited?.includes(email))).toHaveLength(batches.length - 1);
+      expect(await outboxFor(email)).toHaveLength(1);
+    }
+    for (let n = 0; n < batches.length; n++) expect(results[n]?.invited).toContain(candidate(`race-only${n}`));
+  });
+
+  it("the database refuses a second live invite even when the app check is skipped", async () => {
+    const expires_at = new Date(Date.now() + 864e5).toISOString();
+    const email = candidate("direct");
+    const inserts = await Promise.all(
+      Array.from({ length: 8 }, (_, n) =>
+        recruiter.client.from("invites").insert({ org_id: orgA, job_id: jobId, email: n % 2 ? email.toUpperCase() : email, expires_at }),
+      ),
+    );
+    expect(inserts.filter((r) => r.error === null)).toHaveLength(1);
+    expect(inserts.filter((r) => r.error?.code === "23505")).toHaveLength(7);
+  });
+
+  it("an invite past its expiry can be re-invited; the old row is marked expired and can't be revived", async () => {
+    acting = recruiter;
+    const email = candidate("lapsed");
+    expect((await actions.inviteCandidates(undefined, form({ orgId: orgA, jobId, emails: email })))?.invited).toEqual([email]);
+    const old = await inviteRow(email);
+    await service.from("invites").update({ expires_at: new Date(Date.now() - 60_000).toISOString() }).eq("id", old.id);
+
+    const again = await actions.inviteCandidates(undefined, form({ orgId: orgA, jobId, emails: email }));
+    expect(again?.invited).toEqual([email]);
+    const { data: rows } = await service.from("invites").select("id, status").eq("job_id", jobId).eq("email", email).order("created_at");
+    expect(rows?.map((r) => r.status)).toEqual(["expired", "invited"]);
+
+    const revive = await actions.resendInviteAction(undefined, form({ orgId: orgA, inviteId: old.id }));
+    expect(revive?.error).toMatch(/already has a newer invite/);
+    expect((await service.from("invites").select("status, sent_count").eq("id", old.id).single()).data).toEqual({ status: "expired", sent_count: 1 });
   });
 });

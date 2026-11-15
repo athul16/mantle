@@ -3,6 +3,7 @@ import "server-only";
 import { getScenario } from "@/lib/engine/scenarios";
 import type { ScenarioDefinition } from "@/lib/engine/types";
 import { displayStatus, type InviteStatus } from "@/lib/jobs/status";
+import { getEmails } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { describeStep, type StepDetail } from "./answer-key";
@@ -187,7 +188,7 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
     },
     steps,
     timeline: buildTimeline(events.data ?? [], { startedAt: attempt.started_at, stepTitles, messageSubjects }),
-    notes: await withAuthorEmails(notes.data ?? []),
+    notes: await withAuthorEmails(db, notes.data ?? []),
   };
 }
 
@@ -204,16 +205,11 @@ async function attemptSeed(orgId: string, attemptId: string): Promise<string | n
 }
 
 async function withAuthorEmails(
+  db: Awaited<ReturnType<typeof createClient>>,
   rows: { id: string; author_id: string; body: string; vote: string | null; created_at: string }[],
 ): Promise<ReportNote[]> {
-  const service = createServiceClient();
-  const emails = new Map<string, string>();
-  await Promise.all(
-    [...new Set(rows.map((r) => r.author_id))].map(async (id) => {
-      const { data } = await service.auth.admin.getUserById(id);
-      emails.set(id, data.user?.email ?? "(former teammate)");
-    }),
-  );
+  // Authors who have left the company no longer share it with the reader, so RLS hides their profile.
+  const emails = await getEmails(db, rows.map((r) => r.author_id));
   return rows.map((r) => ({
     id: r.id,
     authorId: r.author_id,

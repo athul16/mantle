@@ -1,0 +1,8 @@
+<!-- Teammate invite (Supabase Auth "Invite user" template). The link opens a
+     page with an "Accept invite" button; only the button uses the token, so
+     email link scanners (Microsoft Safe Links) can't use it up. Paste this into
+     the hosted project too: Authentication > Emails > Invite user. -->
+<h2>You're invited</h2>
+<p>You've been invited to a company account on Assessment Platform.</p>
+<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite">Accept the invite</a></p>
+<p>The link opens a page with an "Accept invite" button, then you choose your password. If you weren't expecting this, you can ignore this email.</p>

@@ -72,7 +72,7 @@ Code: `src/lib/engine/`. Split so answer keys can't reach the browser:
 | Folder | Holds | Runs in |
 | --- | --- | --- |
 | `types.ts` | Shared shapes (`ScenarioDefinition`, `Step`, `Message`, `StepScore`, `AttemptScore`); no keys | Both |
-| `server/` | Seeded RNG (sfc32 + cyrb128), `{{name}}` / `{{name\|money}}` templates, step-type interface, registry, render, score | Server only (`import "server-only"`) |
+| `server/` | Seeded RNG (sfc32 + cyrb128), `{{name}}` / `{{name\|money}}` templates (plus `{{first_name}}`, the candidate's, "there" if unknown; not seeded), step-type interface, registry, render, score | Server only (`import "server-only"`) |
 | `client/` | Browser registry, `StepView` | Browser |
 | `step-types/<type>/` | `public.ts` (what the candidate sees, answer shape), `client.tsx` (input), `server.ts` (key schema, `parseAnswer`, `score`) | Split per file |
 | `scenarios/` | Code-defined scenarios + generators, registered by `slug@version` | Server only |
@@ -154,6 +154,8 @@ Changes from the original draft:
 - Triggers: published scenarios can't be edited; an assessment's time limit, proctoring, and scenario lock once a candidate starts.
 - Role-check helpers live in a `private` schema the API doesn't expose.
 - `attempts.auto_score` and `step_responses.auto_score` (decision D11): the score as the server computed it at submit. `score` is the final score, which a rubric review (`review_rubric_step`) changes; `auto_score` never changes once written (a trigger refuses). Rows from before the change were backfilled: a reviewed rubric step's automatic score is the same step with every criterion back at 0 and `needsReview`, which is what `inbox_reply` always produces. The candidate report shows the automatic score next to the final one once a reviewer has changed it.
+- `invites.last_sent_at` and `invites.sent_count` (D12/S1): set on the first send and every resend; the job page shows "last sent". A partial unique index `invites_job_email_live_key` on `(job_id, lower(email))` for invited, started and completed rows (D12/S2) stops two batches from inviting the same email at once; the batch action retries its check when the insert hits it. Invites still marked invited after their expiry are marked expired before a batch, so they leave the index and can be re-invited.
+- `invite_accommodations` (D9): per-invite extra time (+0/25/50/100%) and camera / screen-share waivers. Members read it; writes only through `set_invite_accommodations()`, which allows admins and recruiters before the candidate starts and writes the audit log. The extra time is applied to `attempts.deadline_at` when the attempt starts. `organizations.settings.contact_email` (set by admins through `set_contact_email()`) is shown to candidates.
 
 Original draft table list (still accurate for the main columns):
 

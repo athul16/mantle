@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   THRESHOLDS,
+  downPeriods,
   evaluateRules,
   integrityLabel,
   parseSignalBatch,
@@ -199,5 +200,82 @@ describe("parseSignalBatch", () => {
   it("limits surface to the values browsers report", () => {
     const [s] = parseSignalBatch({ signals: [{ kind: "screen_share_wrong_surface", at: at(1), surface: "<script>" }] }, now);
     expect(s.payload).toEqual({ surface: "unknown" });
+  });
+});
+
+describe("downtime (camera or screen share down, timer running)", () => {
+  /** A recorded down period, as the server stores it from downPeriods(). */
+  function down(source: "camera" | "screen", fromS: number, toS: number, closedBy = "reconnected", stopEventId = nextId + 1000): SignalEvent {
+    return ev("monitoring_down", fromS, { source, from: at(fromS), to: at(toS), downMs: (toS - fromS) * 1000, closedBy, stopEventId });
+  }
+  const downtime = (events: SignalEvent[], settings = both) => evaluateRules(events, [], settings).find((f) => f.rule === "downtime");
+
+  it("pairs each stop with the next start of the same source", () => {
+    const events = [
+      ev("camera_started", 0),
+      ev("screen_share_started", 0, { surface: "monitor" }),
+      ev("screen_share_stopped", 100),
+      ev("camera_stopped", 110),
+      ev("camera_stopped", 115), // a second stop while down: same gap
+      ev("camera_started", 130),
+      ev("screen_share_started", 160, { surface: "monitor" }),
+    ];
+    const periods = downPeriods(events);
+    expect(periods).toEqual([
+      { source: "screen", stopEventId: events[2].id, from: at(100), to: at(160), downMs: 60_000, closedBy: "reconnected" },
+      { source: "camera", stopEventId: events[3].id, from: at(110), to: at(130), downMs: 20_000, closedBy: "reconnected" },
+    ]);
+  });
+
+  it("leaves an open gap out until it closes, then closes it at submit or deadline", () => {
+    const events = [ev("camera_started", 0), ev("camera_stopped", 200)];
+    expect(downPeriods(events)).toEqual([]);
+    expect(downPeriods(events, { at: at(500), closedBy: "deadline" })).toEqual([
+      { source: "camera", stopEventId: events[1].id, from: at(200), to: at(500), downMs: 300_000, closedBy: "deadline" },
+    ]);
+  });
+
+  it("closes a gap at reconnect after a page refresh (the next start, however late)", () => {
+    // Refresh mid-gap: the old page's stop, then the new page's camera start.
+    const events = [ev("camera_started", 0), ev("camera_stopped", 50), ev("camera_started", 95)];
+    expect(downPeriods(events, { at: at(900), closedBy: "submitted" })).toMatchObject([{ downMs: 45_000, closedBy: "reconnected" }]);
+  });
+
+  it("ignores starts with no stop before them", () => {
+    expect(downPeriods([ev("camera_started", 0), ev("camera_started", 30)])).toEqual([]);
+  });
+
+  it("does not flag short blips", () => {
+    expect(downtime([down("camera", 10, 15), down("screen", 100, 110)])).toBeUndefined();
+  });
+
+  it(`flags one gap of ${THRESHOLDS.longDowntimeSeconds} s, with each gap as evidence`, () => {
+    const flag = downtime([down("screen", 100, 100 + THRESHOLDS.longDowntimeSeconds), down("camera", 300, 305)]);
+    expect(flag?.reason).toBe("Camera or screen share was down 2 times: the task was covered for 35 s in total while the timer kept running");
+    expect(flag?.evidence.events).toMatchObject([
+      { kind: "monitoring_down", at: at(100), source: "screen", downMs: 30_000, endAt: at(130), closedBy: "reconnected" },
+      { kind: "monitoring_down", at: at(300), source: "camera", downMs: 5_000, endAt: at(305) },
+    ]);
+  });
+
+  it(`flags ${THRESHOLDS.totalDowntimeSeconds} s covered in total, counting overlapping gaps once`, () => {
+    const gaps = [down("camera", 0, 20), down("screen", 10, 25), down("camera", 100, 120), down("screen", 200, 225)];
+    // Covered: 0–25, 100–120, 200–225 = 70 s (camera and screen overlap 10–20).
+    expect(downtime(gaps)?.reason).toContain("covered for 1 min 10 s in total");
+    // Overlap only: 0–25 and 100–120 = 45 s, under both bars.
+    expect(downtime(gaps.slice(0, 3))).toBeUndefined();
+  });
+
+  it("counts a gap closed at the deadline", () => {
+    expect(downtime([down("screen", 3000, 3600, "deadline")])?.evidence.events[0]).toMatchObject({ closedBy: "deadline", downMs: 600_000 });
+  });
+
+  it("counts each stop once even if the period was recorded twice", () => {
+    const flag = downtime([down("camera", 0, 40, "reconnected", 7), down("camera", 0, 40, "reconnected", 7)]);
+    expect(flag?.evidence.total).toBe(1);
+  });
+
+  it("ignores sources the assessment does not use", () => {
+    expect(downtime([down("camera", 0, 120)], { camera: false, screen: true })).toBeUndefined();
   });
 });
