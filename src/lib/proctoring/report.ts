@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { getEmails } from "@/lib/profiles";
-import { PROCTORING_BUCKET, readProctoring, type Proctoring } from "./config";
+import { PROCTORING_BUCKET, isCaptureReason, readProctoring, type CaptureReason, type Proctoring } from "./config";
 import type { EvidenceEvent } from "./rules";
 
 /**
@@ -14,7 +14,26 @@ import type { EvidenceEvent } from "./rules";
  * storage policies check them too.
  */
 
-export type ReportFlagMedia = { id: number; source: "camera" | "screen" | "phone"; at: string; url: string };
+/** A signed snapshot or audio clip; reason is why it was captured (null for older rows). */
+export type ReportFlagMedia = {
+  id: number;
+  source: "camera" | "screen" | "phone" | "audio";
+  at: string;
+  url: string;
+  reason?: CaptureReason | null;
+};
+
+/**
+ * One evidence event as the report reads it. Downtime gaps (D4) carry source
+ * (camera, screen or fullscreen), downMs, endAt and closedBy; looks away carry
+ * direction, awayMs and endAt; multiple_faces carries faces; speech carries
+ * speechMs and endAt. A left_window departure carries mediaIds and, when the
+ * member may see media, `media`: the captures taken while away, in time order.
+ */
+export type ReportFlagEvent = Pick<
+  EvidenceEvent,
+  "kind" | "at" | "awayMs" | "chars" | "surface" | "source" | "downMs" | "endAt" | "closedBy" | "direction" | "faces" | "speechMs" | "mediaIds"
+> & { media?: ReportFlagMedia[] };
 
 export type ReportFlag = {
   id: string;
@@ -25,8 +44,8 @@ export type ReportFlag = {
   reviewedAt: string | null;
   reviewerEmail: string | null;
   createdAt: string;
-  /** Downtime flags (D4) carry one event per gap: source, downMs, endAt and closedBy. */
-  events: Pick<EvidenceEvent, "kind" | "at" | "awayMs" | "chars" | "surface" | "source" | "downMs" | "endAt" | "closedBy">[];
+  /** Downtime flags (D4) carry one event per gap: source, downMs, endAt and closedBy. See ReportFlagEvent. */
+  events: ReportFlagEvent[];
   media: ReportFlagMedia[];
 };
 
@@ -51,9 +70,17 @@ export async function getFlagsForReport(db: Db, orgId: string, attemptId: string
   const rows = flagsRes.data ?? [];
 
   const evidenceOf = (e: unknown) => (e ?? {}) as { events?: EvidenceEvent[]; mediaIds?: number[] };
-  const mediaIds = [...new Set(rows.flatMap((r) => evidenceOf(r.evidence).mediaIds ?? []))].filter((n) => Number.isInteger(n));
+  const mediaIds = [
+    ...new Set(
+      rows.flatMap((r) => {
+        const ev = evidenceOf(r.evidence);
+        return [...(ev.mediaIds ?? []), ...(ev.events ?? []).flatMap((e) => e.mediaIds ?? [])];
+      }),
+    ),
+  ].filter((n) => Number.isInteger(n));
   const media = canSeeMedia && mediaIds.length ? await signedMedia(db, orgId, attemptId, mediaIds) : new Map<number, ReportFlagMedia>();
   const emails = await getEmails(db, rows.map((r) => r.reviewed_by).filter((id): id is string => !!id));
+  const resolve = (ids: number[]) => ids.map((id) => media.get(id)).filter((m): m is ReportFlagMedia => !!m);
 
   return {
     canSeeMedia,
@@ -68,18 +95,24 @@ export async function getFlagsForReport(db: Db, orgId: string, attemptId: string
         reviewedAt: r.reviewed_at,
         reviewerEmail: r.reviewed_by ? (emails.get(r.reviewed_by) ?? "(former teammate)") : null,
         createdAt: r.created_at,
-        events: (ev.events ?? []).map(({ kind, at, awayMs, chars, surface, source, downMs, endAt, closedBy }) => ({
-          kind,
-          at,
-          awayMs,
-          chars,
-          surface,
-          source,
-          downMs,
-          endAt,
-          closedBy,
-        })),
-        media: (ev.mediaIds ?? []).map((id) => media.get(id)).filter((m): m is ReportFlagMedia => !!m),
+        events: (ev.events ?? []).map(
+          ({ kind, at, awayMs, chars, surface, source, downMs, endAt, closedBy, direction, faces, speechMs, mediaIds }): ReportFlagEvent => ({
+            kind,
+            at,
+            awayMs,
+            chars,
+            surface,
+            source,
+            downMs,
+            endAt,
+            closedBy,
+            direction,
+            faces,
+            speechMs,
+            ...(mediaIds?.length ? { mediaIds, media: resolve(mediaIds) } : {}),
+          }),
+        ),
+        media: resolve(ev.mediaIds ?? []),
       };
     }),
   };
@@ -102,7 +135,7 @@ async function memberCanSeeMedia(db: Db, orgId: string): Promise<boolean> {
 async function signedMedia(db: Db, orgId: string, attemptId: string, ids: number[]): Promise<Map<number, ReportFlagMedia>> {
   const { data: rows, error } = await db
     .from("media")
-    .select("id, at, source, storage_path")
+    .select("id, at, source, reason, storage_path")
     .eq("org_id", orgId)
     .eq("attempt_id", attemptId)
     .in("id", ids);
@@ -116,7 +149,10 @@ async function signedMedia(db: Db, orgId: string, attemptId: string, ids: number
   const out = new Map<number, ReportFlagMedia>();
   for (const r of rows) {
     const url = urlFor.get(r.storage_path);
-    if (url) out.set(r.id, { id: r.id, at: r.at, source: r.source as ReportFlagMedia["source"], url });
+    if (url) {
+      const reason = isCaptureReason(r.reason) ? r.reason : null;
+      out.set(r.id, { id: r.id, at: r.at, source: r.source as ReportFlagMedia["source"], url, reason });
+    }
   }
   return out;
 }
