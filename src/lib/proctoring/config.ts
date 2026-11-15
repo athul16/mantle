@@ -212,4 +212,4 @@ function joinList(items: string[]): string {
 }
 
 /** Camera, screen or microphone; full screen or gaze alone doesn't make an assessment monitored. */
-export const isMonitored = (s: Pick<Proctoring, "camera" | "screen" | "microphone">) => s.camera || s.screen || s.microphone;
+export const isMonitored = (s: Proctoring) => s.camera || s.screen || s.microphone;
