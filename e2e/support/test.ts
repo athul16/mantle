@@ -106,7 +106,7 @@ export async function axeSerious(page: Page, testInfo: TestInfo, options: A11yOp
   for (const sel of options.exclude ?? []) builder = builder.exclude(sel);
   if (options.disableRules?.length) builder = builder.disableRules(options.disableRules);
   // Lighthouse found candidate pages without a title or main landmark; axe rates those moderate, so check them here.
-  expect(await page.title(), `page title on ${page.url()}`).not.toBe("");
+  await expect.poll(() => page.title(), { message: `page title on ${page.url()}` }).not.toBe("");
   expect(await page.getAttribute("html", "lang"), "html lang").toBeTruthy();
   await expect(page.getByRole("main"), `one main landmark on ${page.url()}`).toHaveCount(1);
   // Dialogs, menus and banners fade in (the prototype's "rise" animation); let finite animations
@@ -147,6 +147,8 @@ export const test = base.extend<Options & Fixtures>({
         if (allowConsole.some((re) => re.test(text))) return;
         // The browser logs every 4xx resource as a console error; those are judged by the response check below.
         if (/Failed to load resource/.test(text) && allowedUrl(msg.location().url)) return;
+        // Firefox logs a font download cut off by the next navigation (NS_BINDING_ABORTED) as an error; it's an abort, like ABORTED below.
+        if (browserName === "firefox" && /downloadable font: download failed.*status=2152398850/.test(text)) return;
         problems.push(`console error: ${text}`);
       });
       page.on("pageerror", (err) => {

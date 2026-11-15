@@ -30,7 +30,7 @@ test("Create company shows Creating… then opens the company", async ({ page, d
   await page.getByLabel("Company name").fill(`Feedback Co ${data.run}`);
   await expectPending(page, () => page.getByRole("button", { name: "Create company" }).click(), "Creating…");
   // The new company's admin is asked to turn on two-factor before opening it.
-  await expect(page).toHaveURL(/\/app\/account\/security\?next=%2Fapp%2F[a-z0-9-]+$/);
+  await expect(page).toHaveURL(/\/app\/account\/security\?next=%2Fapp%2F[a-z0-9-]+%2Fjobs$/);
   const slug = decodeURIComponent(new URL(page.url()).searchParams.get("next")!).split("/")[2];
   const orgId = await orgIdForSlug(slug);
   data.trackOrg(orgId);

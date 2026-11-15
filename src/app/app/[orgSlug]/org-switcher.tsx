@@ -108,15 +108,15 @@ export function AccountMenu({ email, memberships, active }: { email: string; mem
             </>
           ) : null}
           <div className="divider" style={{ margin: "4px 0" }} />
-          <Link role="menuitem" className={path.startsWith(`${base}/team`) ? "nav-a on" : "nav-a"} href={`${base}/team`} onClick={() => setOpenOn(null)}>
+          <Link role="menuitem" className={path.startsWith(`${base}/team`) ? "nav-a on" : "nav-a"} href={`${base}/team`} prefetch={false} onClick={() => setOpenOn(null)}>
             <Icon name="users" />
             Team
           </Link>
-          <Link role="menuitem" className={path.startsWith(`${base}/settings`) ? "nav-a on" : "nav-a"} href={`${base}/settings`} onClick={() => setOpenOn(null)}>
+          <Link role="menuitem" className={path.startsWith(`${base}/settings`) ? "nav-a on" : "nav-a"} href={`${base}/settings`} prefetch={false} onClick={() => setOpenOn(null)}>
             <Icon name="sliders" />
             Settings
           </Link>
-          <Link role="menuitem" className="nav-a" href="/app/account/security" onClick={() => setOpenOn(null)}>
+          <Link role="menuitem" className="nav-a" href="/app/account/security" prefetch={false} onClick={() => setOpenOn(null)}>
             <Icon name="shield" />
             Two-factor authentication
           </Link>

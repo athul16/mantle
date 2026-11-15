@@ -30,5 +30,5 @@ export async function createOrganization(_state: FormState, formData: FormData):
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions);
   // Drop any cached /app render from before the org existed (it redirected here).
   revalidatePath("/", "layout");
-  redirect(org ? `/app/${org.slug}` : "/app");
+  redirect(org ? `/app/${org.slug}/jobs` : "/app");
 }

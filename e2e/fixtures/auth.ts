@@ -19,6 +19,8 @@ export async function signInViaUi(page: Page, user: SignInUser, next?: string, {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).not.toHaveURL(/\/login(\?|$)/);
   if (mfa) await completeMfaIfAsked(page, user);
+  // Let the landing page finish rendering, so a test's next page.goto doesn't cut it off mid-load.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 }
 
 /** On the sign-in code page (/app/account/verify), enter the current code and wait to leave it. */

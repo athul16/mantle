@@ -9,7 +9,7 @@ test.describe("colour contrast", () => {
   // Every company page, with no excluded nodes: muted text must be 4.5:1 or better.
   test("company pages pass axe, including colour contrast", async ({ page, hiring }, testInfo) => {
     const { company, jobId } = hiring;
-    await signInViaUi(page, company.users.admin, `/app/${company.slug}`);
+    await signInViaUi(page, company.users.admin, `/app/${company.slug}/jobs`);
     for (const path of [
       `/app/${company.slug}`,
       `/app/${company.slug}/jobs`,

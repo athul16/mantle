@@ -33,6 +33,17 @@ export function VerifyForm({
   const [code, setCode] = useState("");
   const [consent, setConsent] = useState(false);
   const [pending, setPending] = useState(false);
+  // The inputs are uncontrolled so anything typed before hydration survives;
+  // these ref callbacks copy it into state when React attaches.
+  const syncName = (el: HTMLInputElement | null) => {
+    if (el && el.value !== name) setName(el.value);
+  };
+  const syncCode = (el: HTMLInputElement | null) => {
+    if (el && el.value !== code) setCode(el.value.replace(/\D/g, "").slice(0, 6));
+  };
+  const syncConsent = (el: HTMLInputElement | null) => {
+    if (el && el.checked !== consent) setConsent(el.checked);
+  };
   const codeOk = /^\d{6}$/.test(code);
   const ready = codeOk && consent && name.trim() !== "";
 
@@ -62,7 +73,8 @@ export function VerifyForm({
               required
               maxLength={120}
               autoComplete="name"
-              value={name}
+              defaultValue={defaultName}
+              ref={syncName}
               onChange={(e) => setName(e.currentTarget.value)}
             />
           </div>
@@ -82,8 +94,12 @@ export function VerifyForm({
                 pattern="\d{6}"
                 maxLength={6}
                 placeholder="······"
-                value={code}
-                onChange={(e) => setCode(e.currentTarget.value.replace(/\D/g, "").slice(0, 6))}
+                ref={syncCode}
+                onChange={(e) => {
+                  const digits = e.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                  if (e.currentTarget.value !== digits) e.currentTarget.value = digits;
+                  setCode(digits);
+                }}
                 aria-describedby="v-code-help"
               />
               {codeOk ? (
@@ -114,7 +130,7 @@ export function VerifyForm({
             className="chk"
             style={{ marginTop: 2 }}
             required
-            checked={consent}
+            ref={syncConsent}
             onChange={(e) => setConsent(e.currentTarget.checked)}
           />
           <span className="small">{consentLabel}</span>

@@ -10,5 +10,5 @@ export async function switchOrg(formData: FormData) {
   // Only remember (and open) a company the user really belongs to.
   const membership = await requireMembership(orgId);
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions);
-  redirect(`/app/${membership.orgSlug}`);
+  redirect(`/app/${membership.orgSlug}/jobs`);
 }
