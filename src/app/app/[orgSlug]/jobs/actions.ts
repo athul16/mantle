@@ -259,7 +259,7 @@ export async function resendInviteAction(_state: FormState, formData: FormData):
 export async function setAccommodationsAction(_state: FormState, formData: FormData): Promise<FormState> {
   const parsed = accommodationsSchema.safeParse(fields(formData));
   if (!parsed.success) return { error: "Invalid request." };
-  const { orgId, inviteId, extraTimePercent, waiveCamera, waiveScreen } = parsed.data;
+  const { orgId, inviteId, extraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone } = parsed.data;
 
   try {
     await requireMembership(orgId, MANAGERS);
@@ -267,7 +267,7 @@ export async function setAccommodationsAction(_state: FormState, formData: FormD
       db: await createClient(),
       orgId,
       inviteId,
-      accommodations: { extraTimePercent: extraTimePercent as ExtraTimePercent, waiveCamera, waiveScreen },
+      accommodations: { extraTimePercent: extraTimePercent as ExtraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone },
     });
     refreshJobs();
     return { message: `Saved accommodations for ${email}.` };

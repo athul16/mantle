@@ -18,7 +18,7 @@ const row = (over: Partial<CandidateRow> & Pick<CandidateRow, "inviteId" | "emai
   candidateName: null,
   lastSentAt: null,
   sentCount: 1,
-  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false },
+  accommodations: { extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false },
   status: "completed",
   needsReview: false,
   points: null,

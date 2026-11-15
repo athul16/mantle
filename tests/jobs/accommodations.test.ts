@@ -100,7 +100,7 @@ beforeAll(async () => {
   if (lib.error) throw lib.error;
   const asm = await service
     .from("assessments")
-    .insert({ org_id: orgA, scenario_id: lib.data.id, title: "Monitored", time_limit_minutes: 30, proctoring: { camera: true, screen: true } })
+    .insert({ org_id: orgA, scenario_id: lib.data.id, title: "Monitored", time_limit_minutes: 30, proctoring: { camera: true, screen: true, fullscreen: false, microphone: false, gaze: false} })
     .select("id")
     .single();
   if (asm.error) throw asm.error;
@@ -120,7 +120,7 @@ describe("invite accommodations", () => {
     acting = recruiter;
     const res = await jobsActions.setAccommodationsAction(
       undefined,
-      form({ orgId: orgA, inviteId, extraTimePercent: 50, waiveCamera: true, waiveScreen: false }),
+      form({ orgId: orgA, inviteId, extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false }),
     );
     expect(res).toMatchObject({ message: expect.stringContaining("Saved accommodations") });
 
@@ -133,11 +133,11 @@ describe("invite accommodations", () => {
     ]);
 
     const listed = (await listInvites(orgA, jobId)).find((i) => i.id === inviteId);
-    expect(listed).toMatchObject({ started: false, accommodations: { extraTimePercent: 50, waiveCamera: true, waiveScreen: false } });
+    expect(listed).toMatchObject({ started: false, accommodations: { extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false } });
 
     // Viewers read it on the report; they can't change it.
     acting = viewer;
-    expect(await getInviteAccommodations(orgA, inviteId)).toEqual({ extraTimePercent: 50, waiveCamera: true, waiveScreen: false });
+    expect(await getInviteAccommodations(orgA, inviteId)).toEqual({ extraTimePercent: 50, waiveCamera: true, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false });
     const denied = await jobsActions.setAccommodationsAction(undefined, form({ orgId: orgA, inviteId, extraTimePercent: 0 }));
     expect(denied?.error).toMatch(/permission/);
     const direct = await viewer.client.rpc("set_invite_accommodations", {

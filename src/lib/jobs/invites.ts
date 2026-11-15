@@ -312,6 +312,8 @@ export async function setAccommodations(args: {
     p_extra_time_percent: a.extraTimePercent,
     p_waive_camera: a.waiveCamera,
     p_waive_screen: a.waiveScreen,
+    p_waive_fullscreen: a.waiveFullscreen,
+    p_waive_microphone: a.waiveMicrophone,
   });
   if (error) {
     if (error.code === "55000") throw new InviteError("The candidate has started, so accommodations can no longer change.");

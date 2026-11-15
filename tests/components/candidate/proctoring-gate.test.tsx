@@ -52,7 +52,7 @@ afterEach(() => {
 describe("Proctoring off", () => {
   it("shows the workspace straight away and asks for nothing", () => {
     render(
-      <Proctoring settings={{ camera: false, screen: false }}>
+      <Proctoring settings={{ camera: false, screen: false, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );
@@ -66,7 +66,7 @@ describe("Proctoring on", () => {
   async function activate() {
     const user = userEvent.setup();
     render(
-      <Proctoring settings={{ camera: true, screen: true }}>
+      <Proctoring settings={{ camera: true, screen: true, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );
@@ -78,7 +78,7 @@ describe("Proctoring on", () => {
 
   it("covers the workspace until the camera is on and the entire screen is shared", async () => {
     render(
-      <Proctoring settings={{ camera: true, screen: true }}>
+      <Proctoring settings={{ camera: true, screen: true, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );
@@ -146,7 +146,7 @@ describe("Proctoring on", () => {
     media.getDisplayMedia.mockResolvedValueOnce(fakeStream(tab));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(
-      <Proctoring settings={{ camera: false, screen: true }}>
+      <Proctoring settings={{ camera: false, screen: true, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );
@@ -161,7 +161,7 @@ describe("Proctoring on", () => {
     media.getDisplayMedia.mockRejectedValueOnce(domError("NotAllowedError"));
     const user = userEvent.setup();
     render(
-      <Proctoring settings={{ camera: false, screen: true }}>
+      <Proctoring settings={{ camera: false, screen: true, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );
@@ -184,7 +184,7 @@ describe("Proctoring on", () => {
     holdMedia("camera", fakeStream(camera));
     holdMedia("screen", fakeStream(shared));
     render(
-      <Proctoring settings={{ camera: true, screen: true }}>
+      <Proctoring settings={{ camera: true, screen: true, fullscreen: false, microphone: false, gaze: false}}>
         <Workspace />
       </Proctoring>,
     );

@@ -27,7 +27,7 @@ const assessment: AssessmentSummary = {
   scenarioTitle: "Mini month-end close (v1)",
   timeLimitMinutes: 50,
   passScore: 70,
-  proctoring: { camera: false, screen: true },
+  proctoring: { camera: false, screen: true, fullscreen: false, microphone: false, gaze: false},
   lockedAt: null,
   createdAt: "2026-11-01T10:00:00Z",
 };
@@ -185,7 +185,7 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
   });
 
   it("opens an unmonitored assessment with Not monitored chosen", () => {
-    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false } })} />);
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false} })} />);
     expect(screen.getByRole("radio", { name: "Not monitored" })).toBeChecked();
     expect(screen.queryByRole("switch", { name: "Entire-screen sharing" })).not.toBeInTheDocument();
   });

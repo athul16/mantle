@@ -23,7 +23,7 @@ const bodiesTo = (url: string) =>
   fetchMock.mock.calls.filter(([u]) => u === url).map(([, init]) => JSON.parse((init as RequestInit).body as string));
 const row = (label: string) => screen.getAllByRole("listitem").find((li) => li.querySelector(".strong")?.textContent === label)!;
 const continueLink = () => screen.queryByRole("link", { name: "Continue" });
-const both = { camera: true, screen: true };
+const both = { camera: true, screen: true, fullscreen: false, microphone: false, gaze: false};
 let media: ReturnType<typeof installMediaDevices>;
 
 beforeEach(() => {
@@ -94,7 +94,7 @@ describe("SystemCheck with consent from the verify page", () => {
     vi.mocked(takeSnapshot).mockResolvedValueOnce(false);
     const SystemCheck = await load();
     const user = userEvent.setup();
-    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false, fullscreen: false, microphone: false, gaze: false}} consented />);
     await user.click(await screen.findByRole("button", { name: "Take start photo" }));
     await waitFor(() => expect(row("Start photo")).toHaveTextContent("Couldn't save it. Take it again."));
     expect(continueLink()).not.toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("SystemCheck with consent from the verify page", () => {
     media.getUserMedia.mockRejectedValueOnce(domError("NotAllowedError"));
     const SystemCheck = await load();
     const user = userEvent.setup();
-    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false, fullscreen: false, microphone: false, gaze: false}} consented />);
     await waitFor(() => expect(row("Camera")).toHaveTextContent(/blocked/i));
     expect(screen.getByText("Your browser blocked the camera")).toBeVisible();
     expect(bodiesTo("/api/candidate/proctoring/signals").flatMap((b) => b.signals.map((s: { kind: string }) => s.kind))).toContain("camera_refused");
@@ -117,7 +117,7 @@ describe("SystemCheck with consent from the verify page", () => {
   it("says when there is no camera", async () => {
     media.getUserMedia.mockRejectedValueOnce(domError("NotFoundError"));
     const SystemCheck = await load();
-    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: true, screen: false, fullscreen: false, microphone: false, gaze: false}} consented />);
     await waitFor(() => expect(row("Camera")).toHaveTextContent("No camera found. Connect one and try again."));
   });
 
@@ -126,7 +126,7 @@ describe("SystemCheck with consent from the verify page", () => {
     media.getDisplayMedia.mockResolvedValueOnce(fakeStream(tab));
     const SystemCheck = await load();
     const user = userEvent.setup();
-    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true, fullscreen: false, microphone: false, gaze: false}} consented />);
     await user.click(screen.getByRole("button", { name: "Share entire screen" }));
     await waitFor(() => expect(row("Screen sharing")).toHaveTextContent("You shared a window or tab"));
     expect(screen.getByRole("button", { name: "Share again" })).toBeEnabled();
@@ -143,7 +143,7 @@ describe("SystemCheck with consent from the verify page", () => {
     media.getDisplayMedia.mockRejectedValueOnce(domError("NotAllowedError"));
     const SystemCheck = await load();
     const user = userEvent.setup();
-    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true, fullscreen: false, microphone: false, gaze: false}} consented />);
     await user.click(screen.getByRole("button", { name: "Share entire screen" }));
     expect(await screen.findByText("Screen sharing was cancelled. You need to share your entire screen to take this test.")).toBeVisible();
   });
@@ -151,7 +151,7 @@ describe("SystemCheck with consent from the verify page", () => {
   it("says when the browser cannot share the screen at all", async () => {
     Object.defineProperty(navigator, "mediaDevices", { value: { getUserMedia: media.getUserMedia }, configurable: true });
     const SystemCheck = await load();
-    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true }} consented />);
+    render(<SystemCheck token="t" proctoring={{ camera: false, screen: true, fullscreen: false, microphone: false, gaze: false}} consented />);
     expect(row("Screen sharing")).toHaveTextContent("Not supported in this browser");
     expect(screen.getByText("This browser can't share your screen. Use a recent Chrome, Edge or Firefox on a computer.")).toBeVisible();
   });

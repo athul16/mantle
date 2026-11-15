@@ -279,7 +279,7 @@ describe("InviteRowActions", () => {
 });
 
 describe("AccommodationsForm", () => {
-  const none = { extraTimePercent: 0, waiveCamera: false, waiveScreen: false } as const;
+  const none = { extraTimePercent: 0, waiveCamera: false, waiveScreen: false, waiveFullscreen: false, waiveMicrophone: false } as const;
 
   it("offers the extra time choices and a waiver per monitored source", () => {
     render(<AccommodationsForm orgId="org-1" inviteId="inv-1" email="jane@example.com" current={none} camera screen={false} />);
@@ -299,7 +299,7 @@ describe("AccommodationsForm", () => {
         orgId="org-1"
         inviteId="inv-1"
         email="jane@example.com"
-        current={{ extraTimePercent: 25, waiveCamera: false, waiveScreen: true }}
+        current={{ extraTimePercent: 25, waiveCamera: false, waiveScreen: true, waiveFullscreen: false, waiveMicrophone: false }}
         camera
         screen
       />,

@@ -36,7 +36,7 @@ function postJson(url: string, body: unknown, init?: RequestInit) {
   return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), ...init });
 }
 
-const NO_PROCTORING: ProctoringSettings = { camera: false, screen: false };
+const NO_PROCTORING: ProctoringSettings = { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false};
 
 /**
  * The timed workspace (prototype "workspace B"): a header with the clock,

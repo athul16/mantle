@@ -12,7 +12,7 @@ import { takeSnapshot } from "@/lib/proctoring/client/snapshots";
 
 const MIN_WIDTH = 1024;
 const MIN_HEIGHT = 600;
-const OFF: Proctoring = { camera: false, screen: false };
+const OFF: Proctoring = { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false};
 
 interface CheckResult {
   desktop: boolean;
