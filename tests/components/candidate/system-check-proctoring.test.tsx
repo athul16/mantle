@@ -80,7 +80,7 @@ describe("SystemCheck with consent from the verify page", () => {
 
     await user.click(screen.getByRole("button", { name: "Take start photo" }));
     await waitFor(() => expect(row("Start photo")).toHaveTextContent("Taken"));
-    expect(takeSnapshot).toHaveBeenCalledWith("camera", expect.anything());
+    expect(takeSnapshot).toHaveBeenCalledWith("camera", expect.anything(), "start");
     expect(continueLink()).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Share entire screen" }));

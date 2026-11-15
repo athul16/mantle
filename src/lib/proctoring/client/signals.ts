@@ -2,8 +2,20 @@
 
 import type { ClientSignalKind } from "../config";
 
-/** A browser signal as sent to /api/candidate/proctoring/signals. */
-export type Signal = { kind: ClientSignalKind; at: string; awayMs?: number; chars?: number; surface?: string };
+/**
+ * A browser signal as sent to /api/candidate/proctoring/signals. Optional
+ * fields follow SignalPayloadV2 in config.ts.
+ */
+export type Signal = {
+  kind: ClientSignalKind;
+  at: string;
+  awayMs?: number;
+  chars?: number;
+  surface?: string;
+  direction?: "left" | "right" | "up" | "down";
+  faces?: number;
+  speechMs?: number;
+};
 
 export const SIGNALS_URL = "/api/candidate/proctoring/signals";
 

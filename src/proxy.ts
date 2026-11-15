@@ -18,8 +18,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except: Next internals, static files, and candidate routes
-    // (/a/* and /api/candidate/*), which never use company sessions.
-    "/((?!_next/static|_next/image|favicon.ico|a/|api/candidate/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Everything except: Next internals, static files, candidate routes
+    // (/a/* and /api/candidate/*), which never use company sessions, and the
+    // self-hosted MediaPipe runtime and model (/mediapipe/*: wasm, .task).
+    "/((?!_next/static|_next/image|favicon.ico|a/|api/candidate/|mediapipe/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|wasm|task)$).*)",
   ],
 };

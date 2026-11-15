@@ -108,13 +108,19 @@ describe("Proctoring on", () => {
     expect(snapshotSources()).toHaveLength(4);
   });
 
-  it("takes snapshots when the candidate leaves the window", async () => {
+  it("takes away snapshots shortly after the candidate leaves the window", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"], shouldAdvanceTime: true });
     await activate();
     await waitFor(() => expect(snapshotSources()).toHaveLength(2));
     act(() => {
       window.dispatchEvent(new Event("blur"));
     });
-    await waitFor(() => expect(snapshotSources()).toHaveLength(4));
+    expect(snapshotSources()).toHaveLength(2);
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(vi.mocked(takeSnapshot).mock.calls.slice(2).map(([source, , reason]) => [source, reason]).sort()).toEqual([
+      ["camera", "away"],
+      ["screen", "away"],
+    ]);
   });
 
   it("brings the cover back and records it when screen sharing stops", async () => {
