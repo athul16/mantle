@@ -236,7 +236,7 @@ describe("FlagsSection: proctoring v2", () => {
 
   it("counts copies and, when on, looks away, no face, extra faces, speech and full screen exits", () => {
     renderSection({
-      counts: { copied: 2, cut: 1, looking_away: 3, no_face: 1, multiple_faces: 2, speech_started: 4, fullscreen_exited: 5 },
+      counts: { pasted: 4, copied: 2, cut: 1, looking_away: 3, no_face: 1, multiple_faces: 2, speech_started: 4, fullscreen_exited: 5 },
       gaze: true,
       microphone: true,
       fullscreen: true,
