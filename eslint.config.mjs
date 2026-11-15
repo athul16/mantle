@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Agent worktrees (separate checkouts, gitignored).
     ".claude/**",
+    // Vendored MediaPipe runtime (gaze check), not our code.
+    "public/mediapipe/**",
     // Test output.
     "coverage/**",
     "playwright-report/**",
