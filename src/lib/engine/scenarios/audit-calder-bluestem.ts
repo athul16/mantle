@@ -7,14 +7,19 @@ import { DOCUMENT_REVIEW } from "../step-types/document_review/public";
 import { INBOX_REPLY } from "../step-types/inbox_reply/public";
 import { JOURNAL_ENTRY } from "../step-types/journal_entry/public";
 import { NUMERIC } from "../step-types/numeric/public";
+import { RAPID_ROUND } from "../step-types/rapid_round/public";
 import { SPREADSHEET } from "../step-types/spreadsheet/public";
+import type { Rng } from "../server/rng";
 
 /**
  * docs/07 Example 5: audit intern at Calder & Finch LLP on the December 31,
- * 2025 audit of Bluestem Manufacturing. Phase A: the parts built on existing
- * step types, 70 points. The three rapid rounds (30 points) come in phase B,
- * once timed sections and the rapid_round step type exist.
+ * 2025 audit of Bluestem Manufacturing, 100 points in six timed sections
+ * (52 minutes): rapid round A (tick and tie), vouching (one pair per screen),
+ * rapid round B (cutoff), inbox (one screen each), rapid round C (sample
+ * selection), then the summary, adjusting entries and email to Marcus.
  *
+ * 0. Rapid rounds (3 × 10): 15 items × 20 s each, every exhibit seeded; the
+ *    first five items of a round are worth 0.5, the other ten 0.75.
  * 1. Expense vouching (25): 8 sampled GL entries in four pairs, one planted
  *    exception per pair (amount above the invoice, a January 3 invoice booked
  *    in December, a personal expense booked as client entertainment, an
@@ -117,6 +122,7 @@ function vouchStep(k: number) {
     id: `vouch-${k}`,
     type: DOCUMENT_REVIEW,
     title: `Expense vouching: items ${a} and ${b}`,
+    seconds: 180,
     config: {
       prompt: [
         `Vouch sample items ${a} and ${b}: agree each GL entry to its support (amount, date and period, payee, business purpose and account).`,
@@ -153,23 +159,368 @@ const money = (name: string) => ({ text: `{{${name}|money}}`, align: "right" as 
 const bold = (text: string) => ({ text, bold: true });
 const input = (id: string, label: string, points: number, format?: "number") => ({ input: id, label, points, ...(format ? { format } : {}) });
 
+/* ---------- Rapid rounds (phase B): authored once, every exhibit filled from seeded values ---------- */
+
+const RAPID_COUNT = 15;
+const RAPID_SECONDS = 20;
+const ITEMS = Array.from({ length: RAPID_COUNT }, (_, i) => i + 1);
+/** 5 × 0.5 + 10 × 0.75 = 10 exactly (2/3 a point each wouldn't add up to 10 in floating point). */
+const itemPoints = (n: number) => (n <= 5 ? 0.5 : 0.75);
+const opts = (pairs: [string, string][]) => pairs.map(([id, label]) => ({ id, label }));
+
+/** Lookalike names: the vendor (or bank) exception swaps one for the other. */
+const VENDOR_PAIRS: [string, string][] = [
+  ["Harlow Industrial Supply", "Harlan Industrial Supply"],
+  ["Midland Fastener Co.", "Midway Fastener Co."],
+  ["Cascade Steel Service", "Cascade Steel Supply"],
+  ["Tri-County Hydraulics", "Tri-State Hydraulics"],
+  ["Prairie Tool & Die", "Pioneer Tool & Die"],
+  ["Summit Office Products", "Summit Office Supply"],
+];
+const BANK_PAIRS: [string, string][] = [
+  ["First Prairie Bank", "First Prairie Savings Bank"],
+  ["Heartland Trust Bank", "Heartland Bank & Trust"],
+  ["Cedar Valley Bank", "Cedar Valley Credit Union"],
+];
+const PURCHASES = ["steel bar stock", "hydraulic cylinders", "bearings and seals", "powder-coat paint", "gearbox castings"];
+
+/** Tick and tie: does the schedule line agree to its source document? */
+const TICK_DOCS = {
+  invoice: { sched: "AP subledger", doc: "Vendor invoice", refLabel: "Invoice no.", partyLabel: "Vendor", figLabel: "Amount" },
+  bank: { sched: "Cash lead schedule", doc: "Bank confirmation", refLabel: "Account", partyLabel: "Bank", figLabel: "Balance" },
+  receiving: { sched: "Inventory receipts log", doc: "Receiving report", refLabel: "Receiving report no.", partyLabel: "Vendor", figLabel: "Quantity" },
+} as const;
+type TickDoc = keyof typeof TICK_DOCS;
+type TickCase = "agrees" | "amount" | "cutoff" | "vendor" | "no_support";
+
+const tickItem = (n: number) => {
+  const v = (name: string) => `{{tt${n}_${name}}}`;
+  return {
+    id: `tt-${n}`,
+    prompt: "Agree the schedule line to the source document.",
+    exhibit: {
+      table: {
+        columns: ["", v("sched"), v("doc")],
+        rows: [
+          [v("ref_label"), v("s_ref"), v("d_ref")],
+          [v("party_label"), v("s_party"), v("d_party")],
+          ["Date", v("s_date"), v("d_date")],
+          [v("fig_label"), v("s_fig"), v("d_fig")],
+        ],
+      },
+    },
+    fields: [
+      { id: "result", label: "Result", kind: "choice" as const, options: opts([["agrees", "Agrees"], ["exception", "Exception"]]) },
+      {
+        id: "reason",
+        label: "Reason",
+        kind: "choice" as const,
+        options: opts([
+          ["amount", "Amount or quantity"],
+          ["cutoff", "Date or cutoff"],
+          ["vendor", "Vendor or bank name"],
+          ["no_support", "No support"],
+          ["na", "N/A: agrees"],
+        ]),
+      },
+    ],
+    points: itemPoints(n),
+  };
+};
+
+/** Cutoff: which year does the sale or purchase belong to under its FOB terms, and was it recorded there? */
+const cutoffItem = (n: number) => {
+  const v = (name: string) => `{{co${n}_${name}}}`;
+  return {
+    id: `co-${n}`,
+    prompt: `Year-end is 12/31/${YEAR}. Which year does this ${v("what")} belong to, and did Bluestem record it in that year?`,
+    exhibit: {
+      title: v("title"),
+      rows: [
+        { label: "Transaction", value: v("txn") },
+        { label: "Terms", value: v("terms") },
+        { label: "Shipped", value: v("shipped") },
+        { label: "Delivered", value: v("delivered") },
+        { label: "Invoice date", value: v("invoiced") },
+        { label: "Recorded in GL", value: v("recorded") },
+        { label: "Amount", value: `{{co${n}_amt|money}}` },
+      ],
+    },
+    fields: [
+      { id: "year", label: "Belongs to", kind: "choice" as const, options: opts([[`y${YEAR}`, String(YEAR)], [`y${YEAR + 1}`, String(YEAR + 1)]]) },
+      { id: "recorded", label: "Recorded in the right year?", kind: "choice" as const, options: opts([["yes", "Yes"], ["no", "No"]]) },
+    ],
+    points: itemPoints(n),
+  };
+};
+
+/** Sample selection: items 1, 4, 7, ... pick the selected line; 2, 5, 8, ... count them; 3, 6, 9, ... find the missing check. */
+type SampleKind = "line" | "count" | "missing";
+const sampleKind = (n: number): SampleKind => (["line", "count", "missing"] as const)[(n - 1) % 3];
+const LINES = ["A", "B", "C", "D", "E"];
+const MISSING_OPTIONS = 4;
+
+const sampleItem = (n: number) => {
+  const v = (name: string) => `{{ss${n}_${name}}}`;
+  const kind = sampleKind(n);
+  const base = { id: `ss-${n}`, points: itemPoints(n) };
+  if (kind === "missing") {
+    return {
+      ...base,
+      prompt: "Scan the check register for a gap in the check sequence. Which check number is missing?",
+      exhibit: {
+        title: `Check register, operating account, December ${YEAR}`,
+        table: {
+          columns: ["Check no.", "Date", "Payee", "Amount"],
+          rows: [1, 2, 3, 4, 5, 6].map((r) => [`#${v(`r${r}_no`)}`, v(`r${r}_date`), v(`r${r}_payee`), `{{ss${n}_r${r}_amt|money}}`]),
+        },
+      },
+      fields: [
+        {
+          id: "missing",
+          label: "Missing check",
+          kind: "choice" as const,
+          options: Array.from({ length: MISSING_OPTIONS }, (_, i) => ({ id: `o${i + 1}`, label: `#${v(`o${i + 1}`)}` })),
+        },
+      ],
+    };
+  }
+  const rule = `Rule: select every item over {{ss${n}_thr|money}}, plus every ${v("kth")} item number starting at #${v("start")}.`;
+  return {
+    ...base,
+    prompt: kind === "line" ? `${rule} Which line does the rule select?` : `${rule} How many of these five lines does the rule select?`,
+    exhibit: {
+      title: "Population listing (excerpt)",
+      table: {
+        columns: ["Line", "Item no.", "Amount"],
+        rows: LINES.map((l) => [l, `#${v(`${l.toLowerCase()}_no`)}`, `{{ss${n}_${l.toLowerCase()}_amt|money}}`]),
+      },
+    },
+    fields:
+      kind === "line"
+        ? [{ id: "line", label: "Selected line", kind: "choice" as const, options: LINES.map((l) => ({ id: l.toLowerCase(), label: `Line ${l}` })) }]
+        : [{ id: "count", label: "Lines selected", kind: "choice" as const, options: opts([["c1", "1"], ["c2", "2"], ["c3", "3"], ["c4", "4"]]) }],
+  };
+};
+
+/** Days after December 31 of the audit year (0 = 12/31, 1 = 01/01 of the next year) as mm/dd/yyyy. */
+function dayDate(offset: number): string {
+  const d = new Date(Date.UTC(YEAR, 11, 31 + offset));
+  return `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")}/${d.getUTCFullYear()}`;
+}
+const ordinal = (k: number) => `${k}${k === 1 ? "st" : k === 2 ? "nd" : k === 3 ? "rd" : "th"}`;
+
+type RapidKey = { items: Record<string, Record<string, { choice: string }>> };
+
+/** Seeds the three rapid rounds. Runs after phase A's draws, so phase A's numbers don't move. */
+function buildRapid(rng: Rng, values: Record<string, VariantValue>) {
+  const put = (prefix: string, obj: Record<string, VariantValue>) => {
+    for (const [k, x] of Object.entries(obj)) values[`${prefix}_${k}`] = x;
+  };
+  const tick: RapidKey = { items: {} };
+  const cutoff: RapidKey = { items: {} };
+  const sample: RapidKey = { items: {} };
+
+  // Tick and tie: 5 agree; 3 amount, 3 cutoff, 2 vendor, 2 no support. Five of each document type.
+  const cases = rng.shuffle<TickCase>([
+    ...Array<TickCase>(5).fill("agrees"),
+    ...Array<TickCase>(3).fill("amount"),
+    ...Array<TickCase>(3).fill("cutoff"),
+    ...Array<TickCase>(2).fill("vendor"),
+    ...Array<TickCase>(2).fill("no_support"),
+  ]);
+  const docs = rng.shuffle<TickDoc>([...Array<TickDoc>(5).fill("invoice"), ...Array<TickDoc>(5).fill("bank"), ...Array<TickDoc>(5).fill("receiving")]);
+  for (const n of ITEMS) {
+    const c = cases[n - 1];
+    const docType = docs[n - 1];
+    const t = TICK_DOCS[docType];
+    const pair = rng.pick(docType === "bank" ? BANK_PAIRS : VENDOR_PAIRS);
+    const swap = rng.int(0, 1);
+    const party = pair[swap];
+    const ref =
+      docType === "invoice" ? `INV-${rng.int(10_000, 99_999)}` : docType === "bank" ? `Operating, ending ${rng.int(1_000, 9_999)}` : `RR-${rng.int(1_000, 9_999)}`;
+    const date = docType === "bank" ? dayDate(0) : dayDate(-rng.int(0, 27));
+    let fig: string;
+    let otherFig: string;
+    if (docType === "receiving") {
+      const qty = rng.int(20, 2_400);
+      const alt = qty + rng.int(2, 60) * (rng.int(0, 1) === 1 || qty < 80 ? 1 : -1);
+      fig = `${qty.toLocaleString("en-US")} units`;
+      otherFig = `${alt.toLocaleString("en-US")} units`;
+    } else {
+      const amt = docType === "bank" ? rng.cents(60_000, 900_000) : rng.cents(400, 24_000);
+      const delta = rng.pick([900, 9_000, 10_000, 100_000, 1_800]) * (rng.int(0, 1) === 1 ? 1 : -1);
+      fig = formatCents(amt);
+      otherFig = formatCents(amt + delta);
+    }
+    const doc = {
+      ref: c === "no_support" ? "Not on file" : ref,
+      party: c === "no_support" ? NONE : c === "vendor" ? pair[1 - swap] : party,
+      date: c === "no_support" ? NONE : c === "cutoff" ? dayDate(rng.int(2, 9)) : date,
+      fig: c === "no_support" ? NONE : c === "amount" ? otherFig : fig,
+    };
+    put(`tt${n}`, {
+      sched: t.sched,
+      doc: t.doc,
+      ref_label: t.refLabel,
+      party_label: t.partyLabel,
+      fig_label: t.figLabel,
+      s_ref: ref,
+      s_party: party,
+      s_date: c === "cutoff" && docType !== "bank" ? dayDate(-rng.int(0, 4)) : date,
+      s_fig: fig,
+      d_ref: doc.ref,
+      d_party: doc.party,
+      d_date: doc.date,
+      d_fig: doc.fig,
+    });
+    tick.items[`tt-${n}`] = { result: { choice: c === "agrees" ? "agrees" : "exception" }, reason: { choice: c === "agrees" ? "na" : c } };
+  }
+
+  // Cutoff: every (year, recorded right) pair occurs; FOB shipping point and destination split 8 / 7.
+  const combos = rng.shuffle([
+    [YEAR, true],
+    [YEAR, false],
+    [YEAR + 1, true],
+    [YEAR + 1, false],
+  ] as const);
+  const plan = rng.shuffle(combos.flatMap((combo, i) => Array(i === 3 ? 3 : 4).fill(combo) as (typeof combo)[]));
+  const terms = rng.shuffle([...Array<boolean>(8).fill(true), ...Array<boolean>(7).fill(false)]);
+  for (const n of ITEMS) {
+    const [year, right] = plan[n - 1];
+    const shippingPoint = terms[n - 1];
+    const sale = rng.int(0, 1) === 1;
+    const transfer = year === YEAR ? -rng.int(0, 5) : rng.int(1, 5);
+    const transit = rng.int(1, 4);
+    const shipped = shippingPoint ? transfer : transfer - transit;
+    const delivered = shippingPoint ? transfer + transit : transfer;
+    const invoiced = shipped + rng.int(0, 2);
+    const inYear = (d: number, y: number) => (d <= 0 ? YEAR : YEAR + 1) === y;
+    const recordYear = right ? year : year === YEAR ? YEAR + 1 : YEAR;
+    const candidates = [shipped, invoiced, delivered].filter((d) => inYear(d, recordYear));
+    const recorded = candidates.length ? rng.pick(candidates) : recordYear === YEAR ? 0 : 2;
+    put(`co${n}`, {
+      what: sale ? "sale" : "purchase",
+      title: `Bill of lading BL-${rng.int(10_000, 99_999)}`,
+      txn: sale ? `Sale of finished goods to ${rng.pick(CUSTOMERS)}` : `Purchase of ${rng.pick(PURCHASES)} from ${rng.pick(VENDOR_PAIRS)[0]}`,
+      terms: shippingPoint ? "FOB shipping point" : "FOB destination",
+      shipped: dayDate(shipped),
+      delivered: dayDate(delivered),
+      invoiced: dayDate(invoiced),
+      recorded: dayDate(recorded),
+      amt: rng.cents(3_000, 85_000),
+    });
+    cutoff.items[`co-${n}`] = { year: { choice: `y${year}` }, recorded: { choice: right ? "yes" : "no" } };
+  }
+
+  // Sample selection.
+  for (const n of ITEMS) {
+    const kind = sampleKind(n);
+    if (kind === "missing") {
+      const first = rng.int(1_000, 9_000);
+      const gap = rng.int(1, 5);
+      const nos = Array.from({ length: 7 }, (_, i) => first + i).filter((_, i) => i !== gap);
+      let day = rng.int(1, 6);
+      nos.forEach((no, r) => {
+        day += rng.int(0, 4);
+        put(`ss${n}_r${r + 1}`, { no, date: dayDate(-(31 - Math.min(day, 31))), payee: rng.pick(VENDOR_PAIRS)[0], amt: rng.cents(150, 18_000) });
+      });
+      const missing = first + gap;
+      const options = rng.shuffle([missing, ...rng.shuffle(nos).slice(0, MISSING_OPTIONS - 1)]);
+      options.forEach((no, i) => (values[`ss${n}_o${i + 1}`] = no));
+      sample.items[`ss-${n}`] = { missing: { choice: `o${options.indexOf(missing) + 1}` } };
+      continue;
+    }
+
+    const thrDollars = rng.pick([5_000, 10_000, 25_000]);
+    const thr = thrDollars * 100;
+    const below = () => rng.cents(Math.round(thrDollars * 0.08), Math.round(thrDollars * 0.9));
+    const above = () => rng.cents(thrDollars + 1, thrDollars * 3);
+    const k = rng.pick([3, 4, 5]);
+    let nos: number[];
+    let start: number;
+    let overThreshold: number[];
+    let answer: string;
+    const hits = (ns: number[], s: number) => ns.map((x, i) => (x >= s && (x - s) % k === 0 ? i : -1)).filter((i) => i >= 0);
+
+    if (kind === "line") {
+      // Exactly one line is selected, by amount or by the interval.
+      const target = rng.int(0, 4);
+      const byAmount = rng.int(0, 1) === 1;
+      for (let tries = 0; ; tries++) {
+        if (tries > 200) throw new Error("audit-calder-bluestem: no sample line layout");
+        let x = rng.int(1_200, 8_800);
+        nos = LINES.map(() => (x += rng.int(1, 4)));
+        start = byAmount ? nos[0] - rng.int(0, 3 * k) : nos[target] - k * rng.int(0, 3);
+        const h = hits(nos, start);
+        if (byAmount ? h.length === 0 : h.length === 1 && h[0] === target) break;
+      }
+      overThreshold = byAmount ? [target] : [];
+      answer = LINES[target].toLowerCase();
+    } else {
+      // Five consecutive item numbers: the interval picks one or two, amounts add 0 to 2 more.
+      const first = rng.int(1_200, 8_800);
+      nos = LINES.map((_, i) => first + i);
+      start = first + rng.int(0, k - 1) - k * rng.int(1, 3);
+      const h = hits(nos, start);
+      const rest = rng.shuffle([0, 1, 2, 3, 4].filter((i) => !h.includes(i)));
+      const total = rng.int(h.length, Math.min(4, h.length + 2));
+      overThreshold = rest.slice(0, total - h.length);
+      answer = `c${total}`;
+    }
+
+    const selected = new Set([...hits(nos, start), ...overThreshold]);
+    const unselected = [0, 1, 2, 3, 4].filter((i) => !selected.has(i));
+    const nearMiss = unselected.length ? rng.pick(unselected) : -1;
+    LINES.forEach((l, i) => {
+      const amt = overThreshold.includes(i) ? above() : i === nearMiss ? thr - rng.cents(1, 250) : below();
+      put(`ss${n}_${l.toLowerCase()}`, { no: nos[i], amt });
+    });
+    put(`ss${n}`, { thr, kth: ordinal(k), start });
+    sample.items[`ss-${n}`] = kind === "line" ? { line: { choice: answer } } : { count: { choice: answer } };
+  }
+
+  return { "rapid-tick": tick, "rapid-cutoff": cutoff, "rapid-sample": sample };
+}
+
 export const auditCalderBluestem = defineScenario({
   slug: "audit-calder-bluestem",
   version: 1,
   title: "Calder & Finch: Bluestem Manufacturing year-end audit",
   roleFamily: "accounting",
-  timeLimitMinutes: 50,
+  timeLimitMinutes: 52,
   definition: {
-    intro: `You're an audit intern at Calder & Finch LLP. It's fieldwork week on the December 31, ${YEAR} year-end audit of Bluestem Manufacturing. Your senior, Marcus Avery, will send you work through the session, and the client's team will be in touch too.`,
+    intro: `You're an audit intern at Calder & Finch LLP. It's fieldwork week on the December 31, ${YEAR} year-end audit of Bluestem Manufacturing. Your senior, Marcus Avery, will send you work through the session, and the client's team will be in touch too. The session runs in six timed parts, three of them quick-fire rounds; once a part ends you can't go back to it.`,
     steps: [
+      {
+        id: "rapid-tick",
+        type: RAPID_ROUND,
+        title: "Rapid round: tick and tie",
+        config: {
+          intro: "Agree each schedule line to its source document: Agrees or Exception, and why. 15 items, 20 seconds each.",
+          secondsPerItem: RAPID_SECONDS,
+          items: ITEMS.map(tickItem),
+        },
+      },
       vouchStep(1),
       vouchStep(2),
       vouchStep(3),
       vouchStep(4),
       {
+        id: "rapid-cutoff",
+        type: RAPID_ROUND,
+        title: "Rapid round: cutoff",
+        config: {
+          intro: "Shipments either side of December 31: which year each belongs to under its FOB terms, and whether Bluestem recorded it there. 15 items, 20 seconds each.",
+          secondsPerItem: RAPID_SECONDS,
+          items: ITEMS.map(cutoffItem),
+        },
+      },
+      {
         id: "controller-reply",
         type: INBOX_REPLY,
         title: "Reply to Renee",
+        seconds: 240,
         config: {
           prompt: "Reply to Renee about the item she wants to skip.",
           to: "Renee Okafor, Controller, Bluestem Manufacturing",
@@ -202,12 +553,14 @@ export const auditCalderBluestem = defineScenario({
         id: "exception-count",
         type: NUMERIC,
         title: "Marcus: number of exceptions",
+        seconds: 90,
         config: { prompt: "How many of the 8 sampled items are exceptions?", unit: "items", decimals: 0, points: 2 },
       },
       {
         id: "exception-total",
         type: NUMERIC,
         title: "Marcus: total misstatement",
+        seconds: 90,
         config: {
           prompt: "Total misstatement from those exceptions, in dollars: how much operating expenses are overstated, as a positive number.",
           unit: "$",
@@ -219,6 +572,7 @@ export const auditCalderBluestem = defineScenario({
         id: "bank-confirm",
         type: DOCUMENT_REVIEW,
         title: "Bank confirmation: {{bank}}",
+        seconds: 180,
         config: {
           prompt: "Compare the bank confirmation with the cash lead schedule. Flag anything that doesn't agree, then choose what you do next.",
           document: {
@@ -251,6 +605,16 @@ export const auditCalderBluestem = defineScenario({
             ],
             points: 3,
           },
+        },
+      },
+      {
+        id: "rapid-sample",
+        type: RAPID_ROUND,
+        title: "Rapid round: sample selection",
+        config: {
+          intro: "Apply each item's selection rule to the listing, or find the gap in the check register. 15 items, 20 seconds each.",
+          secondsPerItem: RAPID_SECONDS,
+          items: ITEMS.map(sampleItem),
         },
       },
       {
@@ -324,15 +688,23 @@ export const auditCalderBluestem = defineScenario({
     ],
     messages: [
       {
+        id: "m-tick",
+        from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
+        subject: "Warm-up: tick and tie",
+        body: "Hi {{first_name}}, while I pull the expense sample, a warm-up: 15 quick tick-and-tie checks. Each shows a line from one of our schedules next to its source document (vendor invoice, bank confirmation or receiving report). Tell me whether they agree and, if not, why. 20 seconds each.\n\nMarcus",
+        arriveAtMinute: 0,
+        stepId: "rapid-tick",
+      },
+      {
         id: "m1",
         from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
         subject: "Bluestem: expense vouching",
         body: [
           "Hi {{first_name}},",
           "",
-          "Welcome to fieldwork week on Bluestem Manufacturing. First job: expense vouching.",
+          "Next job: expense vouching.",
           "",
-          `I pulled a sample of 8 entries from operating expenses for the year ended December 31, ${YEAR}. They're in four pairs, each with the GL detail and whatever support the client gave us. For each item, agree the GL entry to its support: amount, date and period, payee, and whether it's a genuine business expense in the right account. Flag anything that's off, with a reason. After the last pair, give me your conclusion on the sample.`,
+          `I pulled a sample of 8 entries from operating expenses for the year ended December 31, ${YEAR}. They're in four pairs, one screen each (about 3 minutes a pair), each with the GL detail and whatever support the client gave us. For each item, agree the GL entry to its support: amount, date and period, payee, and whether it's a genuine business expense in the right account. Flag anything that's off, with a reason. After the last pair, give me your conclusion on the sample.`,
           "",
           "More will come through as the day goes. Shout if you're stuck.",
           "",
@@ -340,6 +712,14 @@ export const auditCalderBluestem = defineScenario({
         ].join("\n"),
         arriveAtMinute: 0,
         stepId: "vouch-1",
+      },
+      {
+        id: "m-cutoff",
+        from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
+        subject: "Cutoff testing",
+        body: "Cutoff next: 15 shipments either side of December 31. For each, which year does it belong to under its FOB terms, and did Bluestem record it in that year? 20 seconds each.\n\nMarcus",
+        arriveAtMinute: 0,
+        stepId: "rapid-cutoff",
       },
       {
         id: "m2",
@@ -355,15 +735,15 @@ export const auditCalderBluestem = defineScenario({
           "Thanks,",
           "Renee",
         ].join("\n"),
-        arriveAtMinute: 8,
+        arriveAtMinute: 0,
         stepId: "controller-reply",
       },
       {
         id: "m3",
         from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
         subject: "Quick one",
-        body: "I'm meeting Renee at 2. How many exceptions are there in the expense sample of 8? Finish the pairs first if you need to.\n\nMarcus",
-        arriveAtMinute: 15,
+        body: "I'm meeting Renee at 2. How many exceptions did you find in the expense sample of 8?\n\nMarcus",
+        arriveAtMinute: 0,
         stepId: "exception-count",
       },
       {
@@ -371,7 +751,7 @@ export const auditCalderBluestem = defineScenario({
         from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
         subject: "RE: Quick one",
         body: "And the total dollar misstatement from them? How much expenses are overstated.\n\nMarcus",
-        arriveAtMinute: 16,
+        arriveAtMinute: 0,
         stepId: "exception-total",
       },
       {
@@ -385,8 +765,16 @@ export const auditCalderBluestem = defineScenario({
           "",
           "Marcus",
         ].join("\n"),
-        arriveAtMinute: 22,
+        arriveAtMinute: 0,
         stepId: "bank-confirm",
+      },
+      {
+        id: "m-sample",
+        from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
+        subject: "Sample selection",
+        body: "One more quick round before the wrap-up: sample selection. Apply the rule in each item to the listing, and check the register for a gap in the check sequence. 20 seconds each.\n\nMarcus",
+        arriveAtMinute: 0,
+        stepId: "rapid-sample",
       },
       {
         id: "m6",
@@ -405,7 +793,7 @@ export const auditCalderBluestem = defineScenario({
           "",
           "Marcus",
         ].join("\n"),
-        arriveAtMinute: 28,
+        arriveAtMinute: 0,
         stepId: "misstatement-summary",
       },
       {
@@ -413,7 +801,7 @@ export const auditCalderBluestem = defineScenario({
         from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
         subject: "Adjusting entries",
         body: "Please draft the adjusting entries for the expense exceptions, one entry per exception. Draft them whether we pass or propose: they go on the summary either way.\n\nMarcus",
-        arriveAtMinute: 30,
+        arriveAtMinute: 0,
         stepId: "proposed-aje",
       },
       {
@@ -421,9 +809,23 @@ export const auditCalderBluestem = defineScenario({
         from: "Marcus Avery, Audit Senior, Calder & Finch LLP",
         subject: "Bluestem expense testing: summary for partner review",
         body: "Partner review is at 4. Send me a short email I can use: how many exceptions, the total, a line on each, and whether we pass or propose.\n\nMarcus",
-        arriveAtMinute: 32,
+        arriveAtMinute: 0,
         stepId: "marcus-summary",
       },
+    ],
+    sections: [
+      { id: "s-rapid-a", title: "Rapid round A: tick and tie", minutes: 6, stepIds: ["rapid-tick"] },
+      { id: "s-vouch", title: "Expense vouching", minutes: 12, stepIds: ["vouch-1", "vouch-2", "vouch-3", "vouch-4"], oneAtATime: true },
+      { id: "s-rapid-b", title: "Rapid round B: cutoff", minutes: 6, stepIds: ["rapid-cutoff"] },
+      {
+        id: "s-inbox",
+        title: "Inbox",
+        minutes: 10,
+        stepIds: ["controller-reply", "exception-count", "exception-total", "bank-confirm"],
+        oneAtATime: true,
+      },
+      { id: "s-rapid-c", title: "Rapid round C: sample selection", minutes: 6, stepIds: ["rapid-sample"] },
+      { id: "s-wrap", title: "Summary and adjusting entries", minutes: 12, stepIds: ["misstatement-summary", "proposed-aje", "marcus-summary"] },
     ],
   },
 
@@ -619,6 +1021,8 @@ export const auditCalderBluestem = defineScenario({
       });
     });
 
+    const rapidKeys = buildRapid(rng, values);
+
     const d = (c: number) => c / 100;
     const entry = (dr: string[], cr: string[], amount: number) => ({
       lines: [
@@ -650,6 +1054,7 @@ export const auditCalderBluestem = defineScenario({
     return {
       values,
       keys: {
+        ...rapidKeys,
         ...vouchKeys,
         "controller-reply": {
           notes: {
