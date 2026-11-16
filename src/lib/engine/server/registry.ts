@@ -5,6 +5,7 @@ import { inboxReplyServer } from "../step-types/inbox_reply/server";
 import { journalEntryServer } from "../step-types/journal_entry/server";
 import { multipleChoiceServer } from "../step-types/multiple_choice/server";
 import { numericServer } from "../step-types/numeric/server";
+import { orderingServer } from "../step-types/ordering/server";
 import { rapidRoundServer } from "../step-types/rapid_round/server";
 import { spreadsheetServer } from "../step-types/spreadsheet/server";
 import type { AnyServerStepType } from "./step-type";
@@ -22,6 +23,7 @@ const serverStepTypes: Record<string, AnyServerStepType> = {
   [documentReviewServer.type]: documentReviewServer,
   [rapidRoundServer.type]: rapidRoundServer,
   [multipleChoiceServer.type]: multipleChoiceServer,
+  [orderingServer.type]: orderingServer,
 };
 
 export function getServerStepType(type: string): AnyServerStepType {
