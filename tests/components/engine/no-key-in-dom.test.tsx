@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { StepView } from "@/lib/engine/client/StepView";
 import { listScenarios } from "@/lib/engine/scenarios";
 import { renderAttemptForCandidate } from "@/lib/engine/server/render";
+import { keyVariantScenario } from "../../engine/key-variants";
 
 const SEEDS = Array.from({ length: 100 }, (_, i) => `dom-seed-${i.toString(16).padStart(3, "0")}`);
 
@@ -30,12 +31,21 @@ function leakPatterns(value: number): RegExp[] {
  * material lists on purpose (account codes, flaggable items, reasons, decision options, debit/credit side)
  * are skipped: they're in every candidate's choices, so they reveal nothing.
  */
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice"]);
-function keyLeaves(key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") {
-  if (PUBLIC_ID_FIELDS.has(field)) return out;
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct"]);
+/** Only id-shaped strings are skipped under those fields; a note or sentence there is still checked. */
+const ID_LIKE = /^[A-Za-z0-9_.-]{1,64}$/;
+function keyLeaves(
+  key: unknown,
+  out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] },
+  field = "",
+  publicIds = false,
+): { numbers: number[]; strings: string[] } {
+  const ids = publicIds || PUBLIC_ID_FIELDS.has(field);
   if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);
-  else if (typeof key === "string") out.strings.push(key);
-  else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k);
+  else if (typeof key === "string") {
+    if (!(ids && ID_LIKE.test(key))) out.strings.push(key);
+  } else if (Array.isArray(key)) for (const v of key) keyLeaves(v, out, field, ids);
+  else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k, ids);
   return out;
 }
 
@@ -105,6 +115,29 @@ describe("rendered candidate DOM never contains the answer key", () => {
     const key = scenario.generate("abc").keys["adjusted-balance"] as { value: number };
     const { container } = render(<p>Adjusted: ${key.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>);
     expect(leakPatterns(key.value).some((p) => p.test(container.innerHTML))).toBe(true);
+  });
+
+  it("multiple_choice and a clean document_review: the DOM is the same whatever the key says", () => {
+    const doms = new Set<string>();
+    const keys = new Set<string>();
+    for (const seed of SEEDS.slice(0, 40)) {
+      keys.add(JSON.stringify(keyVariantScenario.generate(seed).keys));
+      // React's useId differs per render; the ids aren't content.
+      doms.add(renderCandidateDom(renderAttemptForCandidate(keyVariantScenario, seed, 60)).replace(/[«:]r[0-9a-z]+[»:]/g, "id"));
+    }
+    expect(keys.size).toBeGreaterThan(10);
+    expect(doms.size).toBe(1);
+    const [html] = doms;
+    expect(html).toContain('type="radio"');
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain("Nothing wrong with this invoice");
+    expect(html).not.toMatch(/correct|Paid on Oct 3/i);
+  });
+
+  it("correct option ids are skipped as public ids, but text under an id field is still checked", () => {
+    expect(keyLeaves({ correct: ["ar", "cash"] }).strings).toEqual([]);
+    expect(keyLeaves({ correct: ["Paid on Oct 3."] }).strings).toEqual(["Paid on Oct 3."]);
+    expect(keyLeaves({ findings: { dup: { targets: ["invoice_no"], reasons: ["dup"], note: "Paid on Oct 3." } } }).strings).toEqual(["Paid on Oct 3."]);
   });
 
   it("journal_entry amounts in a key are checked too, and the check fires when one is planted", () => {
