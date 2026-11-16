@@ -232,6 +232,100 @@ Accepted for v1 (forced by the current step types):
 - Accounts payable is accepted for the check-error entry without the explanation, because the journal step can't read the memo.
 - Process signals come from attempt events, not the scenario.
 
+## Example 5: Corporate AP intern, payment run day (~50 min, phase A)
+
+**Status: draft: needs accountant review.** Built as `corporate-ap-ridgeway` v1 in `src/lib/engine/scenarios/corporate-ap-ridgeway.ts`, tests in `tests/engine/corporate-ap-ridgeway.test.ts`. Phase A only: the parts that use existing step types, 70 points, as a normal scenario without sections. The three rapid rounds (30 points) come in phase B (see the TODO at the end).
+
+**Setup:** "You're an accounts payable intern in the in-house finance team at Ridgeway Outdoor Supply, an outdoor gear retailer. Your manager is Priya Desai, the AP lead. Today is the mid-month payment run."
+
+Seeded per candidate: every amount, quantity, vendor and contact name, email domain, phone number, invoice / PO / receiving report number and date, and **which of the four match documents holds which trap**. Numbers below are one variant (seed `abc`).
+
+### Messages
+
+| Minute | From | Delivers |
+| --- | --- | --- |
+| 0 | Priya: match queue for today's run, the AP policy ("pay only when PO, receiving report and invoice agree on quantity and price and we haven't paid it before; any difference, however small, goes on hold"), and two bills she approved yesterday that are already in the run | Three-way match 1 (2–4 and the posting are open from the start) |
+| 15 | The short-shipped vendor's AR clerk: "Is invoice TP-26323 for $1,392.23 in today's run?" | Reply to the vendor |
+| 22 | Priya forwards an AP-inbox email: "Updated remittance details" | Bank-change review |
+| 28 | Priya: "Total approved for today's run? Number only." | Run total |
+| 32 | Priya: a fifth vendor's statement doesn't agree with our AP subledger | Statement rec |
+| 33 | Priya: "Send me a short note, under 120 words: the balance we owe, what to ask them for, and the entry we need." | Note to Priya |
+
+### Part 1 · Three-way match (25 points)
+
+Four `document_review` steps, one per vendor. Each shows the PO (number, date), the receiving report (number, date), the invoice (number, date, terms), the last payment to that vendor, and a line table with PO qty, PO unit price, received qty, invoiced qty, invoice unit price and amount. Each invoice has two merchandise lines and one store-use line. The candidate flags what breaks the match with a reason, then chooses **Pay** or **Hold**.
+
+Planted, one each, shuffled across the four documents:
+
+| Trap | What the document shows (seed `abc`) | Expected |
+| --- | --- | --- |
+| Short shipment | Timberline Packs: fleece pullovers ordered 14, received 11, billed 14 | Flag the line (or the total), reason "Billed for more than we received"; Hold |
+| Price above PO | Granite Peak Footwear: water bottles billed $12.77 a unit, PO $11.40 | Flag the line (or the total), reason "Price is higher than the PO"; Hold |
+| Already paid | High Desert Hydration: invoice HDH-31099 $1,622.85; "Last payment to this vendor: Invoice HDH-31099 · $1,622.85 · paid Oct 15" | Flag the invoice number (or the last-payment row), reason "Duplicate: already paid"; Hold |
+| Clean match | Lakeshore Lantern Co.: everything agrees, $1,069.56 | Flag the "Three-way match" row with "All three agree"; Pay |
+
+Every document shows a last payment, so its presence gives nothing away; only the duplicate's invoice number matches it. The duplicate's PO, receiving report and invoice are dated September / October, the others late October / November.
+
+Then a `journal_entry` step posts the approved invoice (the clean one): Dr Merchandise Inventory (the two merchandise lines, $764.70), Dr Store Supplies Expense (the store-use line, $304.86) / Cr Accounts Payable $1,069.56. The prompt asks for one debit line per account. Priya's two pre-approved bills are already posted.
+
+### Part 2 · Inbox under pressure (15 points)
+
+- **(a) Vendor chasing the held invoice** (`inbox_reply`, 5): rubric: explains the hold with the facts (received 11, billed 14) 2; asks for a corrected invoice or credit memo (or ship the balance), paid once it matches 2; courteous, no promised date 1.
+- **(b) Run total** (`numeric`, 4): Priya's two pre-approved bills plus the clean invoice: $2,674.06 + $1,278.43 + $1,069.56 = **$5,022.05**. No partial credit. Including any held invoice (e.g. the duplicate) is wrong.
+- **(c) Bank-details change** (`document_review`, 6): an email "from" the clean vendor (the one being paid today) at a lookalike domain (`lakeshorelantern-remit.com` against `lakeshorelantern.com` on file), asking to switch remittance to a new account before today's run, saying the old account closes this week, and giving a new phone number. The vendor master's email and phone are shown. Findings: lookalike domain 1.5; unverified bank change 1.5; pressure or new contact number 1 (either line). False flags cost 0.5. Decision 2: **change nothing; call the vendor on the number on file and tell Priya**. Wrong decisions offered: update the bank details, reply to the email to confirm, call the number in the email.
+
+### Part 3 · Vendor statement reconciliation (30 points)
+
+`spreadsheet` (20): the vendor's statement (as of Nov 12) and our AP subledger for them, both opening at October's agreed balance, then a reconciliation template.
+
+| | Seed `abc` |
+| --- | --- |
+| Balance per vendor statement, Nov 12 | 8,669.02 |
+| Less: payment sent 11/13, not on the statement (in transit) | (1,520.04) |
+| **Adjusted vendor balance** | **7,148.98** |
+| Balance per AP subledger | 5,120.41 |
+| Add: invoice NPW-47229 on the statement, never received | 2,160.47 |
+| Less: credit memo CM-1706 (returned goods) not booked | (311.90) |
+| Add / (less): invoice NPW-47154 keyed at 3,130.41, billed 3,310.41 (transposition) | 180.00 |
+| **Adjusted AP balance** | **7,148.98** |
+
+Scoring: each of the four planted items 4, each adjusted balance 2. The keying error is a hundreds/tens transposition, either direction, so its sign matters.
+
+`inbox_reply` to Priya (10), under ~120 words: states the balance we owe (7,148.98) and that the difference is explained 3; asks the vendor for a copy of invoice NPW-47229 (and checks the goods arrived before booking) and of credit memo CM-1706 3; names the entries 2: book the credit memo (Dr AP / Cr Merchandise Inventory), correct the keyed invoice (here Dr Merchandise Inventory / Cr AP 180.00), record the missing invoice once received and approved; no entry for the payment in transit; brief and forwardable 2.
+
+### Scoring, phase A (70 points)
+
+| Area | What earns points | Points |
+| --- | --- | --- |
+| Three-way match | Per document: the right flag and reason 3 (half for the right item with another reason), Pay / Hold 2; × 4 | 20 |
+| Posting | The clean invoice to Inventory, Supplies and AP | 5 |
+| Vendor reply | Rubric (reviewer) | 5 |
+| Run total | Pre-approved bills + clean invoice | 4 |
+| Bank-change email | Domain 1.5, bank change 1.5, pressure / new contact 1, decision 2 | 6 |
+| Statement rec | Four planted items 4 each, both adjusted balances 2 each | 20 |
+| Note to Priya | Rubric (reviewer) | 10 |
+
+A perfect attempt shows 55 automatic points until a reviewer marks the two replies. Each trap answered wrongly costs exactly its own points (tested): paying the duplicate, the short shipment or the price variance costs that document's 5; holding the clean invoice costs 5; updating the bank details without flags costs 6, and calling the number in the email or replying to it costs the 2 decision points. Knock-on effects are scored where they land: a run total that includes a held invoice loses the 4 numeric points.
+
+### Judgment calls for the accountant review
+
+- Policy is strict (no price tolerance, hold the whole invoice on a short shipment). Many companies short-pay the received quantity or allow a small price tolerance; Priya's email states the strict policy so the key is unambiguous.
+- The clean match is answered by flagging a "Three-way match" row with "All three agree", because `document_review` needs at least one finding per document. This reads oddly next to the red Flag buttons.
+- Posting a held invoice as well isn't penalised by `journal_entry` (extra entries score 0 and are listed for the reviewer).
+- Merchandise goes to inventory (perpetual system), store-use items to Store Supplies Expense. The journal step asks for one debit line per account, because splitting inventory over two lines costs the leftover-line penalty.
+- The unreceived invoice is added on our side of the rec (we owe it once received and approved), and the credit memo is booked against Merchandise Inventory (returned goods). An accountant may prefer a purchase returns account or to leave the unreceived invoice as a vendor-side item until it's verified.
+- The phishing email is auto-scored as a `document_review` rather than a written reply, so the trap can be tested exactly. A candidate who would also forward it to IT or security gets no extra credit.
+
+### TODO, phase B (30 points, after the sections engine and `rapid_round` merge)
+
+Three timed rapid rounds, 15 items × 20 seconds each, 10 points each:
+
+1. **JE flash**: pick the debit and credit for a one-line AP event (e.g. invoice for store supplies, payment of an invoice, credit memo for returned goods, early-payment discount taken).
+2. **Pay or hold**: one-line PO / receipt / invoice summaries; Pay or Hold.
+3. **Cash application**: match a vendor payment or remittance to the invoice(s) it pays.
+
+Phase B turns the scenario into sections (match queue, inbox, rapid rounds, statement) and brings it to 100 points.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.
