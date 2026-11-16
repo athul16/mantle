@@ -78,3 +78,66 @@ export function renderAttemptForCandidate(
 
   return { intro: fill(scenario.definition.intro), messages, steps };
 }
+
+/** Item position of a sequence step (rapid_round) for the candidate: the open item, or every item over. */
+export type SequencePosition = { index: number; count: number; endsAt: string } | { done: true };
+
+/** Item count and seconds per item when the step is a timed sequence (step type with a `sequence` hook), else null. */
+export function stepSequenceInfo(scenario: ServerScenario, stepId: string): { count: number; secondsPerItem: number } | null {
+  const step = findStep(scenario, stepId);
+  const stepType = getServerStepType(step.type);
+  if (!stepType.sequence) return null;
+  const config = stepType.configSchema.parse(step.config);
+  return { count: stepType.sequence.count(config), secondsPerItem: stepType.sequence.secondsPerItem(config) };
+}
+
+/**
+ * The candidate's view in a timed flow: exactly the steps and messages the
+ * caller decided are open (src/lib/engine/server/flow.ts), newest message
+ * first. `arriveAtMinute` here is the actual arrival, minutes after the
+ * attempt start. A sequence step gets its open item injected as
+ * `config.current` (one item, filled, no key), or `config.done`.
+ */
+export function renderFlowForCandidate(
+  scenario: ServerScenario,
+  seed: string,
+  {
+    stepIds,
+    messages: arrived,
+    sequences = {},
+  }: { stepIds: string[]; messages: { id: string; arriveAtMinute: number }[]; sequences?: Record<string, SequencePosition> },
+  candidate: CandidateContext = {},
+): { intro: string; messages: PublicMessage[]; steps: PublicStep[] } {
+  const variant = scenario.generate(seed);
+  const values = templateValues(variant.values, candidate);
+  const fill = (template: string) => fillTemplate(template, values);
+  const at = new Map(arrived.map((m) => [m.id, m.arriveAtMinute]));
+
+  const messages = scenario.definition.messages
+    .filter((m) => at.has(m.id))
+    .map((m) => ({
+      id: m.id,
+      from: m.from,
+      subject: fill(m.subject),
+      body: fill(m.body),
+      arriveAtMinute: at.get(m.id)!,
+      stepId: m.stepId,
+    }))
+    .sort((a, b) => b.arriveAtMinute - a.arriveAtMinute);
+
+  const open = new Set(stepIds);
+  const steps = scenario.definition.steps
+    .filter((s) => open.has(s.id))
+    .map((s) => {
+      const pub = toPublicStep(scenario, s.id, variant, candidate);
+      const position = sequences[s.id];
+      const sequence = getServerStepType(s.type).sequence;
+      if (!position || !sequence) return pub;
+      if ("done" in position) return { ...pub, config: { ...(pub.config as object), done: true } };
+      const config = getServerStepType(s.type).configSchema.parse(s.config);
+      const item = sequence.renderItem(config, { variant, fill }, position.index);
+      return { ...pub, config: { ...(pub.config as object), current: { ...position, item } } };
+    });
+
+  return { intro: fill(scenario.definition.intro), messages, steps };
+}
