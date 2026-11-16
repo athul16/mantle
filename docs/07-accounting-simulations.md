@@ -232,24 +232,35 @@ Accepted for v1 (forced by the current step types):
 - Accounts payable is accepted for the check-error entry without the explanation, because the journal step can't read the memo.
 - Process signals come from attempt events, not the scenario.
 
-## Example 5: Audit intern, year-end fieldwork at Calder & Finch (~50 min, phase A)
+## Example 5: Audit intern, year-end fieldwork at Calder & Finch (52 min, 100 points)
 
-**Status: draft: needs accountant review.** Built as `audit-calder-bluestem` v1 in `src/lib/engine/scenarios/audit-calder-bluestem.ts`, tests in `tests/engine/audit-calder-bluestem.test.ts`. Extends Example 2 (vouching) into a full session with the Example 4 message pattern. Numbers below describe the structure; every amount, payee, officer, date, document number, and which item in which pair holds which trap is seeded per candidate.
+**Status: draft: needs accountant review.** Built as `audit-calder-bluestem` v1 in `src/lib/engine/scenarios/audit-calder-bluestem.ts`, tests in `tests/engine/audit-calder-bluestem.test.ts`. Extends Example 2 (vouching) into a full session with the Example 4 message pattern, in six timed sections with three rapid rounds. Numbers below describe the structure; every amount, payee, officer, date, document number, rapid-round exhibit, and which item in which pair holds which trap is seeded per candidate. Not yet published (still v1).
 
-**Setup:** "You're an audit intern at Calder & Finch LLP. It's fieldwork week on the December 31, 2025 year-end audit of Bluestem Manufacturing. Your senior, Marcus Avery, will send you work through the session, and the client's team will be in touch too."
+**Setup:** "You're an audit intern at Calder & Finch LLP. It's fieldwork week on the December 31, 2025 year-end audit of Bluestem Manufacturing. Your senior, Marcus Avery, will send you work through the session, and the client's team will be in touch too. The session runs in six timed parts, three of them quick-fire rounds; once a part ends you can't go back to it."
 
-### Timeline
+### Sections (52 minutes)
 
-| Minute | From | Delivers |
-| --- | --- | --- |
-| 0 | Marcus | Vouch a sample of 8 operating-expense entries (four pairs, all open from the start) |
-| 8 | Renee Okafor, Controller | "Can you just skip that one and pick a different entry?" (the unsupported accrual) |
-| 15 | Marcus | How many exceptions? |
-| 16 | Marcus | And the total dollar misstatement? |
-| 22 | Marcus | The bank confirmation came back $X higher / lower than the cash lead schedule |
-| 28 | Marcus | Materiality memo: overall, performance (75%) and clearly trivial (5%); pass below clearly trivial, propose at or above |
-| 30 | Marcus | Draft the adjusting entries |
-| 32 | Marcus | Summary for partner review |
+Sections run back to back (docs/06 "Timed sections and rapid rounds"); a finished section can't be reopened. Every message is linked to a step and arrives when that step's section starts, so each brief is there when its section opens.
+
+| # | Section | Minutes | Steps | Messages on arrival |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round A: tick and tie | 6 | `rapid-tick` (15 × 20 s) | Marcus: warm-up while he pulls the sample |
+| 2 | Expense vouching, one screen at a time | 12 | `vouch-1` … `vouch-4`, 3 min each | Marcus: vouch the sample of 8 |
+| 3 | Rapid round B: cutoff | 6 | `rapid-cutoff` (15 × 20 s) | Marcus: cutoff testing |
+| 4 | Inbox, one screen at a time | 10 | `controller-reply` 4 min, `exception-count` 1.5 min, `exception-total` 1.5 min, `bank-confirm` 3 min | Renee: "Can you just skip that one?"; Marcus: how many exceptions, and the total; the bank confirmation is back $X higher / lower |
+| 5 | Rapid round C: sample selection | 6 | `rapid-sample` (15 × 20 s) | Marcus: sample selection |
+| 6 | Summary and adjusting entries | 12 | `misstatement-summary`, `proposed-aje`, `marcus-summary` | Marcus: materiality memo (overall, performance 75%, clearly trivial 5%; pass below clearly trivial, propose at or above); draft the adjusting entries; summary for partner review |
+
+### Rapid rounds (30 points, `rapid_round` × 3)
+
+15 items × 20 seconds each, choice fields only. Items 1–5 of each round are worth 0.5 and items 6–15 are worth 0.75 (10 per round, exactly); a field right earns its share of the item. Option lists are the same for every candidate (except the check numbers offered in round C); the exhibits and answers are seeded.
+
+1. **Tick and tie.** A schedule line next to its source document, five items each: AP subledger vs vendor invoice, cash lead schedule vs bank confirmation, inventory receipts log vs receiving report. Rows: reference, vendor or bank, date, amount / balance / quantity. Fields: **Agrees / Exception** and the reason (**amount or quantity, date or cutoff, vendor or bank name, no support, N/A: agrees**). Per candidate: 5 agree, 3 amount differences, 3 January-dated documents against December schedule lines, 2 lookalike names (e.g. Midland vs Midway Fastener), 2 with the document "Not on file". Each exception differs in one row only.
+2. **Cutoff call.** A sale or purchase with FOB shipping point or FOB destination, ship, delivery, invoice and recorded dates between late December 2025 and early January 2026. Fields: **which year it belongs to** (2025 / 2026: ownership passes at shipment under FOB shipping point, at delivery under FOB destination) and **recorded in the right year?** (Yes / No). Every round has both years, both outcomes and both terms; the invoice date often falls in the other year as a distractor. The same rule is used for Bluestem's purchases (title passes to Bluestem at the same point).
+3. **Sample selection.** Three kinds, five each, alternating:
+   - *Which line:* a five-line population excerpt and a rule, "select every item over $T, plus every kth item number starting at #s". Exactly one line is selected, either by amount or by the interval; one unselected line sits just under the threshold.
+   - *How many:* five consecutive item numbers, same rule; the answer is 1–4. Interval picks are always under the threshold, so the count is the same whether or not the interval skips key items.
+   - *Missing check:* a six-line December check register with one number missing from the sequence; pick it from four numbers (the other three are in the register).
 
 ### Part 1 · Expense vouching (25 points, `document_review` × 4)
 
@@ -267,7 +278,7 @@ The four clean items agree on amount, date, payee and period. One clean option i
 ### Part 2 · Inbox under pressure (15 points)
 
 - **Controller (`inbox_reply`, 5):** politely declines to skip or swap the sampled item (2); asks for alternative support: engagement letter or contract, emails agreeing the fee, evidence the work was done, the invoice when it arrives (2); courteous, no promises (1).
-- **Marcus's questions (`numeric` × 2):** count of exceptions, always 4 (2); total misstatement (3).
+- **Marcus's questions (`numeric` × 2):** count of exceptions, always 4 (2); total misstatement (3). Asked after the vouching section has closed, so the candidate answers from their own notes.
 - **Bank confirmation (`document_review`, 5):** flag the confirmed balance, lead balance or difference as "Balances don't agree" (2); next step: **get the client's December 31 bank reconciliation, agree the confirmed balance to it and vouch the reconciling items** (3). Wrong: adjust cash to the confirmation, pass as immaterial, ask the client to have the bank change it. The payroll account agrees and is a false-flag trap.
 
 ### Part 3 · Proposed adjustment (30 points)
@@ -284,28 +295,24 @@ The four clean items agree on amount, date, payee and period. One clean option i
 
 - **Summary to Marcus (`inbox_reply`, 8):** count, total and pass/propose call (3); a line on each exception (3); short and organized (2).
 
-### Scoring, phase A (70 of 100 points)
+### Scoring (100 points)
 
 | Area | Points |
 | --- | --- |
+| Rapid round A: tick and tie (15 items, 2 fields each) | 10 |
 | Vouching: 4 exceptions × 5 (half for the right item with the wrong reason; −1 per false flag) | 20 |
 | Vouching: conclusion on the sample | 5 |
+| Rapid round B: cutoff (15 items, 2 fields each) | 10 |
 | Reply to the controller (reviewer) | 5 |
 | Exception count / total misstatement | 2 / 3 |
 | Bank confirmation: flag / next step | 2 / 3 |
+| Rapid round C: sample selection (15 items, 1 field each) | 10 |
 | Summary of misstatements: 4 items × 2, total 2, pass or propose 4 | 14 |
 | Adjusting entries: 4 × 2 | 8 |
 | Summary to Marcus (reviewer) | 8 |
+| **Total** | **100** |
 
-A perfect attempt shows 57 automatic points until a reviewer marks the two replies.
-
-### Phase B TODO: rapid rounds (30 points)
-
-Needs timed sections and the `rapid_round` step type (in progress on another branch). Then add three rapid rounds and bump to a new version:
-
-1. **Tick-and-tie**, 15 items × 20 s: does this figure agree to that source?
-2. **Cutoff call**, 15 items × 20 s: which year does this invoice or shipment belong in?
-3. **Sample selection**, 15 items × 20 s: is this item in the population / a valid selection?
+A perfect attempt shows 87 automatic points until a reviewer marks the two replies. The rapid rounds also report the median response time (0 points).
 
 ### Accepted for v1 (forced by the current step types)
 
@@ -313,7 +320,8 @@ Needs timed sections and the `rapid_round` step type (in progress on another bra
 - Each vouching pair holds exactly one exception, because `document_review` findings are fixed in the config. Trap types and positions move per seed.
 - The controller mentions one missing item, not two, so the four planted traps stay as specified.
 - Message senders (Marcus Avery, Renee Okafor) are fixed: `from` lines aren't templated. Everything inside the messages is seeded.
-- Marcus's numbers are asked mid-task, so a candidate still vouching can come back and change them before submitting.
+- Rapid-round items carry 0.5 or 0.75 points (first five vs the rest) so each round adds up to exactly 10; 2/3 of a point each would not.
+- The time limit is 52 minutes (the six sections as specified), not 50.
 
 ### For the accountant reviewing this draft
 
@@ -322,6 +330,11 @@ Needs timed sections and the `rapid_round` step type (in progress on another bra
 - The cutoff entry against Accounts payable or Accrued liabilities.
 - The engagement rule "pass below clearly trivial, propose at or above", with clearly trivial at 5% and performance materiality at 75% of overall. A real team would also weigh a 4-of-8 exception rate (projection, control findings); Marcus says he handles projection.
 - The bank confirmation's expected next step.
+- Rapid round A: a January-dated document against a December schedule line counts as "date or cutoff" whatever the document type, including a bank confirmation dated in January.
+- Rapid round B: FOB terms decide the year for purchases as well as sales; the invoice date never does. "Recorded in GL" is the posting date.
+- Rapid round C: the sample-selection rule ("every item over $T, plus every kth item number starting at #s") and the reading that the interval runs over item numbers, key items included; the seeding avoids any line where the two readings would differ.
+- Section lengths: 3 minutes per vouching pair, 4 minutes for the controller reply.
+
 ## Example 6: Corporate AP intern, payment run day (52 min, 100 points)
 
 **Status: draft: needs accountant review.** Built as `corporate-ap-ridgeway` v1 in `src/lib/engine/scenarios/corporate-ap-ridgeway.ts`, tests in `tests/engine/corporate-ap-ridgeway.test.ts`. Six timed sections (`06-assessment-engine.md`, "Timed sections and rapid rounds"): three rapid rounds (30 points) between the phase A work (70 points). Not published yet.
