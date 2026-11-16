@@ -55,6 +55,8 @@ pnpm scenarios:publish
 
 It reads `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` from `.env.local`, which points at the cloud project. Each line prints `slug@vN -> <id>`. Re-run after any scenario change that bumps a version.
 
+Before publishing the accounting simulations (Harbor Lane, Calder & Finch audit, Ridgeway AP), get the accountant's sign-off on [reviews/2026-11-accountant-review.md](reviews/2026-11-accountant-review.md).
+
 ## 5. Pilot company and team
 
 1. Sign up at `APP/signup` with your own address, confirm the email, and create the pilot company on `/onboarding`. You are its admin.
