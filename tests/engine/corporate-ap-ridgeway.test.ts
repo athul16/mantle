@@ -95,8 +95,6 @@ function readMatch(doc: Doc) {
   return { lines, invoiceNo, prior, priorNo, total, vendor, short, price, duplicate, issues, trap };
 }
 
-type Match = ReturnType<typeof readMatch>;
-
 /** Everything the candidate sees after the whole attempt. */
 function screen(seed: string) {
   const view = renderAttemptForCandidate(scenario, seed, END);
