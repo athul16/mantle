@@ -1,4 +1,4 @@
-/** Report rows (answer next to expected) for journal_entry, document_review, multiple_choice and rapid_round. No database. */
+/** Report rows (answer next to expected) for journal_entry, document_review, multiple_choice, rapid_round and ordering. No database. */
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -8,6 +8,7 @@ const { journalEntryServer } = await import("@/lib/engine/step-types/journal_ent
 const { documentReviewServer } = await import("@/lib/engine/step-types/document_review/server");
 const { multipleChoiceServer } = await import("@/lib/engine/step-types/multiple_choice/server");
 const { rapidRoundServer } = await import("@/lib/engine/step-types/rapid_round/server");
+const { orderingServer } = await import("@/lib/engine/step-types/ordering/server");
 
 const row = <R extends { id: string }>(rows: R[], id: string): R => {
   const r = rows.find((x) => x.id === id);
@@ -416,5 +417,83 @@ describe("rapid_round report rows", () => {
   it("without the seed, shows the prompts unfilled and no expected values", () => {
     const d = describeStep(step, null, answer, null);
     expect(row(d.rows, "rent")).toMatchObject({ prompt: "Paid rent of {{rent|money}} by check.", expected: "—" });
+  });
+});
+
+describe("ordering report rows", () => {
+  const config = {
+    prompt: "Put the records in date-of-service order.",
+    items: [
+      { id: "pt", label: "Physical therapy evaluation", detail: "Seen {{pt_date}}" },
+      { id: "er", label: "Emergency department visit" },
+      { id: "mri", label: "MRI of the lumbar spine" },
+      { id: "ortho", label: "Orthopedic consult at {{ortho}}" },
+      { id: "pcp", label: "Primary care follow-up" },
+      { id: "pain", label: "Pain management consult" },
+    ],
+    positionPoints: 6,
+    pairwisePoints: 3,
+  };
+  const step = { id: "chron", type: "ordering", title: "Medical chronology", config };
+  const keyOrder = { order: ["er", "pcp", "mri", "ortho", "pt", "pain"] };
+  const variant = { values: { pt_date: "Mar 3, 2026", ortho: "Kestrel Orthopedics" }, keys: { chron: keyOrder } };
+  const scored = (order: string[] | undefined) =>
+    orderingServer.score({
+      config: orderingServer.configSchema.parse(config),
+      key: orderingServer.keySchema.parse(keyOrder),
+      variant,
+      answer: order ? { order } : null,
+    });
+  const describeOrder = (order: string[] | undefined) => describeStep(step, variant, order ? { order } : undefined, order ? scored(order) : null);
+
+  it("shows readable rows, not raw JSON", () => {
+    const d = describeOrder(["er", "pcp", "mri", "ortho", "pt", "pain"]);
+    expect(d.answerText).toBeNull();
+    expect(d.rows.some((r) => r.id === "__key")).toBe(false);
+    expect(d.rows.map((r) => r.id)).toEqual(["pos-1", "pos-2", "pos-3", "pos-4", "pos-5", "pos-6", "positions", "pairs"]);
+    expect(JSON.stringify(d.rows)).not.toContain('"order"');
+  });
+
+  it("one row per position: the candidate's item next to the expected item, labels filled", () => {
+    // Swapped the MRI and the orthopedic consult.
+    const d = describeOrder(["er", "pcp", "ortho", "mri", "pt", "pain"]);
+    expect(row(d.rows, "pos-1")).toMatchObject({ label: "Position 1", answer: "Emergency department visit", expected: "Emergency department visit" });
+    expect(row(d.rows, "pos-3")).toMatchObject({ label: "Position 3", answer: "Orthopedic consult at Kestrel Orthopedics", expected: "MRI of the lumbar spine" });
+    expect(row(d.rows, "pos-4")).toMatchObject({ answer: "MRI of the lumbar spine", expected: "Orthopedic consult at Kestrel Orthopedics" });
+    expect(row(d.rows, "pos-5")).toMatchObject({ answer: "Physical therapy evaluation", expected: "Physical therapy evaluation" });
+    // Position rows carry no points; the two score lines do.
+    expect(row(d.rows, "pos-3").earned).toBeUndefined();
+  });
+
+  it("ends with the scored parts: items in place and pairs in order, with the score's points", () => {
+    const d = describeOrder(["er", "pcp", "ortho", "mri", "pt", "pain"]);
+    expect(row(d.rows, "positions")).toMatchObject({ label: "Items in the right position", answer: "4 of 6", expected: "6 of 6", earned: 4, max: 6 });
+    expect(row(d.rows, "pairs")).toMatchObject({ label: "Pairs in the right order", answer: "14 of 15", expected: "15 of 15", earned: 2.8, max: 3 });
+  });
+
+  it("lists only the parts worth points", () => {
+    const onlyPairs = { ...step, config: { ...config, positionPoints: 0 } };
+    const d = describeStep(onlyPairs, variant, { order: keyOrder.order }, null);
+    expect(d.rows.map((r) => r.id).slice(-1)).toEqual(["pairs"]);
+    expect(d.rows.some((r) => r.id === "positions")).toBe(false);
+  });
+
+  it("handles an unanswered, unscored step", () => {
+    const d = describeOrder(undefined);
+    expect(row(d.rows, "pos-1")).toMatchObject({ answer: "(not answered)", expected: "Emergency department visit" });
+    expect(row(d.rows, "positions")).toMatchObject({ answer: "(not answered)", expected: "6 of 6" });
+  });
+
+  it("an answer that doesn't list every item once shows what was given and counts nothing", () => {
+    const d = describeStep(step, variant, { order: ["er", "pcp"] }, scored(["er", "pcp"]));
+    expect(row(d.rows, "pos-2")).toMatchObject({ answer: "Primary care follow-up" });
+    expect(row(d.rows, "pos-3")).toMatchObject({ answer: "(not answered)", expected: "MRI of the lumbar spine" });
+    expect(row(d.rows, "positions")).toMatchObject({ answer: "Not every item once", earned: 0 });
+  });
+
+  it("without the seed, shows the labels unfilled and no expected order", () => {
+    const d = describeStep(step, null, { order: ["ortho", "er", "pcp", "mri", "pt", "pain"] }, null);
+    expect(row(d.rows, "pos-1")).toMatchObject({ answer: "Orthopedic consult at {{ortho}}", expected: "—" });
+    expect(row(d.rows, "positions")).toMatchObject({ answer: "—", expected: "6 of 6" });
   });
 });
