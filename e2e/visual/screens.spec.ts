@@ -13,11 +13,14 @@ test.skip(process.platform !== "linux" && !process.env.E2E_LOCAL_SCREENSHOTS, "s
 
 const masks = (page: Page, ...extra: string[]) => [page.locator("time"), ...extra.map((t) => page.getByText(t, { exact: false }))];
 
+// A fixed start-by date: "7 days from today" changes length with the date and re-wraps the landing page.
+const EXPIRES_AT = new Date("2099-12-30T17:00:00Z");
+
 test("company pages", async ({ page, data }) => {
   const co = await data.company({ name: "Northwind Audit" });
   const { assessmentId } = await data.assessment({ orgId: co.orgId, title: "Petty cash" });
   const { jobId } = await data.job({ orgId: co.orgId, assessmentId, title: "Audit intern" });
-  const invite = await data.invite({ orgId: co.orgId, jobId });
+  const invite = await data.invite({ orgId: co.orgId, jobId, expiresAt: EXPIRES_AT });
 
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
@@ -37,7 +40,7 @@ test("candidate pages", async ({ page, data, candidate }) => {
   const co = await data.company({ name: "Harbor Hiring" });
   const { assessmentId } = await data.assessment({ orgId: co.orgId, title: "Petty cash" });
   const { jobId } = await data.job({ orgId: co.orgId, assessmentId, title: "Audit intern" });
-  const invite = await data.invite({ orgId: co.orgId, jobId });
+  const invite = await data.invite({ orgId: co.orgId, jobId, expiresAt: EXPIRES_AT });
 
   await page.goto(invite.link);
   await expect(page.getByRole("heading", { level: 1, name: "Harbor Hiring invited you to an assessment" })).toBeVisible();
