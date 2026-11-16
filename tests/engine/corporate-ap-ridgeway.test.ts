@@ -8,7 +8,7 @@ const { renderAttemptForCandidate } = await import("@/lib/engine/server/render")
 const { scoreAttempt } = await import("@/lib/engine/server/score");
 
 /**
- * docs/07 Example 5: Ridgeway Outdoor Supply, corporate AP intern, phase A
+ * docs/07 Example 6: Ridgeway Outdoor Supply, corporate AP intern, phase A
  * (no rapid rounds). These tests solve every task from what the candidate sees
  * (the rendered documents, workbook and emails), then compare that with the
  * server key, so the material and the key can't drift apart.

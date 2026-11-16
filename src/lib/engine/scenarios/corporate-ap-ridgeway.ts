@@ -10,7 +10,7 @@ import { NUMERIC } from "../step-types/numeric/public";
 import { SPREADSHEET } from "../step-types/spreadsheet/public";
 
 /**
- * docs/07 Example 5: corporate AP intern at Ridgeway Outdoor Supply, payment
+ * docs/07 Example 6: corporate AP intern at Ridgeway Outdoor Supply, payment
  * run day. PHASE A: the parts built from existing step types, 70 points:
  * three-way match 25, inbox under pressure 15, vendor statement rec 30. The
  * three rapid rounds (30 points) come in phase B, once the sections engine

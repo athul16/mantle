@@ -22,11 +22,30 @@ export interface Step {
   type: string;
   title: string;
   config: unknown;
+  /** Screen time limit in seconds when the step is in a one-at-a-time section. */
+  seconds?: number;
+}
+
+/**
+ * A timed part of an attempt. Sections run in order: each starts when the
+ * previous one ends (its time ran out or the candidate finished it early) and
+ * gets its own `minutes`. Steps outside the current section are locked.
+ * `oneAtATime` shows the section's steps as screens, one at a time, each with
+ * its own `seconds` limit.
+ */
+export interface Section {
+  id: string;
+  title: string;
+  minutes: number;
+  stepIds: string[];
+  oneAtATime?: boolean;
 }
 
 /**
  * An inbox item. `arriveAtMinute` is minutes after the attempt starts
  * (omitted or 0 = present at start). `stepId` links the message to the task it delivers.
+ * In a scenario with sections, a message linked to a step arrives relative to
+ * the start of that step's section instead.
  */
 export interface Message {
   id: string;
@@ -42,6 +61,8 @@ export interface ScenarioDefinition {
   intro: string;
   steps: Step[];
   messages: Message[];
+  /** Timed sections. Without them every step is open for the whole attempt. */
+  sections?: Section[];
 }
 
 /**
@@ -102,5 +123,7 @@ export interface StepComponentProps<PublicConfig, Answer> {
   config: PublicConfig;
   answer?: Answer;
   onChange(answer: Answer): void;
+  /** Submit this answer now, without the autosave debounce (e.g. one rapid item). */
+  onCommit?(answer: unknown): void;
   disabled?: boolean;
 }

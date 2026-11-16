@@ -11,8 +11,15 @@ import type { PublicMessage, PublicStep } from "@/lib/engine/types";
 import { FullscreenButton, Proctoring, ProctoringIndicators } from "@/lib/proctoring/client/proctoring";
 import type { Proctoring as ProctoringSettings } from "@/lib/proctoring/config";
 import { Calculator } from "./calculator";
-import { hasAnswer, isWorkbookStep, senderParts, shortLabel } from "./labels";
+import { formatRemaining, hasAnswer, isWorkbookStep, senderParts, shortLabel } from "./labels";
 import { ClockTime, TimerBadge } from "./parts";
+
+/** Mirrors FlowView from src/lib/candidate/attempt.ts: timed sections, display only. */
+interface Flow {
+  done: boolean;
+  section?: { id: string; title: string; index: number; count: number; startedAt: string; endsAt: string; oneAtATime: boolean };
+  screen?: { stepId: string; index: number; count: number; startedAt: string; endsAt: string };
+}
 
 /** Mirrors WorkspaceView from src/lib/candidate/attempt.ts (that module is server-only). */
 interface View {
@@ -23,7 +30,19 @@ interface View {
   answers: Record<string, unknown>;
   deadlineAt: string;
   serverNow: string;
+  flow?: Flow | null;
 }
+
+/** The open item's deadline when a step shows one item at a time (a sequence step such as rapid_round). */
+function itemEndsAt(step: PublicStep): string | undefined {
+  const endsAt = (step.config as { current?: { endsAt?: unknown } } | null)?.current?.endsAt;
+  return typeof endsAt === "string" ? endsAt : undefined;
+}
+
+/** After a section, screen or item deadline passes, ask the server again (at most this often while it's overdue). */
+const FLOW_REFRESH_GAP_MS = 2_000;
+/** Wait this long past a flow deadline before asking, so the server's clock has passed it too. */
+const FLOW_REFRESH_DELAY_MS = 300;
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -83,8 +102,22 @@ export function Workspace({
   // Server time minus browser time, so a wrong local clock doesn't skew the display.
   const [clockOffset] = useState(() => new Date(initial.serverNow).getTime() - Date.now());
   const [remaining, setRemaining] = useState(() => deadline - new Date(initial.serverNow).getTime());
+  const [flow, setFlow] = useState<Flow | null>(initial.flow ?? null);
+  const [nowMs, setNowMs] = useState(() => new Date(initial.serverNow).getTime());
+  const [confirm, setConfirm] = useState<{ kind: "section" | "screen"; id: string } | null>(null);
+  const [advancing, setAdvancing] = useState(false);
 
   const finished = useRef(false);
+  const nextFlowDeadline = useRef<number | null>(null);
+  const lastFlowRefresh = useRef(0);
+  // Steps whose answers are sent one item at a time (onCommit); a retried save refreshes the view too.
+  const committed = useRef(new Set<string>());
+  const confirmButton = useRef<HTMLButtonElement>(null);
+
+  // The confirm dialog takes focus so Enter / Escape act on it.
+  useEffect(() => {
+    if (confirm) confirmButton.current?.focus();
+  }, [confirm]);
   const startedSteps = useRef(new Set<string>());
   const knownMessages = useRef(new Set(initial.messages.map((m) => m.id)));
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -109,7 +142,9 @@ export function Workspace({
       if (arrived.length) setToastId(arrived[0].id);
       setMessages(view.messages);
       setSteps(view.steps);
-      setTaskId((current) => current ?? view.steps[0]?.id ?? null);
+      setFlow(view.flow ?? null);
+      // A task that closed (its section or screen ended) gives way to the first open one.
+      setTaskId((current) => (current && view.steps.some((s) => s.id === current) ? current : (view.steps[0]?.id ?? null)));
       // Keep what the candidate typed locally; only fill in steps we had nothing for.
       setAnswers((prev) => ({ ...view.answers, ...prev }));
     } catch {
@@ -117,12 +152,27 @@ export function Workspace({
     }
   }, [goDone, router, token]);
 
+  // The nearest section, screen or item deadline: when it passes, the server has moved on.
+  useEffect(() => {
+    const times = [flow?.section?.endsAt, flow?.screen?.endsAt, ...steps.map(itemEndsAt)]
+      .filter((t): t is string => typeof t === "string")
+      .map((t) => new Date(t).getTime());
+    nextFlowDeadline.current = times.length ? Math.min(...times) : null;
+  }, [flow, steps]);
+
   // Countdown (display only) and polling for scheduled messages.
   useEffect(() => {
     const tick = setInterval(() => {
-      const left = deadline - (Date.now() + clockOffset);
+      const now = Date.now() + clockOffset;
+      const left = deadline - now;
       setRemaining(left);
+      setNowMs(now);
       if (left <= 0) void refresh();
+      const next = nextFlowDeadline.current;
+      if (next !== null && now >= next + FLOW_REFRESH_DELAY_MS && now - lastFlowRefresh.current >= FLOW_REFRESH_GAP_MS) {
+        lastFlowRefresh.current = now;
+        void refresh();
+      }
     }, 1000);
     const poll = setInterval(() => void refresh(), POLL_MS);
     return () => {
@@ -155,21 +205,55 @@ export function Workspace({
   }
 
   const saveStep = useCallback(
-    async (stepId: string, answer: unknown) => {
+    async (stepId: string, answer: unknown, { commit = false } = {}) => {
       try {
         const res = await postJson("/api/candidate/answer", { stepId, answer });
         if (res.status === 409) return goDone();
         if (res.status === 401) return router.replace(`/a/${token}`);
+        if (res.status === 400) {
+          // The task's section or screen ended, or the rapid item closed: retrying can't help. Show what's open now.
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (body?.error === "locked" || body?.error === "item_closed") {
+            failed.current.delete(stepId);
+            setSaveState(saveTimers.current.size ? "saving" : failed.current.size ? "error" : "saved");
+            void refresh();
+            return;
+          }
+        }
         if (!res.ok) throw new Error(`save failed: ${res.status}`);
         failed.current.delete(stepId);
         setSaveState(saveTimers.current.size ? "saving" : failed.current.size ? "error" : "saved");
+        if (commit) void refresh();
       } catch {
         failed.current.set(stepId, answer);
         setSaveState("error");
       }
     },
-    [goDone, router, token],
+    [goDone, refresh, router, token],
   );
+
+  /** Saves at once, no debounce (one rapid item), then shows what the server opened next. */
+  function commitAnswer(stepId: string, answer: unknown) {
+    setSaveState("saving");
+    failed.current.delete(stepId);
+    committed.current.add(stepId);
+    void saveStep(stepId, answer, { commit: true });
+  }
+
+  async function advance() {
+    if (!confirm || advancing) return;
+    setAdvancing(true);
+    try {
+      const res = await postJson("/api/candidate/advance", confirm);
+      if (res.status === 401) return router.replace(`/a/${token}`);
+    } catch {
+      // Offline: the refresh below shows whatever the server has.
+    } finally {
+      setAdvancing(false);
+      setConfirm(null);
+    }
+    await refresh();
+  }
 
   function changeAnswer(stepId: string, answer: unknown) {
     setAnswers((prev) => ({ ...prev, [stepId]: answer }));
@@ -189,7 +273,7 @@ export function Workspace({
   const retrySaves = useCallback(() => {
     if (!failed.current.size) return;
     setSaveState("saving");
-    for (const [stepId, answer] of [...failed.current]) void saveStep(stepId, answer);
+    for (const [stepId, answer] of [...failed.current]) void saveStep(stepId, answer, { commit: committed.current.has(stepId) });
   }, [saveStep]);
 
   // Keep retrying failed saves in the background while there are any.
@@ -252,7 +336,13 @@ export function Workspace({
   let main: ReactNode = null;
   if (step) {
     const view = (
-      <StepView key={step.id} step={step} answer={answers[step.id]} onChange={(a) => changeAnswer(step.id, a)} />
+      <StepView
+        key={step.id}
+        step={step}
+        answer={answers[step.id]}
+        onChange={(a) => changeAnswer(step.id, a)}
+        onCommit={(a) => commitAnswer(step.id, a)}
+      />
     );
     if (isWorkbookStep(step.type)) {
       main = (
@@ -322,7 +412,28 @@ export function Workspace({
     } else {
       main = <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 24 }}>{view}</div>;
     }
+  } else if (flow?.done) {
+    main = (
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "40px 48px" }}>
+        <section className="card col g10" style={{ maxWidth: 560, padding: 24 }}>
+          <h2 style={{ fontSize: 20 }}>All sections are done</h2>
+          <p className="ink2">
+            Every section has finished, so there&apos;s nothing left to work on. Review what you saved and submit. The overall timer keeps
+            running until you do.
+          </p>
+          <div>
+            <Link href={`/a/${token}/review`} className="btn btn-primary">
+              Review and submit
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
   }
+
+  const sectionLeft = flow?.section ? new Date(flow.section.endsAt).getTime() - nowMs : 0;
+  const screenLeft = flow?.screen ? new Date(flow.screen.endsAt).getTime() - nowMs : 0;
+  const advanceLabel = confirm?.kind === "screen" ? "Next screen" : "Finish section";
 
   const saveIndicator =
     saveState === "saving" ? (
@@ -348,7 +459,7 @@ export function Workspace({
     <Proctoring settings={proctoring} inlineIndicators>
       <div className="ws">
         <header className="ws-head">
-          <TimerBadge remainingMs={remaining} />
+          <TimerBadge remainingMs={remaining} asTimer={!(step && itemEndsAt(step))} />
           <div className="col ws-title" style={{ lineHeight: 1.2, minWidth: 0 }}>
             <span className="strong" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 320 }}>
               {initial.title}
@@ -405,6 +516,63 @@ export function Workspace({
             Submit
           </Link>
         </header>
+
+        {flow?.section ? (
+          <div role="region" aria-label="Section" className="wsbanner" style={{ background: "var(--subtle)" }}>
+            <Icon name="clock" />
+            <span className="txt row g10 wrap">
+              <strong>{`Section ${flow.section.index + 1} of ${flow.section.count}`}</strong>
+              <span>{flow.section.title}</span>
+              <span className="tnum ink2">{`${formatRemaining(sectionLeft)} left in section`}</span>
+              {flow.screen ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <strong>{`Screen ${flow.screen.index + 1} of ${flow.screen.count}`}</strong>
+                  <span className="tnum ink2">{`${formatRemaining(screenLeft)} left on this screen`}</span>
+                </>
+              ) : null}
+            </span>
+            <span className="grow" />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() =>
+                setConfirm(flow.screen ? { kind: "screen", id: flow.screen.stepId } : { kind: "section", id: flow.section!.id })
+              }
+            >
+              {flow.screen ? "Next screen" : "Finish section"}
+            </button>
+          </div>
+        ) : null}
+        {confirm ? (
+          <div className="mwrap" onMouseDown={(e) => e.target === e.currentTarget && !advancing && setConfirm(null)}>
+            <div
+              className="mbox"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="advance-title"
+              onKeyDown={(e) => e.key === "Escape" && !advancing && setConfirm(null)}
+            >
+              <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+                <h2 id="advance-title" style={{ fontSize: 20 }}>
+                  {confirm.kind === "screen" ? "Go to the next screen?" : "Finish this section?"}
+                </h2>
+                <p className="small ink2">
+                  {confirm.kind === "screen" ? "You can't come back to this screen." : "You can't come back to this section."} What
+                  you&apos;ve saved is kept. The overall timer keeps running.
+                </p>
+                <div className="row g10" style={{ justifyContent: "flex-end" }}>
+                  <button type="button" className="btn" disabled={advancing} onClick={() => setConfirm(null)}>
+                    Cancel
+                  </button>
+                  <button ref={confirmButton} type="button" className="btn btn-primary" disabled={advancing} onClick={() => void advance()}>
+                    {advanceLabel}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {saveState === "error" ? (
           <div className="wsbanner" role="alert" style={{ background: "var(--bad-bg)", color: "var(--bad)", borderColor: "var(--bad-line)" }}>
@@ -464,7 +632,9 @@ export function Workspace({
               <span>
                 {step?.type === "document_review"
                   ? "Flags on items that are fine cost points. Flag only real issues."
-                  : "Move between tasks freely. Everything saves automatically."}
+                  : flow
+                    ? "Each section has its own time. A finished section can't be reopened."
+                    : "Move between tasks freely. Everything saves automatically."}
               </span>
             </div>
           </aside>

@@ -17,7 +17,7 @@ const sheet: PublicStep = {
 
 describe("StepView", () => {
   it("registers every built step type", () => {
-    expect(Object.keys(clientStepTypes).sort()).toEqual(["document_review", "inbox_reply", "journal_entry", "numeric", "spreadsheet"]);
+    expect(Object.keys(clientStepTypes).sort()).toEqual(["document_review", "inbox_reply", "journal_entry", "numeric", "rapid_round", "spreadsheet"]);
     expect(hasStepComponent("numeric")).toBe(true);
     expect(hasStepComponent("multiple_choice")).toBe(false);
   });
