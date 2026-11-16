@@ -44,6 +44,9 @@ test("candidate pages", async ({ page, data, candidate }) => {
 
   await page.goto(invite.link);
   await expect(page.getByRole("heading", { level: 1, name: "Harbor Hiring invited you to an assessment" })).toBeVisible();
+  // The server renders dates in UTC with a " UTC" suffix and the browser swaps in local time after hydration;
+  // the two differ in width, so wait for the browser's version before comparing.
+  for (const time of await page.locator("time").all()) await expect(time).not.toHaveText(/UTC$/);
   await expect(page).toHaveScreenshot("candidate-landing.png", { mask: masks(page) });
 
   const code = await candidate.requestCode(invite);
