@@ -7,6 +7,7 @@ import { getEmails } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { describeStep, type StepDetail } from "./answer-key";
+import { answersSoonAfterReturn, rapidGap, type TimingReport } from "./timing";
 import {
   buildTimeline,
   durationSeconds,
@@ -103,6 +104,8 @@ export type CandidateReport = {
   } | null;
   steps: (StepDetail & { autoScore: StoredStepScore | null })[];
   timeline: TimelineEntry[];
+  /** Timing evidence rows when the assessment has a rapid round (docs/06); null otherwise. Never changes the label. */
+  timing: TimingReport | null;
   notes: ReportNote[];
 };
 
@@ -136,11 +139,12 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
     attempt: null,
     steps: [],
     timeline: [],
+    timing: null,
     notes: [],
   };
   if (!attempt) return base;
 
-  const [scenarioRow, responses, events, notes] = await Promise.all([
+  const [scenarioRow, responses, events, notes, signals] = await Promise.all([
     db.from("scenarios").select("slug, version, definition").eq("id", attempt.scenario_id).maybeSingle(),
     db.from("step_responses").select("step_id, answer").eq("org_id", orgId).eq("attempt_id", attempt.id),
     db.from("action_events").select("at, kind, payload").eq("org_id", orgId).eq("attempt_id", attempt.id).order("at").order("id"),
@@ -150,8 +154,16 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
       .eq("org_id", orgId)
       .eq("attempt_id", attempt.id)
       .order("created_at", { ascending: true }),
+    db
+      .from("integrity_events")
+      .select("at, kind, payload")
+      .eq("org_id", orgId)
+      .eq("attempt_id", attempt.id)
+      .eq("kind", "returned_to_window")
+      .order("at")
+      .limit(5000),
   ]);
-  for (const r of [scenarioRow, responses, events, notes]) if (r.error) throw r.error;
+  for (const r of [scenarioRow, responses, events, notes, signals]) if (r.error) throw r.error;
 
   const score = attempt.status === "scored" ? readAttemptScore(attempt.score) : null;
   const autoScore = attempt.status === "scored" ? readAttemptScore(attempt.auto_score) : null;
@@ -171,6 +183,13 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
   }
 
   const stepTitles = Object.fromEntries((definition?.steps ?? []).map((s) => [s.id, s.title]));
+  const hasRapid = (definition?.steps ?? []).some((s) => s.type === "rapid_round");
+  const timing: TimingReport | null = hasRapid
+    ? {
+        quickAfterReturn: answersSoonAfterReturn(events.data ?? [], signals.data ?? [], stepTitles),
+        rapidGap: rapidGap((definition?.steps ?? []).map((s) => ({ type: s.type, score: score?.steps[s.id] ?? null }))),
+      }
+    : null;
   const messageSubjects = Object.fromEntries((definition?.messages ?? []).map((m) => [m.id, m.subject]));
 
   return {
@@ -187,6 +206,7 @@ export async function getCandidateReport(orgId: string, inviteId: string): Promi
       needsReview: stepsNeedingReview(score),
     },
     steps,
+    timing,
     timeline: buildTimeline(events.data ?? [], { startedAt: attempt.started_at, stepTitles, messageSubjects }),
     notes: await withAuthorEmails(db, notes.data ?? []),
   };
