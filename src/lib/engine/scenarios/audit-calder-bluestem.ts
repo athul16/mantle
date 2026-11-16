@@ -6,6 +6,7 @@ import { formatCents } from "../server/template";
 import { DOCUMENT_REVIEW } from "../step-types/document_review/public";
 import { INBOX_REPLY } from "../step-types/inbox_reply/public";
 import { JOURNAL_ENTRY } from "../step-types/journal_entry/public";
+import { MULTIPLE_CHOICE } from "../step-types/multiple_choice/public";
 import { NUMERIC } from "../step-types/numeric/public";
 import { RAPID_ROUND } from "../step-types/rapid_round/public";
 import { SPREADSHEET } from "../step-types/spreadsheet/public";
@@ -23,12 +24,14 @@ import type { Rng } from "../server/rng";
  * 1. Expense vouching (25): 8 sampled GL entries in four pairs, one planted
  *    exception per pair (amount above the invoice, a January 3 invoice booked
  *    in December, a personal expense booked as client entertainment, an
- *    accrual with no support), then a conclusion on the sample.
+ *    accrual with no support), then a conclusion on the sample
+ *    (`multiple_choice`, its own screen after the last pair).
  * 2. Inbox under pressure (15): the controller asks to skip the unsupported
  *    item; Marcus wants the exception count and total; a bank confirmation
  *    doesn't agree to the cash lead schedule.
  * 3. Proposed adjustment (30): summary of misstatements, pass or propose
- *    against the clearly trivial threshold, adjusting entries, summary email.
+ *    against the clearly trivial threshold (`multiple_choice`), adjusting
+ *    entries, summary email.
  *
  * Every amount, payee, officer, date and document number is seeded per
  * candidate, and so is which item in which pair holds which trap. The key is
@@ -117,17 +120,16 @@ function vouchStep(k: number) {
           id: `i${n}-doc`,
           cells: [`#${n}`, `{{e${n}_src}}`, `{{e${n}_doc_ref}}`, `{{e${n}_doc_date}}`, `{{e${n}_doc_payee}}`, `{{e${n}_doc_desc}}`, "", `{{e${n}_doc_amt}}`],
         };
-  const last = k === 4;
   return {
     id: `vouch-${k}`,
     type: DOCUMENT_REVIEW,
     title: `Expense vouching: items ${a} and ${b}`,
-    seconds: 180,
+    seconds: 165,
     config: {
       prompt: [
         `Vouch sample items ${a} and ${b}: agree each GL entry to its support (amount, date and period, payee, business purpose and account).`,
         "Flag the GL line of any item with an exception and pick the reason. Leave items that agree unflagged.",
-        ...(last ? ["This is the last pair. Then give your conclusion on the whole sample of 8."] : []),
+        ...(k === 4 ? ["This is the last pair. Your conclusion on the whole sample of 8 comes next."] : []),
       ].join("\n"),
       document: {
         title: `Bluestem Manufacturing · Operating expenses, year ended December 31, ${YEAR} · Sample items ${a}–${b}`,
@@ -137,23 +139,28 @@ function vouchStep(k: number) {
       },
       reasons: VOUCH_REASONS,
       findings: [{ id: "exception", label: `Exception in items ${a}–${b}`, points: 5 }],
-      ...(last
-        ? {
-            decision: {
-              prompt: "Your conclusion on the sample of 8:",
-              options: [
-                { id: "no_exceptions", label: "No exceptions: operating expenses are supported" },
-                { id: "propose", label: "Exceptions noted: document them and work out the adjustment" },
-                { id: "replace", label: "Exceptions noted: replace those items with new sample items" },
-                { id: "client_fix", label: "Exceptions noted: ask the client to fix them; nothing to document" },
-              ],
-              points: 5,
-            },
-          }
-        : {}),
     },
   };
 }
+
+/** After the last pair: the conclusion on the whole sample. Always "exceptions noted", but the screen is the same for everyone. */
+const VOUCH_CONCLUSION = {
+  id: "vouch-conclusion",
+  type: MULTIPLE_CHOICE,
+  title: "Expense vouching: conclusion",
+  seconds: 60,
+  config: {
+    prompt: "Your conclusion on the sample of 8:",
+    options: [
+      { id: "no_exceptions", label: "No exceptions: operating expenses are supported" },
+      { id: "propose", label: "Exceptions noted: document them and work out the adjustment" },
+      { id: "replace", label: "Exceptions noted: replace those items with new sample items" },
+      { id: "client_fix", label: "Exceptions noted: ask the client to fix them; nothing to document" },
+    ],
+    select: "single" as const,
+    points: 5,
+  },
+};
 
 const money = (name: string) => ({ text: `{{${name}|money}}`, align: "right" as const });
 const bold = (text: string) => ({ text, bold: true });
@@ -506,6 +513,7 @@ export const auditCalderBluestem = defineScenario({
       vouchStep(2),
       vouchStep(3),
       vouchStep(4),
+      VOUCH_CONCLUSION,
       {
         id: "rapid-cutoff",
         type: RAPID_ROUND,
@@ -624,7 +632,7 @@ export const auditCalderBluestem = defineScenario({
         config: {
           prompt: [
             "For each sampled item, enter the misstatement: how much operating expenses are overstated, as a positive amount (0 if none).",
-            "Then the total, and the call from Marcus's memo: 1 if we propose the adjustment, 0 if we pass.",
+            "Then the total. Make the pass or propose call from Marcus's memo next.",
           ].join("\n"),
           columns: ["A", "B", "C", "D", "E"],
           rows: [
@@ -633,8 +641,21 @@ export const auditCalderBluestem = defineScenario({
             ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => [`#${n}`, `{{e${n}_ref}}`, `{{e${n}_payee}}`, money(`e${n}_amt`), input(`mis_${n}`, `Item #${n} misstatement`, 2)]),
             [null, null, null, null, null],
             [bold("Total misstatement"), null, null, null, input("total", "Total misstatement", 2)],
-            ["Propose (1) or pass (0)", null, null, null, input("propose", "Pass or propose call", 4, "number")],
           ],
+        },
+      },
+      {
+        id: "pass-or-propose",
+        type: MULTIPLE_CHOICE,
+        title: "Pass or propose",
+        config: {
+          prompt: "Your call on the total misstatement, using the clearly trivial threshold in Marcus's materiality memo:",
+          options: [
+            { id: "pass", label: "Pass: below clearly trivial" },
+            { id: "propose", label: "Propose the adjustment" },
+          ],
+          select: "single",
+          points: 4,
         },
       },
       {
@@ -815,7 +836,13 @@ export const auditCalderBluestem = defineScenario({
     ],
     sections: [
       { id: "s-rapid-a", title: "Rapid round A: tick and tie", minutes: 6, stepIds: ["rapid-tick"] },
-      { id: "s-vouch", title: "Expense vouching", minutes: 12, stepIds: ["vouch-1", "vouch-2", "vouch-3", "vouch-4"], oneAtATime: true },
+      {
+        id: "s-vouch",
+        title: "Expense vouching",
+        minutes: 12,
+        stepIds: ["vouch-1", "vouch-2", "vouch-3", "vouch-4", "vouch-conclusion"],
+        oneAtATime: true,
+      },
       { id: "s-rapid-b", title: "Rapid round B: cutoff", minutes: 6, stepIds: ["rapid-cutoff"] },
       {
         id: "s-inbox",
@@ -825,7 +852,12 @@ export const auditCalderBluestem = defineScenario({
         oneAtATime: true,
       },
       { id: "s-rapid-c", title: "Rapid round C: sample selection", minutes: 6, stepIds: ["rapid-sample"] },
-      { id: "s-wrap", title: "Summary and adjusting entries", minutes: 12, stepIds: ["misstatement-summary", "proposed-aje", "marcus-summary"] },
+      {
+        id: "s-wrap",
+        title: "Summary and adjusting entries",
+        minutes: 12,
+        stepIds: ["misstatement-summary", "pass-or-propose", "proposed-aje", "marcus-summary"],
+      },
     ],
   },
 
@@ -1044,7 +1076,7 @@ export const auditCalderBluestem = defineScenario({
       },
     });
     const vouchKeys = Object.fromEntries(
-      pairTraps.map((t, p) => [`vouch-${p + 1}`, p === 3 ? { ...findingKey(t), decision: ["propose"] } : findingKey(t)]),
+      pairTraps.map((t, p) => [`vouch-${p + 1}`, findingKey(t)]),
     );
 
     const call = propose
@@ -1056,6 +1088,7 @@ export const auditCalderBluestem = defineScenario({
       keys: {
         ...rapidKeys,
         ...vouchKeys,
+        "vouch-conclusion": { correct: ["propose"] },
         "controller-reply": {
           notes: {
             declines: `Item #${n("support")}, the ${fc(supportAmt)} ${consultant} accrual, stays in the sample: a selected item isn't skipped or swapped for an easier one.`,
@@ -1079,9 +1112,9 @@ export const auditCalderBluestem = defineScenario({
           cells: {
             ...Object.fromEntries(TRAPS.map((t) => [`mis_${n(t)}`, { value: d(trapItems[t].misstatement) }])),
             total: { value: d(total) },
-            propose: { value: propose ? 1 : 0, tolerance: 0 },
           },
         },
+        "pass-or-propose": { correct: [propose ? "propose" : "pass"] },
         "proposed-aje": {
           entries: {
             // Booked through payables; accept Cash if the candidate treats it as paid.

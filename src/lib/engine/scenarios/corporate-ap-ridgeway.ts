@@ -28,10 +28,12 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  * harder kind worth 1 point, the other ten are worth ½, so each round is
  * exactly 10. The order is shuffled per seed within each tier.
  *
+ * The clean match is answered with the "Nothing wrong here" confirm (every
+ * match screen offers it, so it gives nothing away) and Pay; the other three
+ * with a flag and Hold. Confirming a document that has a problem costs like a
+ * false flag (docs/06, `document_review` "nothing wrong here").
+ *
  * Shaped by the current step types (draft: needs accountant review):
- * - `document_review` needs at least one finding per document, so the clean
- *   match is answered by flagging its "Three-way match" row with "All three
- *   agree". Pay / Hold is the decision.
  * - Posting a held invoice too isn't penalised by `journal_entry` (extra
  *   entries score 0 and are listed for the reviewer).
  * - Both written replies need a reviewer, so a perfect attempt shows 85
@@ -120,7 +122,7 @@ function matchStep(k: number) {
     config: {
       prompt: [
         "Compare the purchase order, the receiving report and the invoice.",
-        "Flag the item that breaks the match and choose the reason. If all three agree and the invoice hasn't been paid before, flag the Three-way match row with \"All three agree\" instead.",
+        "Flag the item that breaks the match and choose the reason. If all three agree and the invoice hasn't been paid before, tick \"Nothing wrong here\" instead.",
         "Then choose Pay or Hold.",
       ].join("\n"),
       document: {
@@ -133,7 +135,6 @@ function matchStep(k: number) {
           { id: "invoice_date", label: "Invoice date", value: `{{${p}_inv_date}}` },
           { id: "terms", label: "Terms", value: "Net 30" },
           { id: "prior", label: "Last payment to this vendor", value: `Invoice {{${p}_prior_inv}} · {{${p}_prior_amt|money}} · paid Oct 15 by ACH` },
-          { id: "match", label: "Three-way match", value: "PO ↔ receiving report ↔ invoice" },
         ],
         columns: MATCH_COLUMNS,
         rows: [1, 2, 3].map((j) => {
@@ -151,10 +152,10 @@ function matchStep(k: number) {
         { id: "duplicate", label: "Duplicate: already paid" },
         { id: "math", label: "Amount doesn't equal qty × price" },
         { id: "support", label: "Missing PO or receiving report" },
-        { id: "agrees", label: "All three agree" },
         { id: "other", label: "Other" },
       ],
       findings: [{ id: "result", label: "Three-way match result", points: 3 }],
+      confirmClean: { label: "Nothing wrong here", points: 3 },
       falseFlagPenalty: 1,
       decision: {
         prompt: "Pay this invoice in today's run, or hold it?",
@@ -1005,6 +1006,8 @@ export const corporateApRidgeway = defineScenario({
     // ---- Keys ----
     const d = (cents: number) => cents / 100;
     const matchKey = (doc: (typeof docs)[number]) => {
+      // Clean: no findings; "Nothing wrong here" earns the finding's 3 points.
+      if (doc.trap === "clean") return { findings: {}, clean: true, decision: ["pay"] };
       const line = doc.lines[doc.bad];
       const finding = {
         short: {
@@ -1022,13 +1025,8 @@ export const corporateApRidgeway = defineScenario({
           reasons: ["duplicate"],
           note: `Invoice ${doc.inv} for ${formatCents(doc.total)} was already paid on Oct 15.`,
         },
-        clean: {
-          targets: ["match"],
-          reasons: ["agrees"],
-          note: `PO, receiving report and invoice agree on every line; ${formatCents(doc.total)} is payable today.`,
-        },
       }[doc.trap];
-      return { findings: { result: finding }, decision: [doc.trap === "clean" ? "pay" : "hold"] };
+      return { findings: { result: finding }, decision: ["hold"] };
     };
     const merchTotal = clean.lines.filter((l) => !l.store).reduce((s, l) => s + l.amt, 0);
     const suppliesTotal = clean.lines.filter((l) => l.store).reduce((s, l) => s + l.amt, 0);

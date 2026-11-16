@@ -245,11 +245,11 @@ Sections run back to back (docs/06 "Timed sections and rapid rounds"); a finishe
 | # | Section | Minutes | Steps | Messages on arrival |
 | --- | --- | --- | --- | --- |
 | 1 | Rapid round A: tick and tie | 6 | `rapid-tick` (15 × 20 s) | Marcus: warm-up while he pulls the sample |
-| 2 | Expense vouching, one screen at a time | 12 | `vouch-1` … `vouch-4`, 3 min each | Marcus: vouch the sample of 8 |
+| 2 | Expense vouching, one screen at a time | 12 | `vouch-1` … `vouch-4`, 2¾ min each, then `vouch-conclusion` 1 min | Marcus: vouch the sample of 8 |
 | 3 | Rapid round B: cutoff | 6 | `rapid-cutoff` (15 × 20 s) | Marcus: cutoff testing |
 | 4 | Inbox, one screen at a time | 10 | `controller-reply` 4 min, `exception-count` 1.5 min, `exception-total` 1.5 min, `bank-confirm` 3 min | Renee: "Can you just skip that one?"; Marcus: how many exceptions, and the total; the bank confirmation is back $X higher / lower |
 | 5 | Rapid round C: sample selection | 6 | `rapid-sample` (15 × 20 s) | Marcus: sample selection |
-| 6 | Summary and adjusting entries | 12 | `misstatement-summary`, `proposed-aje`, `marcus-summary` | Marcus: materiality memo (overall, performance 75%, clearly trivial 5%; pass below clearly trivial, propose at or above); draft the adjusting entries; summary for partner review |
+| 6 | Summary and adjusting entries | 12 | `misstatement-summary`, `pass-or-propose`, `proposed-aje`, `marcus-summary` | Marcus: materiality memo (overall, performance 75%, clearly trivial 5%; pass below clearly trivial, propose at or above); draft the adjusting entries; summary for partner review |
 
 ### Rapid rounds (30 points, `rapid_round` × 3)
 
@@ -262,7 +262,7 @@ Sections run back to back (docs/06 "Timed sections and rapid rounds"); a finishe
    - *How many:* five consecutive item numbers, same rule; the answer is 1–4. Interval picks are always under the threshold, so the count is the same whether or not the interval skips key items.
    - *Missing check:* a six-line December check register with one number missing from the sequence; pick it from four numbers (the other three are in the register).
 
-### Part 1 · Expense vouching (25 points, `document_review` × 4)
+### Part 1 · Expense vouching (25 points, `document_review` × 4 + `multiple_choice`)
 
 Each pair shows, per item, the GL line (ref, date, payee, description, account, amount) and the support row (vendor invoice, card receipt, or "No support provided"). The candidate flags the GL line of each exception with a reason. One trap per pair:
 
@@ -273,7 +273,7 @@ Each pair shows, per item, the GL line (ref, date, payee, description, account, 
 | Personal | Card receipt for a ski lodge family stay, jewelry, pet boarding or private boat storage, cardholder an officer, booked as "Client entertainment" | Not a business expense | Full amount |
 | No support | Round-number 12/31 manual accrual ("Q4 consulting"), no invoice, contract or engagement letter; client says the officer agreed it by phone | No support | Full amount |
 
-The four clean items agree on amount, date, payee and period. One clean option is a real client dinner booked to entertainment with attendees and business purpose on the receipt, so "entertainment" alone isn't the tell. After the last pair the candidate concludes on the sample: **"Exceptions noted: document them and work out the adjustment"** (not "no exceptions", "replace those items", or "ask the client to fix them").
+The four clean items agree on amount, date, payee and period. One clean option is a real client dinner booked to entertainment with attendees and business purpose on the receipt, so "entertainment" alone isn't the tell. After the last pair, a one-minute screen (`vouch-conclusion`, `multiple_choice`, single select, 5) asks for the conclusion on the sample: **"Exceptions noted: document them and work out the adjustment"** (not "No exceptions", "replace those items with new sample items", or "ask the client to fix them; nothing to document"). The options are the same for every candidate.
 
 ### Part 2 · Inbox under pressure (15 points)
 
@@ -283,7 +283,8 @@ The four clean items agree on amount, date, payee and period. One clean option i
 
 ### Part 3 · Proposed adjustment (30 points)
 
-- **Summary of misstatements (`spreadsheet`, 14):** one row per sampled item; the four exception cells (2 each), the total (2), and the call: 1 = propose, 0 = pass (4). Clean items aren't scored. Total = sum of the four planted errors for every seed. The threshold is seeded so roughly half of candidates should pass and half propose.
+- **Summary of misstatements (`spreadsheet`, 10):** one row per sampled item; the four exception cells (2 each) and the total (2). Clean items aren't scored. Total = sum of the four planted errors for every seed.
+- **Pass or propose (`multiple_choice`, single select, 4):** **"Pass: below clearly trivial"** or **"Propose the adjustment"**, against the clearly trivial threshold in Marcus's memo. The threshold is seeded so roughly half of candidates should pass and half propose; the screen is the same for everyone.
 - **Adjusting entries (`journal_entry`, 4 × 2):**
 
 | Entry | Debit | Credit |
@@ -301,13 +302,14 @@ The four clean items agree on amount, date, payee and period. One clean option i
 | --- | --- |
 | Rapid round A: tick and tie (15 items, 2 fields each) | 10 |
 | Vouching: 4 exceptions × 5 (half for the right item with the wrong reason; −1 per false flag) | 20 |
-| Vouching: conclusion on the sample | 5 |
+| Vouching: conclusion on the sample (multiple choice) | 5 |
 | Rapid round B: cutoff (15 items, 2 fields each) | 10 |
 | Reply to the controller (reviewer) | 5 |
 | Exception count / total misstatement | 2 / 3 |
 | Bank confirmation: flag / next step | 2 / 3 |
 | Rapid round C: sample selection (15 items, 1 field each) | 10 |
-| Summary of misstatements: 4 items × 2, total 2, pass or propose 4 | 14 |
+| Summary of misstatements: 4 items × 2, total 2 | 10 |
+| Pass or propose (multiple choice) | 4 |
 | Adjusting entries: 4 × 2 | 8 |
 | Summary to Marcus (reviewer) | 8 |
 | **Total** | **100** |
@@ -316,7 +318,6 @@ A perfect attempt shows 87 automatic points until a reviewer marks the two repli
 
 ### Accepted for v1 (forced by the current step types)
 
-- The pass/propose call is a number cell (1 or 0) in the summary spreadsheet; there is no multiple-choice step type yet.
 - Each vouching pair holds exactly one exception, because `document_review` findings are fixed in the config. Trap types and positions move per seed.
 - The controller mentions one missing item, not two, so the four planted traps stay as specified.
 - Message senders (Marcus Avery, Renee Okafor) are fixed: `from` lines aren't templated. Everything inside the messages is seeded.
@@ -333,7 +334,7 @@ A perfect attempt shows 87 automatic points until a reviewer marks the two repli
 - Rapid round A: a January-dated document against a December schedule line counts as "date or cutoff" whatever the document type, including a bank confirmation dated in January.
 - Rapid round B: FOB terms decide the year for purchases as well as sales; the invoice date never does. "Recorded in GL" is the posting date.
 - Rapid round C: the sample-selection rule ("every item over $T, plus every kth item number starting at #s") and the reading that the interval runs over item numbers, key items included; the seeding avoids any line where the two readings would differ.
-- Section lengths: 3 minutes per vouching pair, 4 minutes for the controller reply.
+- Section lengths: 2¾ minutes per vouching pair plus 1 minute for the sample conclusion, 4 minutes for the controller reply.
 
 ## Example 6: Corporate AP intern, payment run day (52 min, 100 points)
 
@@ -416,9 +417,9 @@ Planted, one each, shuffled across the four documents:
 | Short shipment | Timberline Packs: fleece pullovers ordered 14, received 11, billed 14 | Flag the line (or the total), reason "Billed for more than we received"; Hold |
 | Price above PO | Granite Peak Footwear: water bottles billed $12.77 a unit, PO $11.40 | Flag the line (or the total), reason "Price is higher than the PO"; Hold |
 | Already paid | High Desert Hydration: invoice HDH-31099 $1,622.85; "Last payment to this vendor: Invoice HDH-31099 · $1,622.85 · paid Oct 15" | Flag the invoice number (or the last-payment row), reason "Duplicate: already paid"; Hold |
-| Clean match | Lakeshore Lantern Co.: everything agrees, $1,069.56 | Flag the "Three-way match" row with "All three agree"; Pay |
+| Clean match | Lakeshore Lantern Co.: everything agrees, $1,069.56 | Tick "Nothing wrong here" (`document_review` `confirmClean`, 3); Pay |
 
-Every document shows a last payment, so its presence gives nothing away; only the duplicate's invoice number matches it. The duplicate's PO, receiving report and invoice are dated September / October, the others late October / November.
+Every match screen offers "Nothing wrong here" (it can't be ticked while items are flagged), so its presence gives nothing away. Ticking it on a document that has a problem costs 1, like a false flag. Every document shows a last payment, so its presence gives nothing away either; only the duplicate's invoice number matches it. The duplicate's PO, receiving report and invoice are dated September / October, the others late October / November.
 
 Then a `journal_entry` step posts the approved invoice (the clean one): Dr Merchandise Inventory (the two merchandise lines, $764.70), Dr Store Supplies Expense (the store-use line, $304.86) / Cr Accounts Payable $1,069.56. The prompt asks for one debit line per account. Priya's two pre-approved bills are already posted.
 
@@ -452,7 +453,7 @@ Scoring: each of the four planted items 4, each adjusted balance 2. The keying e
 | Area | What earns points | Points |
 | --- | --- | --- |
 | Rapid A: JE flash | Debit and credit, half the item each; 10 items × ½ + 5 × 1 | 10 |
-| Three-way match | Per document: the right flag and reason 3 (half for the right item with another reason), Pay / Hold 2; × 4 | 20 |
+| Three-way match | Per document: the right flag and reason 3 (half for the right item with another reason), or "Nothing wrong here" on the clean match 3; Pay / Hold 2; × 4 | 20 |
 | Posting | The clean invoice to Inventory, Supplies and AP | 5 |
 | Rapid B: pay or hold | Decision and reason, half the item each | 10 |
 | Vendor reply | Rubric (reviewer) | 5 |
@@ -463,12 +464,11 @@ Scoring: each of the four planted items 4, each adjusted balance 2. The keying e
 | Note to Priya | Rubric (reviewer) | 10 |
 | **Total** | | **100** |
 
-A perfect attempt shows 85 automatic points until a reviewer marks the two replies. Each trap answered wrongly costs exactly its own points (tested): paying the duplicate, the short shipment or the price variance costs that document's 5; holding the clean invoice costs 5; updating the bank details without flags costs 6, and calling the number in the email or replying to it costs the 2 decision points. Knock-on effects are scored where they land: a run total that includes a held invoice loses the 4 numeric points.
+A perfect attempt shows 85 automatic points until a reviewer marks the two replies. Each trap answered wrongly costs exactly its own points (tested): paying the duplicate, the short shipment or the price variance costs that document's 5; holding the clean invoice with an invented problem costs 5; paying it without ticking "Nothing wrong here" costs 3; ticking it on a document with a problem costs 1; updating the bank details without flags costs 6, and calling the number in the email or replying to it costs the 2 decision points. Knock-on effects are scored where they land: a run total that includes a held invoice loses the 4 numeric points.
 
 ### Judgment calls for the accountant review
 
 - Policy is strict (no price tolerance, hold the whole invoice on a short shipment). Many companies short-pay the received quantity or allow a small price tolerance; Priya's email states the strict policy so the key is unambiguous.
-- The clean match is answered by flagging a "Three-way match" row with "All three agree", because `document_review` needs at least one finding per document. This reads oddly next to the red Flag buttons.
 - Posting a held invoice as well isn't penalised by `journal_entry` (extra entries score 0 and are listed for the reviewer).
 - Merchandise goes to inventory (perpetual system), store-use items to Store Supplies Expense. The journal step asks for one debit line per account, because splitting inventory over two lines costs the leftover-line penalty.
 - The unreceived invoice is added on our side of the rec (we owe it once received and approved), and the credit memo is booked against Merchandise Inventory (returned goods). An accountant may prefer a purchase returns account or to leave the unreceived invoice as a vendor-side item until it's verified.
