@@ -160,3 +160,70 @@ describe("DocumentReviewStep", () => {
     }
   });
 });
+
+describe('DocumentReviewStep "nothing wrong here"', () => {
+  const withClean: DocumentReviewPublicConfig = { ...config, confirmClean: { label: "Nothing wrong with this invoice" } };
+  const confirm = () => screen.getByRole("checkbox", { name: "Nothing wrong with this invoice" });
+
+  it("isn't offered unless the config asks for it, and answers keep their old shape", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    await user.click(flagButton("Pine straw"));
+    expect(onChange.mock.lastCall?.[0]).not.toHaveProperty("clean");
+  });
+
+  it("confirming emits clean: true with no flags; unconfirming clears it", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness cfg={withClean} onChange={onChange} />);
+    expect(confirm()).not.toBeChecked();
+    await user.click(confirm());
+    expect(onChange).toHaveBeenLastCalledWith({ flags: [], decision: null, clean: true });
+    await user.click(confirm());
+    expect(onChange).toHaveBeenLastCalledWith({ flags: [], decision: null, clean: false });
+  });
+
+  it("a confirmed document can't be flagged until the confirm is removed", async () => {
+    const user = userEvent.setup();
+    render(<Harness cfg={withClean} />);
+    await user.click(confirm());
+    expect(flagButton("Pine straw")).toBeDisabled();
+    expect(screen.getByText("Remove the confirmation to flag items.")).toBeVisible();
+    await user.click(confirm());
+    expect(flagButton("Pine straw")).toBeEnabled();
+  });
+
+  it("can't be confirmed while items are flagged, and says why", async () => {
+    const user = userEvent.setup();
+    render(<Harness cfg={withClean} />);
+    await user.click(flagButton("Pine straw"));
+    expect(confirm()).toBeDisabled();
+    expect(confirm()).toHaveAccessibleDescription("Remove your flags to confirm the document is clean.");
+    await user.click(flagButton("Pine straw"));
+    expect(confirm()).toBeEnabled();
+  });
+
+  it("keeps the decision alongside the confirm", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness cfg={withClean} onChange={onChange} />);
+    await user.click(screen.getByRole("radio", { name: "Approve" }));
+    await user.click(confirm());
+    expect(onChange).toHaveBeenLastCalledWith({ flags: [], decision: "approve", clean: true });
+  });
+
+  it("restores a saved confirm, and an old saved answer as not confirmed", () => {
+    const { unmount } = render(<Harness cfg={withClean} initial={{ flags: [], decision: null, clean: true }} />);
+    expect(confirm()).toBeChecked();
+    unmount();
+    render(<Harness cfg={withClean} initial={{ flags: [], decision: null }} />);
+    expect(confirm()).not.toBeChecked();
+  });
+
+  it("is disabled when the step is", () => {
+    render(<Harness cfg={withClean} disabled />);
+    expect(confirm()).toBeDisabled();
+  });
+});

@@ -1,4 +1,4 @@
-/** Report rows (answer next to expected) for journal_entry and document_review. No database. */
+/** Report rows (answer next to expected) for journal_entry, document_review, multiple_choice and rapid_round. No database. */
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -6,6 +6,8 @@ vi.mock("server-only", () => ({}));
 const { describeStep } = await import("@/lib/results/answer-key");
 const { journalEntryServer } = await import("@/lib/engine/step-types/journal_entry/server");
 const { documentReviewServer } = await import("@/lib/engine/step-types/document_review/server");
+const { multipleChoiceServer } = await import("@/lib/engine/step-types/multiple_choice/server");
+const { rapidRoundServer } = await import("@/lib/engine/step-types/rapid_round/server");
 
 const row = <R extends { id: string }>(rows: R[], id: string): R => {
   const r = rows.find((x) => x.id === id);
@@ -224,5 +226,195 @@ describe("document_review report rows", () => {
     expect(d.answerText).toBeNull();
     expect(d.rows.map((r) => r.id)).toEqual(["overbill", "duplicate", "total-wrong", "decision"]);
     expect(row(d.rows, "overbill").answer).toBe("(not flagged)");
+  });
+
+  describe('"nothing wrong here"', () => {
+    const cleanConfig = { ...config, confirmClean: {} };
+    const cleanStep = { ...step, config: cleanConfig };
+    const describeClean = (k: unknown, flags: Flag[], clean: boolean, decision: string | null = "hold") => {
+      const answer = { ...answerOf(flags, decision), clean };
+      const v = { ...variant, keys: { dr: k } };
+      const score = documentReviewServer.score({
+        config: documentReviewServer.configSchema.parse(cleanConfig),
+        key: documentReviewServer.keySchema.parse(k),
+        variant: v,
+        answer,
+      });
+      return describeStep(cleanStep, v, answer, score);
+    };
+    const cleanKey = { findings: {}, clean: true, decision: ["pay"] };
+
+    it("on a clean document: one 'Nothing wrong' row instead of the findings", () => {
+      const d = describeClean(cleanKey, [], true, "pay");
+      expect(d.rows.map((r) => r.id)).toEqual(["clean", "decision"]);
+      expect(row(d.rows, "clean")).toMatchObject({
+        label: "Nothing wrong",
+        answer: "Confirmed nothing wrong",
+        expected: "Confirm nothing is wrong",
+        earned: 6,
+        max: 6,
+      });
+      expect(row(describeClean(cleanKey, [], false, "pay").rows, "clean")).toMatchObject({ answer: "(not confirmed)", earned: 0 });
+    });
+
+    it("on a clean document, flags are listed as false flags", () => {
+      const d = describeClean(cleanKey, [{ target: "rock", reason: "qty" }], true, "pay");
+      expect(row(d.rows, "false-flags")).toMatchObject({ answer: 'line "River rock": Quantity doesn\'t match the PO', earned: -1 });
+    });
+
+    it("on a document with issues, a wrong confirm is listed with the false flags", () => {
+      const d = describeClean(keyDr, [{ target: "rock", reason: "qty" }], true);
+      expect(d.rows.map((r) => r.id)).toEqual(["overbill", "duplicate", "total-wrong", "decision", "false-flags"]);
+      expect(row(d.rows, "false-flags")).toMatchObject({ answer: "Confirmed nothing wrong", expected: "None", earned: -1 });
+    });
+
+    it("an old answer without the confirm shows the same rows as before", () => {
+      const before = describeDr([{ target: "rock", reason: "qty" }], "hold");
+      const answer = answerOf([{ target: "rock", reason: "qty" }], "hold");
+      const score = documentReviewServer.score({
+        config: documentReviewServer.configSchema.parse(cleanConfig),
+        key: documentReviewServer.keySchema.parse(keyDr),
+        variant,
+        answer,
+      });
+      expect(describeStep(cleanStep, variant, answer, score).rows).toEqual(before.rows);
+    });
+  });
+});
+
+describe("multiple_choice report rows", () => {
+  const config = {
+    prompt: "Which are assets of {{client}}?",
+    options: [
+      { id: "cash", label: "Cash" },
+      { id: "ar", label: "Accounts receivable" },
+      { id: "ap", label: "Accounts payable" },
+    ],
+    select: "multi",
+    points: 2,
+  };
+  const step = { id: "mc", type: "multiple_choice", title: "Assets", config };
+  const variant = { values: { client: "Harbor Lane" }, keys: { mc: { correct: ["cash", "ar"] } } };
+
+  it("puts the picked options next to the right ones, with the points", () => {
+    const answer = { selected: ["cash", "ap"] };
+    const score = multipleChoiceServer.score({
+      config: multipleChoiceServer.configSchema.parse(config),
+      key: multipleChoiceServer.keySchema.parse(variant.keys.mc),
+      variant,
+      answer,
+    });
+    const d = describeStep(step, variant, answer, score);
+    expect(d.answerText).toBeNull();
+    expect(d.rows).toEqual([
+      {
+        id: "answer",
+        label: "Answer",
+        prompt: "Which are assets of Harbor Lane?",
+        answer: "Cash; Accounts payable",
+        expected: "Cash; Accounts receivable",
+        earned: 0,
+        max: 2,
+        note: expect.stringContaining("1 wrong pick"),
+      },
+    ]);
+  });
+
+  it("handles an unanswered, unscored step", () => {
+    const d = describeStep(step, variant, undefined, null);
+    expect(d.rows).toEqual([{ id: "answer", label: "Answer", prompt: "Which are assets of Harbor Lane?", answer: "(not answered)", expected: "Cash; Accounts receivable" }]);
+  });
+});
+
+describe("rapid_round report rows", () => {
+  const choices = [
+    { id: "cash", label: "Cash" },
+    { id: "rent_expense", label: "Rent expense" },
+    { id: "supplies", label: "Supplies" },
+  ];
+  const config = {
+    intro: "Quick checks.",
+    secondsPerItem: 20,
+    items: [
+      {
+        id: "rent",
+        prompt: "Paid rent of {{rent|money}} by check.",
+        fields: [
+          { id: "debit", label: "Debit", kind: "choice", options: choices },
+          { id: "credit", label: "Credit", kind: "choice", options: choices },
+        ],
+      },
+      {
+        id: "dep",
+        prompt: "Monthly depreciation on {{equip|money}}?",
+        fields: [{ id: "amount", label: "Amount", kind: "number", unit: "$", decimals: 2 }],
+        points: 2,
+      },
+      {
+        id: "count",
+        prompt: "How many units?",
+        fields: [{ id: "units", label: "Units", kind: "number", decimals: 0 }],
+      },
+    ],
+  };
+  const step = { id: "quick", type: "rapid_round", title: "Rapid checks", config };
+  const key = {
+    items: {
+      rent: { debit: { choice: "rent_expense" }, credit: { choice: "cash" } },
+      dep: { amount: { value: 1250.5, tolerance: 5 } },
+      count: { units: { value: 12 } },
+    },
+  };
+  const variant = { values: { rent: 250_000, equip: 1_200_000 }, keys: { quick: key } };
+  const answer = {
+    items: {
+      rent: { values: { debit: "rent_expense", credit: "supplies" }, ms: 4_200 },
+      dep: { values: { amount: 1250.5 }, ms: 6_000 },
+    },
+  };
+  const scored = () =>
+    rapidRoundServer.score({ config: rapidRoundServer.configSchema.parse(config), key: rapidRoundServer.keySchema.parse(key), variant, answer });
+
+  it("one row per item: its prompt, the candidate's values, the right values and the response time", () => {
+    const d = describeStep(step, variant, answer, scored());
+    expect(d.answerText).toBeNull();
+    expect(d.rows.some((r) => r.id === "__key")).toBe(false);
+    expect(d.rows.map((r) => r.id)).toEqual(["rent", "dep", "count", "timing"]);
+    expect(row(d.rows, "rent")).toMatchObject({
+      label: "Item 1",
+      prompt: "Paid rent of $2,500.00 by check.",
+      answer: "Debit: Rent expense; Credit: Supplies",
+      expected: "Debit: Rent expense; Credit: Cash",
+      responseMs: 4_200,
+      earned: 0.5,
+      max: 1,
+    });
+    expect(row(d.rows, "dep")).toMatchObject({
+      label: "Item 2",
+      prompt: "Monthly depreciation on $12,000.00?",
+      answer: "Amount: $1,250.50",
+      expected: "Amount: $1,250.50 (± 5)",
+      responseMs: 6_000,
+      earned: 2,
+      max: 2,
+    });
+    expect(row(d.rows, "count")).toMatchObject({ label: "Item 3", answer: "(not answered)", expected: "Units: 12", earned: 0, max: 1 });
+    expect(row(d.rows, "count").responseMs).toBeUndefined();
+  });
+
+  it("ends with the response-time summary from the score, without points", () => {
+    const timing = row(describeStep(step, variant, answer, scored()).rows, "timing");
+    expect(timing).toEqual({ id: "timing", label: "Response time", answer: "Median response 5.1s over 2 answered; 1 with no answer.", expected: "—" });
+  });
+
+  it("handles an unanswered, unscored step", () => {
+    const d = describeStep(step, variant, undefined, null);
+    expect(d.rows.map((r) => r.id)).toEqual(["rent", "dep", "count"]);
+    expect(row(d.rows, "rent")).toMatchObject({ answer: "(not answered)", expected: "Debit: Rent expense; Credit: Cash" });
+  });
+
+  it("without the seed, shows the prompts unfilled and no expected values", () => {
+    const d = describeStep(step, null, answer, null);
+    expect(row(d.rows, "rent")).toMatchObject({ prompt: "Paid rent of {{rent|money}} by check.", expected: "—" });
   });
 });

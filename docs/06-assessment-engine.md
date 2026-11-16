@@ -46,7 +46,7 @@ interface StepScore {
 | `numeric` | Single calculations (e.g., dosage) | Tolerance | MVP |
 | `ordering` | Sequence steps of a procedure | Position-weighted | Later |
 
-First two to build for the skeleton: `inbox_reply` and `spreadsheet`. Built so far: `numeric`, `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review` (see "As built" below).
+First two to build for the skeleton: `inbox_reply` and `spreadsheet`. Built so far: `numeric`, `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`, `rapid_round`, `multiple_choice` (see "As built" below).
 
 ## Variants (anti-leak)
 
@@ -97,7 +97,8 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 | `inbox_reply` | Prompt, to, subject, character limit | `{ body }` (≤ 20,000 chars) | Rubric criteria with guidance and per-variant reference notes. A written reply scores 0 provisional points with `needsReview` and a person marks it; a blank one is final at 0. An AI scorer runs in shadow mode only (below) |
 | `spreadsheet` | Grid of read-only cells and number input cells | `{ cells: { id: number \| null } }` | Each keyed cell full within its tolerance, else 0. Input cells not in the key are scratch |
 | `journal_entry` | Prompt, chart of accounts (code + name), entry and line limits; running totals and a "Balanced / Out of balance by" check per entry | `{ entries: [{ memo, lines: [{ account, debit, credit }] }] }` | See below |
-| `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision | `{ flags: [{ target, reason, note }], decision }`, one flag per item | See below |
+| `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision; optional "nothing wrong here" confirm | `{ flags: [{ target, reason, note }], decision, clean? }`, one flag per item | See below |
+| `multiple_choice` | Prompt (the group's name) and options as radios (`select: "single"`) or checkboxes (`"multi"`) | `{ selected: [optionId] }` | See below |
 | `rapid_round` | One quick item at a time with its own countdown | `{ items: { [itemId]: { values, ms } } }` | Per item, plus a timing line; see "Timed sections and rapid rounds" |
 
 **`journal_entry` scoring.** The config lists the expected entries (`id`, `label`, `points`, default 3); the key gives each one's lines as `{ accounts, side, amount }`, where `accounts` may list several acceptable accounts (docs/07: COGS or Accounts payable for the #1043 fix). Key entries must balance. Per expected entry:
@@ -115,7 +116,19 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 - False flags appear as one "False flags" item with negative `earned` and `max` 0. The deduction is capped at the points earned elsewhere, so the step never goes below 0 and `points` always equals the sum of item `earned`.
 - Flags on ids that aren't in the document are ignored.
 
-Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`) are skipped.
+**`document_review` "nothing wrong here".** Optional, for documents that are clean in some variants, so a candidate doesn't have to invent a finding. The config adds `confirmClean: { label (default "Nothing wrong with this document"), points? }`; the candidate sees the label as a checkbox under the document (it can't be ticked while items are flagged, and items can't be flagged while it is ticked). The answer gets `clean: true | false`, sent only when the config offers the confirm. The key says `clean: true` for a variant whose document has no issues; then its `findings` must be empty and the config's findings are not scored in that variant. A config may list no findings at all only when it has `confirmClean` (every variant clean).
+
+- Clean document: one "Nothing wrong" item worth `confirmClean.points`, earned only when confirmed. `points` defaults to the findings' total (2 when there are none), so every variant of the step has the same maximum. Flags on a clean document are false flags.
+- Document with issues: confirming it clean costs `falseFlagPenalty`, like one more false flag, in the same "False flags" item and under the same cap.
+- Backwards compatible: configs without `confirmClean`, keys without `clean` and answers without `clean` score exactly as before; a stray `clean` in an answer is ignored when the config doesn't offer the confirm.
+
+**`multiple_choice` scoring.** Config: `prompt` and option labels (both may hold `{{templates}}`), `options: [{ id, label }]` (2 to 20, unique ids), `select: "single" | "multi"` (default single), `points` (default 1). Key: `{ correct: [optionId] }`, exactly one for single, one or more for multi. One "Answer" item:
+
+- Single: full points when exactly the right option is picked, else 0.
+- Multi: each right option picked earns `points / (right options)`; each wrong option picked costs `points / (wrong options)`, so picking every option earns 0. Floored at 0, rounded to 0.01. When every option is right, wrong picks can't happen.
+- Picks that aren't options are ignored. The note lists the picks and, unless full marks, the expected options.
+
+Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`, `choice`, `correct`) are skipped, but only id-shaped strings in them: a note or sentence under one of those fields is still checked. Keys whose secret is *which* public id is right (`multiple_choice`) or whether a document is clean can't be caught by a string search, so a test-only scenario (`tests/engine/key-variants.ts`) keeps the values fixed and varies only the keys, and the tests require the payload and DOM to be identical across seeds.
 
 ### Timed sections and rapid rounds
 
@@ -150,7 +163,12 @@ Some tests need parts with their own clock: a two-minute burst of quick checks, 
 
 The demo `demo-timed-close` (12 minutes) has three sections: "Quick checks" (2 minutes, a four-item rapid round: two journal-entry flashes, a pay / hold invoice with a seeded exhibit and a depreciation amount), "Work screens" (3 minutes, one at a time: allowance for doubtful accounts, 90 s; monthly insurance expense, 90 s) and "Reply" (4 minutes, an email from the owner linked to the reply step), plus an intro message at the start.
 
-Not built yet: report rows comparing timing across the attempt (answers within 2 s of returning to the window, rapid-round speed vs the long tasks); a company-report view of rapid answers beyond the per-item notes.
+**Company report.** `describeStep` (`src/lib/results/answer-key.ts`, server only, rendered only on org-member pages) gives one row per rapid item: `Item N`, the prompt with templates filled, the candidate's values (`Debit: Rent expense; Credit: Cash`, numbers with unit and decimals), the expected values from the key (a tolerance shown only when it's at least the last shown decimal) and the server-measured response time; then the step's "Response time" line. The report table adds a Time column when rows have times.
+
+**Report rows for timing (evidence only).** When the scenario has a `rapid_round`, the report shows a Timing card (`src/lib/results/timing.ts`, computed in `getCandidateReport` with the member's own client, so RLS applies). Neither row changes the score, `integrity_label`, flags or `src/lib/proctoring/rules.ts`; the card says so, and its wording is neutral.
+
+- *Answered within 2 s of returning to the window:* each `answered_item` action event (time from its payload, server clock) is joined with the latest `returned_to_window` browser signal at or before it; answers within 2 s (`QUICK_AFTER_RETURN_MS`) are listed with the item, the gap, how long the candidate was away and when. Return times come from the browser's clock, so a small clock skew can move an answer across the 2 s line.
+- *Rapid round vs other tasks:* rapid-round score % against every other step's score %, points pooled on each side, leaving out steps still waiting for a reviewer. Shown when the two are 30 points or more apart (`RAPID_GAP_POINTS`), in either direction.
 
 ### AI rubric scoring, shadow mode (decision D8)
 
