@@ -35,13 +35,14 @@ type Doc = {
   document: { title: string; fields: Field[]; columns: string[]; rows: { id: string; cells: string[] }[]; totals: Field[] };
   reasons: { id: string; label: string }[];
   decision?: { prompt: string; options: { id: string; label: string }[] };
+  confirmClean?: { label: string };
 };
 type Cell = { kind: "text"; text: string } | { kind: "input"; id: string } | { kind: "empty" };
 type Grid = { prompt: string; columns: string[]; rows: Cell[][] };
 type KeyLine = { accounts: string[]; side: "debit" | "credit"; amount: number };
 type JeKey = { entries: Record<string, { lines: KeyLine[] }> };
 type SheetKey = { cells: Record<string, { value: number }> };
-type ReviewKey = { findings: Record<string, { targets: string[]; reasons: string[]; note?: string }>; decision?: string[] };
+type ReviewKey = { findings: Record<string, { targets: string[]; reasons: string[]; note?: string }>; decision?: string[]; clean?: boolean };
 type ReplyKey = { notes: Record<string, string> };
 type Trap = "short" | "price" | "duplicate" | "clean";
 
@@ -366,14 +367,12 @@ const entry = (lines: [string, number | null, number | null][], memo = "") => ({
 /** A strong candidate's answers, built only from the screen. */
 function perfectAnswers(seed: string) {
   const { matches, byTrap, docs } = screen(seed);
-  const reasonFor: Record<Trap, string> = { short: "qty", price: "price", duplicate: "duplicate", clean: "agrees" };
+  const reasonFor: Record<Exclude<Trap, "clean">, string> = { short: "qty", price: "price", duplicate: "duplicate" };
   const matchAnswers = Object.fromEntries(
     matches.map((m, i) => {
-      const target = m.trap === "short" ? m.short[0].id : m.trap === "price" ? m.price[0].id : m.trap === "duplicate" ? "invoice_no" : "match";
-      return [
-        MATCH_STEPS[i],
-        { flags: [{ target, reason: reasonFor[m.trap], note: "" }], decision: m.trap === "clean" ? "pay" : "hold" },
-      ];
+      if (m.trap === "clean") return [MATCH_STEPS[i], { flags: [] as { target: string; reason: string; note: string }[], decision: "pay", clean: true }];
+      const target = m.trap === "short" ? m.short[0].id : m.trap === "price" ? m.price[0].id : "invoice_no";
+      return [MATCH_STEPS[i], { flags: [{ target, reason: reasonFor[m.trap], note: "" }], decision: "hold", clean: false }];
     }),
   );
   expect(docs.length).toBe(4);
@@ -516,20 +515,42 @@ describe("corporate-ap-ridgeway: every variant is internally consistent", () => 
     }
   });
 
-  it("the match keys agree with the documents: hold the three exceptions, pay the clean one", () => {
+  it("the match keys agree with the documents: hold the three exceptions, confirm and pay the clean one", () => {
     for (const seed of SEEDS) {
       const { matches } = screen(seed);
       const keys = scenario.generate(seed).keys;
       matches.forEach((m, i) => {
         const k = keys[MATCH_STEPS[i]] as ReviewKey;
+        expect(k.decision, `${seed} ${m.trap}`).toEqual([m.trap === "clean" ? "pay" : "hold"]);
+        if (m.trap === "clean") {
+          expect(k.clean, seed).toBe(true);
+          expect(k.findings).toEqual({});
+          return;
+        }
+        expect(k.clean, `${seed} ${m.trap}`).not.toBe(true);
         expect(Object.keys(k.findings)).toEqual(["result"]);
         const f = k.findings.result;
-        expect(k.decision, `${seed} ${m.trap}`).toEqual([m.trap === "clean" ? "pay" : "hold"]);
         if (m.trap === "short") expect([f.targets, f.reasons]).toEqual([[m.short[0].id, "total"], ["qty"]]);
         if (m.trap === "price") expect([f.targets, f.reasons]).toEqual([[m.price[0].id, "total"], ["price"]]);
         if (m.trap === "duplicate") expect([f.targets, f.reasons]).toEqual([["invoice_no", "prior"], ["duplicate"]]);
-        if (m.trap === "clean") expect([f.targets, f.reasons]).toEqual([["match"], ["agrees"]]);
       });
+    }
+  });
+
+  it("every match screen offers the same \"Nothing wrong here\" confirm, with no \"All three agree\" reason or Three-way match row", () => {
+    for (const seed of SEEDS.slice(0, 50)) {
+      const { docs } = screen(seed);
+      for (const doc of docs) {
+        expect(doc.confirmClean, seed).toEqual({ label: "Nothing wrong here" });
+        expect(doc.reasons.map((r) => r.id)).not.toContain("agrees");
+        expect(doc.reasons.map((r) => r.label).join(" ")).not.toMatch(/agree/i);
+        expect(doc.document.fields.map((f) => f.id)).not.toContain("match");
+        expect(doc.prompt).not.toMatch(/All three agree|Three-way match row/);
+        expect(doc.prompt).toMatch(/Nothing wrong here/);
+      }
+      // Same reasons, decision and confirm on all four, so the screen's shape gives nothing away.
+      const shape = (d: Doc) => JSON.stringify([d.prompt, d.reasons, d.decision, d.confirmClean, d.document.columns]);
+      expect(new Set(docs.map(shape)).size, seed).toBe(1);
     }
   });
 
@@ -743,12 +764,54 @@ describe("corporate-ap-ridgeway: scoring", () => {
       for (const seed of seeds) expect(lost(seed, (a, sc) => payIt(sc.byTrap("price").stepId)(a))).toBe(5);
     });
 
+    it("clean match paid without confirming \"Nothing wrong here\": loses the 3 confirm points", () => {
+      for (const seed of seeds) {
+        expect(
+          lost(seed, (a, sc) => {
+            (a as Record<string, unknown>)[sc.byTrap("clean").stepId] = { flags: [], decision: "pay", clean: false };
+          }),
+          seed,
+        ).toBe(3);
+      }
+    });
+
+    it("clean match confirmed but held: loses the 2 decision points", () => {
+      for (const seed of seeds) {
+        expect(
+          lost(seed, (a, sc) => {
+            (a as Record<string, unknown>)[sc.byTrap("clean").stepId] = { flags: [], decision: "hold", clean: true };
+          }),
+          seed,
+        ).toBe(2);
+      }
+    });
+
+    for (const trap of ["short", "price", "duplicate"] as const) {
+      it(`confirming "Nothing wrong here" on the ${trap} document costs like a false flag`, () => {
+        for (const seed of seeds) {
+          const doc = screen(seed).byTrap(trap);
+          const perfect = perfectAnswers(seed) as unknown as Record<string, { flags: { target: string; reason: string; note: string }[] }>;
+          const right = perfect[doc.stepId].flags;
+          const other = doc.lines.find((l) => !right.some((f) => f.target === l.id))!;
+          const step = (answer: unknown) => scoreAttempt(scenario, seed, { [doc.stepId]: answer }).steps[doc.stepId];
+          const confirmed = step({ flags: right, decision: "hold", clean: true });
+          const falseFlag = step({ flags: [...right, { target: other.id, reason: "other", note: "" }], decision: "hold", clean: false });
+          expect(confirmed.points, `${seed} ${trap}`).toBe(falseFlag.points);
+          expect(confirmed.points).toBe(4);
+          // Confirmed clean and paid, nothing flagged: 0, never below.
+          expect(step({ flags: [], decision: "pay", clean: true }).points).toBe(0);
+          // Confirmed clean but held: the decision's 2, less the penalty.
+          expect(step({ flags: [], decision: "hold", clean: true }).points).toBe(1);
+        }
+      });
+    }
+
     it("clean match held with an invented problem: loses 5 and never goes below 0", () => {
       for (const seed of seeds) {
         const pts = (a: Answers & Record<string, unknown>) => scoreAttempt(scenario, seed, a);
         const a = clone(perfectAnswers(seed));
         const clean = screen(seed).byTrap("clean");
-        (a as Record<string, unknown>)[clean.stepId] = { flags: [{ target: "l1", reason: "price", note: "" }], decision: "hold" };
+        (a as Record<string, unknown>)[clean.stepId] = { flags: [{ target: "l1", reason: "price", note: "" }], decision: "hold", clean: false };
         expect(pts(perfectAnswers(seed)).points - pts(a).points).toBe(5);
         expect(pts(a).steps[clean.stepId].points).toBe(0);
       }
@@ -883,7 +946,7 @@ describe("corporate-ap-ridgeway: nothing derived reaches the candidate", () => {
       ];
       for (const minute of [0, 28, END]) {
         const payload = JSON.stringify(renderAttemptForCandidate(scenario, seed, minute));
-        expect(payload).not.toMatch(/"keys"|tolerance|"criteria"|"guidance"|"notes"|"points"|"expected"|"findings"/);
+        expect(payload).not.toMatch(/"keys"|tolerance|"criteria"|"guidance"|"notes"|"points"|"expected"|"findings"|"clean":/);
         for (const c of [runTotal, st.adjAp, st.keying]) {
           for (const f of forms(c)) expect(contains(payload, f), `${seed} m${minute}: ${f}`).toBe(false);
         }
