@@ -227,7 +227,7 @@ export default async function InviteLandingPage({ params, searchParams }: PagePr
             "Start by",
             <>
               <LocalTime iso={startBy} format="dayTime" />{" "}
-              <span className="muted" style={{ fontWeight: 400 }}>
+              <span className="muted" style={{ fontWeight: 400, display: "block" }}>
                 your time
               </span>
             </>,
