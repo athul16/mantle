@@ -12,6 +12,7 @@ export const STEP_LABELS: Record<string, string> = {
   journal_entry: "Journal entry",
   document_review: "Document review",
   numeric: "Numeric answer",
+  rapid_round: "Rapid round",
 };
 
 /** "accounting" → "Accounting". */

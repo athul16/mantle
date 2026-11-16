@@ -12,13 +12,14 @@ export const LOW_TIME_MS = 5 * 60_000;
  * The dark countdown pill (.timer). Display only: the server enforces the
  * deadline. `low` turns it amber.
  */
-export function TimerBadge({ remainingMs }: { remainingMs: number }) {
+export function TimerBadge({ remainingMs, asTimer = true }: { remainingMs: number; asTimer?: boolean }) {
   const low = remainingMs < LOW_TIME_MS;
   const left = Math.max(0, Math.ceil(remainingMs / 1000));
   return (
     <span
       className={low ? "timer low" : "timer"}
-      role="timer"
+      // One role="timer" per page: when a task shows its own countdown (a rapid item), that one is the timer.
+      role={asTimer ? "timer" : "group"}
       title="Time left. The official clock is on our server."
       aria-label={`${Math.floor(left / 60)} minutes ${left % 60} seconds left`}
     >
