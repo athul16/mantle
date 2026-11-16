@@ -98,6 +98,7 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 | `spreadsheet` | Grid of read-only cells and number input cells | `{ cells: { id: number \| null } }` | Each keyed cell full within its tolerance, else 0. Input cells not in the key are scratch |
 | `journal_entry` | Prompt, chart of accounts (code + name), entry and line limits; running totals and a "Balanced / Out of balance by" check per entry | `{ entries: [{ memo, lines: [{ account, debit, credit }] }] }` | See below |
 | `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision | `{ flags: [{ target, reason, note }], decision }`, one flag per item | See below |
+| `rapid_round` | One quick item at a time with its own countdown | `{ items: { [itemId]: { values, ms } } }` | Per item, plus a timing line; see "Timed sections and rapid rounds" |
 
 **`journal_entry` scoring.** The config lists the expected entries (`id`, `label`, `points`, default 3); the key gives each one's lines as `{ accounts, side, amount }`, where `accounts` may list several acceptable accounts (docs/07: COGS or Accounts payable for the #1043 fix). Key entries must balance. Per expected entry:
 
@@ -115,6 +116,41 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 - Flags on ids that aren't in the document are ignored.
 
 Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`) are skipped.
+
+### Timed sections and rapid rounds
+
+Some tests need parts with their own clock: a two-minute burst of quick checks, then work screens shown one at a time, then a longer task. This is data on the scenario, not a special case in the attempt flow. Code: `src/lib/engine/sequence.ts` (clock math), `src/lib/engine/server/flow.ts` (sections, screens, items, message arrival, authoring checks), `src/lib/candidate/attempt.ts` (applies them to requests), `src/app/api/candidate/advance/route.ts`.
+
+**Sections.** `ScenarioDefinition.sections?: { id, title, minutes, stepIds, oneAtATime? }[]`. Sections run back to back from `attempts.started_at`. Each gets its own `minutes`; the next one starts when it runs out or when the candidate presses "Finish section" (confirmed in a dialog), whichever is first. Only the current section's steps are open: the server leaves the others out of the workspace payload and answers a save to them with `locked`. Without `sections` nothing changes: every step is open for the whole attempt. `validateSections(definition, timeLimitMinutes)` reports steps in no section or in two, unknown steps, missing screen times and sections that add up to more than the time limit; a test runs it on every code-defined scenario.
+
+**One-at-a-time screens.** In a `oneAtATime` section each step is a screen with its own `Step.seconds`. One screen is open at a time; "Next screen" moves on early. Screens are cut at the section's end, and the section ends when its last screen ends, so nobody waits on an empty section. The section countdown in the bar shows the section's own limit.
+
+**Messages.** A message linked to a step in a section arrives `arriveAtMinute` after that section starts (and never before it starts), so a section's brief is there when it opens. Messages without `stepId` are timed from the attempt start as before. In the payload, `arriveAtMinute` is the actual arrival in minutes after the attempt start.
+
+**The overall timer never pauses (D4).** Sections sit inside the attempt's deadline; finishing early starts the next section, it doesn't bank time. When every section is over, the workspace shows a card that links to review; the attempt still ends at submit or the deadline.
+
+**Sequence hook.** A step type may implement `sequence` on `ServerStepType`: `count(config)`, `secondsPerItem(config)`, `renderItem(config, ctx, index)` (one item, templates filled, nothing from the key) and `recordItem(config, prev, index, raw, ms)` (validates `{ index, values }`, adds it to the saved answer, throws on a bad shape, another item or an item that already has an answer). For such a step the attempt flow injects `config.current = { index, count, endsAt, item }` (or `config.done`) and nothing else about the items. Items run back to back from the step's start (its section, screen, or the attempt), each `secondsPerItem` long and never past the step's end; an answer moves straight on to the next item. A save is accepted only for the open item, or for one that closed less than 1.5 s ago (network delay), else `item_closed`. Response time is measured on the server (`now - item start`). Browser components submit an item with `onCommit` (no debounce); the workspace refreshes after it, when the nearest section, screen or item deadline passes, and after a `locked` / `item_closed` reply (which it never retries).
+
+**Extra time** (`invite_accommodations.extraTimePercent`) stretches sections, screens and items by the same percent, as it stretches the overall limit.
+
+**Events.** All flow state is computed from server-written `action_events` (no schema change): `advanced_section { sectionId, at }`, `advanced_screen { stepId, at }` and `answered_item { stepId, index, at }`, with `at` as the server time of the request. An advance counts only inside the window of the section or screen it names, so a stale or repeated request changes nothing (the API answers `not_current`). The browser can't write these kinds: `/api/candidate/event` accepts only `opened_message` and `started_step`.
+
+**Review.** With sections, the review page lists every step of every section that has started; steps of finished sections show "Section closed". Scoring is unchanged: every step is scored at submit, unanswered ones as 0.
+
+**`rapid_round`.**
+
+| | |
+| --- | --- |
+| Config | `{ intro, secondsPerItem (default 20), items: [{ id, prompt, exhibit?: { title?, rows?: [{ label, value }], table?: { columns, rows } }, fields, points (default 1) }] }`. Fields: `{ id, label, kind: "choice", options: [{ id, label }] }` or `{ id, label, kind: "number", unit?, decimals }`. Prompts and exhibit text may hold `{{templates}}` |
+| Candidate sees | `toPublic` gives only `{ intro, itemCount, secondsPerItem }`; the open item arrives as `current`. Choice fields are sent without `kind` (anything with `options` is a choice), so the word `choice` only ever appears in keys |
+| Key | `{ items: { [itemId]: { [fieldId]: { choice } \| { value, tolerance (default 0) } } } }` |
+| Answer | `{ items: { [itemId]: { values, ms } } }`; only the first answer to an item counts |
+| Scoring | Per item: share of fields right × points, with a note (`Correct in 4.2s.`, the misses, or `No answer`). Plus a 0-point `timing` item: `Median response 7.0s over 2 answered; 1 with no answer.` |
+| View | "Item N of M", the item's countdown (`role="timer"`; the header clock drops the role while an item shows its own), the exhibit, radio groups or a number box ("1,250.50" is read as 1250.5), and "Submit answer", enabled once every field is filled |
+
+The demo `demo-timed-close` (12 minutes) has three sections: "Quick checks" (2 minutes, a four-item rapid round: two journal-entry flashes, a pay / hold invoice with a seeded exhibit and a depreciation amount), "Work screens" (3 minutes, one at a time: allowance for doubtful accounts, 90 s; monthly insurance expense, 90 s) and "Reply" (4 minutes, an email from the owner linked to the reply step), plus an intro message at the start.
+
+Not built yet: report rows comparing timing across the attempt (answers within 2 s of returning to the window, rapid-round speed vs the long tasks); a company-report view of rapid answers beyond the per-item notes.
 
 ### AI rubric scoring, shadow mode (decision D8)
 
@@ -136,6 +172,7 @@ Code-defined, in `src/lib/engine/scenarios/`. Not real test content.
 | --- | --- | --- |
 | `demo-petty-cash` | `numeric` | Engine core, seeded numbers |
 | `demo-mini-close` | `spreadsheet`, `numeric` (minute 5), `inbox_reply` (minute 10) | Scheduled messages, a small bank rec |
+| `demo-timed-close` | `rapid_round`, two `numeric` screens, `inbox_reply`, in three timed sections | Timed sections, one-at-a-time screens, rapid items (see "Timed sections and rapid rounds") |
 | `demo-entries-review` | `journal_entry`, `document_review` (minute 8) | Four bank-rec adjusting entries (fee, NSF, interest, transposed check, from docs/07 Example 4); a vendor invoice with one line billed for extra units and an invoice number already paid in September (docs/07 Example 1 task 4), plus approve / reject / ask-vendor |
 
 Preview (dev only): `/dev/engine?scenario=<slug>&seed=abc&minute=10`. The page lists every scenario, links to each message's arrival minute, and scores the answers on submit.

@@ -54,3 +54,25 @@ export function scoreAttempt(scenario: ServerScenario, seed: string, answers: Re
 
   return { points, maxPoints, steps };
 }
+
+/**
+ * Adds one sequence item's answer (raw `{ index, values }`) to the step's
+ * saved answer, through the step type's `sequence.recordItem`. Throws on a
+ * bad shape or a repeated item. `prev` is the saved answer, if any.
+ */
+export function recordSequenceItem(
+  scenario: ServerScenario,
+  stepId: string,
+  prev: unknown,
+  index: number,
+  raw: unknown,
+  ms: number,
+): unknown {
+  const step = scenario.definition.steps.find((s) => s.id === stepId);
+  if (!step) throw new Error(`scenario ${scenario.slug} has no step "${stepId}"`);
+  const stepType = getServerStepType(step.type);
+  if (!stepType.sequence) throw new Error(`step "${stepId}" is not a sequence`);
+  const config = stepType.configSchema.parse(step.config);
+  const previous = prev === undefined || prev === null ? undefined : stepType.parseAnswer(prev);
+  return stepType.parseAnswer(stepType.sequence.recordItem(config, previous, index, raw, ms));
+}
