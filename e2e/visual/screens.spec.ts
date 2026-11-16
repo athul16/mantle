@@ -13,8 +13,9 @@ test.skip(process.platform !== "linux" && !process.env.E2E_LOCAL_SCREENSHOTS, "s
 
 const masks = (page: Page, ...extra: string[]) => [page.locator("time"), ...extra.map((t) => page.getByText(t, { exact: false }))];
 
-// A fixed start-by date: "7 days from today" changes length with the date and re-wraps the landing page.
-const EXPIRES_AT = new Date("2099-12-30T17:00:00Z");
+// A fixed, short start-by date: "7 days from today" changes length with the date, and a long date sits on the
+// landing page's wrapping edge, where a few pixels of font jitter flip the layout.
+const EXPIRES_AT = new Date("2099-05-04T09:00:00Z");
 
 test("company pages", async ({ page, data }) => {
   const co = await data.company({ name: "Northwind Audit" });
@@ -47,6 +48,7 @@ test("candidate pages", async ({ page, data, candidate }) => {
   // The server renders dates in UTC with a " UTC" suffix and the browser swaps in local time after hydration;
   // the two differ in width, so wait for the browser's version before comparing.
   for (const time of await page.locator("time").all()) await expect(time).not.toHaveText(/UTC$/);
+  await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("candidate-landing.png", { mask: masks(page) });
 
   const code = await candidate.requestCode(invite);
