@@ -123,7 +123,7 @@ describe("rendered candidate DOM never contains the answer key", () => {
     for (const seed of SEEDS.slice(0, 40)) {
       keys.add(JSON.stringify(keyVariantScenario.generate(seed).keys));
       // React's useId differs per render; the ids aren't content.
-      doms.add(renderCandidateDom(renderAttemptForCandidate(keyVariantScenario, seed, 60)).replace(/[«:]r[0-9a-z]+[»:]/g, "id"));
+      doms.add(renderCandidateDom(renderAttemptForCandidate(keyVariantScenario, seed, 60)).replace(/(?:[«:]r[0-9a-z]+[»:]|_r_[0-9a-z]+_)/g, "id"));
     }
     expect(keys.size).toBeGreaterThan(10);
     expect(doms.size).toBe(1);
