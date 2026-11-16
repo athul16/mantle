@@ -76,6 +76,8 @@ export function CandidatesView({
             timeLimitMinutes: job.assessment?.timeLimitMinutes,
             camera: job.assessment?.proctoring.camera ?? false,
             screen: job.assessment?.proctoring.screen ?? false,
+            fullscreen: job.assessment?.proctoring.fullscreen ?? false,
+            microphone: job.assessment?.proctoring.microphone ?? false,
           }}
           heading={heading}
           actions={actions}

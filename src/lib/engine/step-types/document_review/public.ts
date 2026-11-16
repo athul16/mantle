@@ -44,6 +44,8 @@ export interface DocumentReviewPublicConfig {
   reasons: ReviewOption[];
   /** Optional final call on the whole document, e.g. approve / reject / ask vendor. */
   decision?: { prompt: string; options: ReviewOption[] };
+  /** Optional "nothing wrong here" confirm for the whole document. Whether it's right is in the key. */
+  confirmClean?: { label: string };
   maxFlags: number;
 }
 
@@ -65,6 +67,8 @@ export const documentReviewAnswerSchema = z
         message: "one flag per item",
       }),
     decision: z.string().regex(REVIEW_ID_PATTERN).nullable().default(null),
+    /** The candidate confirmed the document has nothing wrong. Absent in answers saved before the option existed. */
+    clean: z.boolean().optional(),
   })
   .strict();
 

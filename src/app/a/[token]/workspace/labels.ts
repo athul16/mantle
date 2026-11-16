@@ -19,6 +19,7 @@ export function stepKindLabel(type: string): string {
       inbox_reply: "Email reply",
       numeric: "Numeric answer",
       document_review: "Document review",
+      rapid_round: "Quick items",
     }[type] ?? "Task"
   );
 }
@@ -60,6 +61,7 @@ export function hasAnswer(answer: unknown): boolean {
     return ((a.entries as { lines?: { account?: string; debit?: unknown; credit?: unknown }[] }[]) ?? []).some((e) =>
       (e.lines ?? []).some((l) => l.account || l.debit != null || l.credit != null),
     );
+  if ("items" in a) return Object.keys((a.items as Record<string, unknown>) ?? {}).length > 0;
   if ("flags" in a) return ((a.flags as unknown[]) ?? []).length > 0 || (a.decision ?? null) !== null;
   return true;
 }

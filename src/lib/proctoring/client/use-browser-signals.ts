@@ -11,8 +11,8 @@ export const SIGNAL_FLUSH_MS = 5_000;
 
 /**
  * Browser signals during the attempt (docs/02): leaving the test window (tab
- * switch or another app), leaving full screen, copy and paste. Pasted text is
- * never read beyond its length. Returns `record` for other signals (screen
+ * switch or another app), entering and leaving full screen, copy, cut and
+ * paste. Clipboard text is never read beyond its length. Returns `record` for other signals (screen
  * share stopped, ...) so they go out in the same batches.
  */
 export function useBrowserSignals({ onSignal }: { onSignal?: (s: Signal) => void } = {}) {
@@ -59,8 +59,10 @@ export function useBrowserSignals({ onSignal }: { onSignal?: (s: Signal) => void
       else if (document.hasFocus()) back();
     };
     const onFullscreen = () => {
-      if (document.fullscreenElement) wasFullscreen = true;
-      else if (wasFullscreen) {
+      if (document.fullscreenElement) {
+        wasFullscreen = true;
+        record("fullscreen_entered");
+      } else if (wasFullscreen) {
         wasFullscreen = false;
         record("fullscreen_exited");
       }
@@ -69,12 +71,13 @@ export function useBrowserSignals({ onSignal }: { onSignal?: (s: Signal) => void
       const text = (e as ClipboardEvent).clipboardData?.getData("text/plain") ?? "";
       record("pasted", { chars: text.length });
     };
-    const onCopy = (e: Event) => {
+    const selectedChars = (e: Event) => {
       const t = e.target as HTMLInputElement | HTMLTextAreaElement | null;
       const inField = t && typeof t.selectionStart === "number" && typeof t.selectionEnd === "number";
-      const chars = inField ? Math.abs((t.selectionEnd ?? 0) - (t.selectionStart ?? 0)) : (window.getSelection()?.toString().length ?? 0);
-      record("copied", { chars });
+      return inField ? Math.abs((t.selectionEnd ?? 0) - (t.selectionStart ?? 0)) : (window.getSelection()?.toString().length ?? 0);
     };
+    const onCopy = (e: Event) => record("copied", { chars: selectedChars(e) });
+    const onCut = (e: Event) => record("cut", { chars: selectedChars(e) });
     const onPageHide = () => void flush(true);
 
     window.addEventListener("blur", leave);
@@ -83,6 +86,7 @@ export function useBrowserSignals({ onSignal }: { onSignal?: (s: Signal) => void
     document.addEventListener("fullscreenchange", onFullscreen);
     document.addEventListener("paste", onPaste, true);
     document.addEventListener("copy", onCopy, true);
+    document.addEventListener("cut", onCut, true);
     window.addEventListener("pagehide", onPageHide);
     const timer = setInterval(() => void flush(), SIGNAL_FLUSH_MS);
 
@@ -93,6 +97,7 @@ export function useBrowserSignals({ onSignal }: { onSignal?: (s: Signal) => void
       document.removeEventListener("fullscreenchange", onFullscreen);
       document.removeEventListener("paste", onPaste, true);
       document.removeEventListener("copy", onCopy, true);
+      document.removeEventListener("cut", onCut, true);
       window.removeEventListener("pagehide", onPageHide);
       clearInterval(timer);
       void flush(true);

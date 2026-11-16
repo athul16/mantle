@@ -9,6 +9,7 @@
  * - `cls()`: cumulative layout shift so far in this document (chromium only).
  * - `candidate`: helpers to walk a candidate through the flow.
  */
+import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page, TestInfo } from "@playwright/test";
 import { test as base, expect } from "../fixtures";
@@ -101,8 +102,40 @@ const CLS_SCRIPT = `
  */
 export const KNOWN_FAINT_TEXT: A11yOptions = { exclude: [".text-neutral-400"] };
 
+/**
+ * Harness adaptation, not an app change: axe reads ARIA element reflection
+ * (`section.ariaLabelledByElements` and friends) from the page's own script
+ * world; when Playwright then reads the same property from its utility world to
+ * resolve `getByRole(..., { name })`, Playwright's Firefox segfaults the content
+ * process ("Page crashed"). Any `<section aria-labelledby>` page did it, the
+ * candidate report most of all. In Firefox only, axe gets its ARIA standards
+ * without those reflection props, so it reads the `aria-*` attributes as it
+ * always did (the app only sets attributes). e2e/axe-harness.spec.ts guards it.
+ */
+const ARIA_ELEMENT_REFLECTION = [
+  "aria-actions",
+  "aria-activedescendant",
+  "aria-controls",
+  "aria-describedby",
+  "aria-details",
+  "aria-errormessage",
+  "aria-flowto",
+  "aria-labelledby",
+  "aria-owns",
+];
+let firefoxAxeSource: string | undefined;
+function axeSourceFor(page: Page) {
+  if (page.context().browser()?.browserType().name() !== "firefox") return undefined;
+  if (!firefoxAxeSource) {
+    const axePath = require.resolve("axe-core/axe.min.js", { paths: [require.resolve("@axe-core/playwright")] });
+    const ariaAttrs = Object.fromEntries(ARIA_ELEMENT_REFLECTION.map((attr) => [attr, { prop: "" }]));
+    firefoxAxeSource = `${readFileSync(axePath, "utf8")}\n;axe.configure({ standards: { ariaAttrs: ${JSON.stringify(ariaAttrs)} } });`;
+  }
+  return firefoxAxeSource;
+}
+
 export async function axeSerious(page: Page, testInfo: TestInfo, options: A11yOptions = {}) {
-  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]);
+  let builder = new AxeBuilder({ page, axeSource: axeSourceFor(page) }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]);
   for (const sel of options.exclude ?? []) builder = builder.exclude(sel);
   if (options.disableRules?.length) builder = builder.disableRules(options.disableRules);
   // Lighthouse found candidate pages without a title or main landmark; axe rates those moderate, so check them here.

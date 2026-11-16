@@ -83,7 +83,7 @@ export async function loadInvite(inviteId: string): Promise<InviteContext | null
     db.from("jobs").select("title, deadline, assessment_id").eq("id", invite.job_id).eq("org_id", invite.org_id).single(),
     db
       .from("invite_accommodations")
-      .select("extra_time_percent, waive_camera, waive_screen")
+      .select("extra_time_percent, waive_camera, waive_screen, waive_fullscreen, waive_microphone")
       .eq("invite_id", invite.id)
       .eq("org_id", invite.org_id)
       .maybeSingle(),

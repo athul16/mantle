@@ -26,7 +26,7 @@ export async function refreshFlags(attempt: AttemptKey, settings: Proctoring): P
   const db = createServiceClient();
   const [events, media, existing] = await Promise.all([
     db.from("integrity_events").select("id, at, kind, payload").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
-    db.from("media").select("id, at, source").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
+    db.from("media").select("id, at, source, reason").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).order("at").limit(5000),
     db.from("flags").select("id, rule, status").eq("attempt_id", attempt.id).eq("org_id", attempt.org_id).not("rule", "is", null),
   ]);
   for (const r of [events, media, existing]) if (r.error) throw new Error(`loading proctoring data failed: ${r.error.message}`);
@@ -57,11 +57,21 @@ export async function refreshFlags(attempt: AttemptKey, settings: Proctoring): P
   if (error) throw new Error(`setting integrity label failed: ${error.message}`);
 }
 
-const GAP_KINDS = ["camera_stopped", "camera_started", "screen_share_stopped", "screen_share_started", DOWNTIME_SIGNAL];
+const GAP_KINDS = [
+  "camera_stopped",
+  "camera_started",
+  "screen_share_stopped",
+  "screen_share_started",
+  "fullscreen_exited",
+  "fullscreen_entered",
+  DOWNTIME_SIGNAL,
+];
 
 /**
- * Records each closed camera / screen-share down period as a DOWNTIME_SIGNAL
- * event (D4: the timer keeps running, the recruiter sees the gaps). Safe to
+ * Records each closed camera / screen-share / full screen down period as a
+ * DOWNTIME_SIGNAL event (D4: the timer keeps running, the recruiter sees the
+ * gaps). Full screen periods are recorded either way; the downtime rule only
+ * counts them when the assessment requires full screen. Safe to
  * call on every signal batch: a period is written once per stop event. With
  * `end`, gaps still open (tab closed, never reconnected) are closed there.
  * Returns how many periods were written.
@@ -97,7 +107,8 @@ export async function recordDownPeriods(
 
 /**
  * At submit or timeout: closes any gap still open at the attempt's end and
- * refreshes its flags. Does nothing for an attempt without camera or screen.
+ * refreshes its flags. Does nothing for an attempt without camera, screen or
+ * required full screen.
  */
 export async function closeDowntimeAtEnd(
   attempt: AttemptKey,
@@ -114,6 +125,6 @@ export async function closeDowntimeAtEnd(
   if (error) throw new Error(`proctoring settings lookup failed: ${error.message}`);
   // The candidate's own settings: a waived camera or screen (D9) is not monitored.
   const settings = applyWaivers(readProctoring(data.proctoring), accommodations);
-  if (!settings.camera && !settings.screen) return;
+  if (!settings.camera && !settings.screen && !settings.fullscreen) return;
   if (await recordDownPeriods(attempt, end)) await refreshFlags(attempt, settings);
 }

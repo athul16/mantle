@@ -5,7 +5,7 @@
  */
 import { signInViaUi } from "../fixtures";
 import { db } from "../support/db";
-import { chromiumOnly, expect, test } from "../support/test";
+import { expect, test } from "../support/test";
 import type { TestData } from "../../tests/helpers/factories";
 import { must } from "../../tests/helpers/supabase";
 
@@ -44,10 +44,6 @@ async function flaggedAttempt(data: TestData) {
   );
   return { co, invite, attemptId, path };
 }
-
-// Like the other report journeys (employer/results.spec.ts). Firefox's page process also crashes when axe runs on
-// this report with a flag on it (passes without axe); reported in the PR.
-chromiumOnly();
 
 // Snapshot files are not covered by the company cascade, so each test removes its own in `finally`.
 

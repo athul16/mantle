@@ -82,6 +82,8 @@ export function AccommodationsForm({
   current,
   camera,
   screen,
+  fullscreen = false,
+  microphone = false,
 }: {
   orgId: string;
   inviteId: string;
@@ -90,6 +92,9 @@ export function AccommodationsForm({
   /** Whether the assessment uses the camera / screen share (a waiver only matters then). */
   camera: boolean;
   screen: boolean;
+  /** Whether the assessment requires full screen / records the microphone. */
+  fullscreen?: boolean;
+  microphone?: boolean;
 }) {
   const [state, action, pending] = useActionState(setAccommodationsAction, undefined);
   return (
@@ -118,6 +123,18 @@ export function AccommodationsForm({
         <label className="small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" className="chk" name="waiveScreen" defaultChecked={current.waiveScreen} />
           No screen share for this candidate
+        </label>
+      ) : null}
+      {fullscreen ? (
+        <label className="small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="checkbox" className="chk" name="waiveFullscreen" defaultChecked={current.waiveFullscreen} />
+          Waive full screen
+        </label>
+      ) : null}
+      {microphone ? (
+        <label className="small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="checkbox" className="chk" name="waiveMicrophone" defaultChecked={current.waiveMicrophone} />
+          Waive microphone
         </label>
       ) : null}
       <p className="xs muted">Applies only to this candidate and can change until they start. Each change is recorded in the audit log.</p>

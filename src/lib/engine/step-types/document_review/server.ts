@@ -47,7 +47,18 @@ const configSchema = z
           })
           .strict(),
       )
-      .min(1),
+      .default([]),
+    /**
+     * Optional "nothing wrong here" confirm, for documents that may be clean in
+     * some variants (the key says which). Confirming a clean document earns
+     * `points` (default: the findings' total, so every variant has the same
+     * maximum; 2 when there are no findings). Confirming a document with issues
+     * costs `falseFlagPenalty`, like a false flag.
+     */
+    confirmClean: z
+      .object({ label: z.string().min(1).default("Nothing wrong with this document"), points: z.number().positive().optional() })
+      .strict()
+      .optional(),
     /** Points taken off per flag on an item that isn't an issue. Total never drops below 0. */
     falseFlagPenalty: z.number().min(0).default(1),
     maxFlags: z.number().int().positive().max(MAX_FLAGS).default(10),
@@ -64,12 +75,20 @@ const configSchema = z
     unique([...c.document.fields, ...c.document.rows, ...c.document.totals].map((x) => x.id), "document item");
     unique(c.reasons.map((r) => r.id), "reason");
     unique(c.findings.map((f) => f.id), "finding");
+    if (c.findings.length === 0 && !c.confirmClean) {
+      ctx.addIssue({ code: "custom", message: "a document review needs at least one finding, or confirmClean for a document that is always clean" });
+    }
     if (c.decision) unique(c.decision.options.map((o) => o.id), "decision option");
     c.document.rows.forEach((r) => {
       if (r.cells.length !== c.document.columns.length) {
         ctx.addIssue({ code: "custom", message: `row "${r.id}" has ${r.cells.length} cells, expected ${c.document.columns.length}` });
       }
     });
+  })
+  .transform((c) => {
+    if (!c.confirmClean || c.confirmClean.points !== undefined) return c;
+    const total = c.findings.reduce((sum, f) => sum + f.points, 0);
+    return { ...c, confirmClean: { ...c.confirmClean, points: total > 0 ? total : 2 } };
   });
 export type DocumentReviewConfig = z.infer<typeof configSchema>;
 
@@ -91,6 +110,8 @@ const keySchema = z
         .strict(),
     ),
     decision: z.array(z.string().regex(REVIEW_ID_PATTERN)).min(1).optional(),
+    /** This variant's document has no issues: `findings` is empty and the "nothing wrong" confirm is the right answer. */
+    clean: z.boolean().optional(),
   })
   .strict();
 export type DocumentReviewKey = z.infer<typeof keySchema>;
@@ -129,6 +150,7 @@ export const documentReviewServer: ServerStepType<
             },
           }
         : {}),
+      ...(config.confirmClean ? { confirmClean: { label: fill(config.confirmClean.label) } } : {}),
       maxFlags: config.maxFlags,
     };
   },
@@ -154,10 +176,14 @@ export const documentReviewServer: ServerStepType<
     const reasonIds = new Set(config.reasons.map((r) => r.id));
     const reasonLabel = new Map(config.reasons.map((r) => [r.id, r.label]));
     const findingIds = new Set(config.findings.map((f) => f.id));
+    const clean = key.clean === true;
+    if (clean && !config.confirmClean) throw new Error("document_review key says clean, but the config can't be confirmed clean");
+    if (clean && Object.keys(key.findings).length) throw new Error("document_review key: a clean document has no findings");
+    if (!clean && config.findings.length === 0) throw new Error("document_review config has no findings, so its key must say clean");
     for (const id of Object.keys(key.findings)) {
       if (!findingIds.has(id)) throw new Error(`document_review key has unknown finding "${id}"`);
     }
-    for (const f of config.findings) {
+    for (const f of clean ? [] : config.findings) {
       const k = key.findings[f.id];
       if (!k) throw new Error(`document_review key is missing finding "${f.id}"`);
       for (const t of k.targets) if (!items.has(t)) throw new Error(`document_review key targets unknown item "${t}"`);
@@ -169,11 +195,13 @@ export const documentReviewServer: ServerStepType<
       for (const o of key.decision) if (!options.has(o)) throw new Error(`document_review key uses unknown decision "${o}"`);
     }
 
+    const findings = clean ? [] : config.findings;
+    const confirmed = !!config.confirmClean && answer?.clean === true;
     const flags = (answer?.flags ?? []).filter((f) => items.has(f.target));
     const used = new Set<number>();
     const credit = new Map<string, { share: number; flag: number }>();
     for (const pass of ["exact", "item"] as const) {
-      for (const f of config.findings) {
+      for (const f of findings) {
         if (credit.has(f.id)) continue;
         const k = key.findings[f.id];
         const j = flags.findIndex(
@@ -186,7 +214,7 @@ export const documentReviewServer: ServerStepType<
       }
     }
 
-    const result: StepScoreItem[] = config.findings.map((f) => {
+    const result: StepScoreItem[] = findings.map((f) => {
       const k = key.findings[f.id];
       const base = { id: f.id, label: f.label, max: f.points };
       const expected = `${k.targets.map(itemLabel).join(" or ")}, reason: ${k.reasons.map((r) => reasonLabel.get(r)).join(" or ")}`;
@@ -201,6 +229,17 @@ export const documentReviewServer: ServerStepType<
         note: `Flagged ${itemLabel(flags[c.flag].target)} but with ${given}. Expected ${expected}.${ref}`,
       };
     });
+
+    if (clean) {
+      const points = config.confirmClean!.points!;
+      result.push({
+        id: "clean",
+        label: "Nothing wrong",
+        max: points,
+        earned: confirmed ? points : 0,
+        note: confirmed ? "Confirmed that nothing is wrong." : "Not confirmed. The document has no issues.",
+      });
+    }
 
     if (config.decision) {
       const chosen = answer?.decision ?? null;
@@ -219,17 +258,28 @@ export const documentReviewServer: ServerStepType<
 
     const issueItems = new Set(Object.values(key.findings).flatMap((k) => k.targets));
     const falseFlags = flags.filter((f, j) => !used.has(j) && !issueItems.has(f.target));
-    if (falseFlags.length > 0 && config.falseFlagPenalty > 0) {
+    // Confirming "nothing wrong" on a document with issues costs like one more false flag.
+    const wrongConfirm = confirmed && !clean;
+    const count = falseFlags.length + (wrongConfirm ? 1 : 0);
+    if (count > 0 && config.falseFlagPenalty > 0) {
       const earnedSoFar = result.reduce((s, i) => s + i.earned, 0);
-      const deduction = Math.min(earnedSoFar, falseFlags.length * config.falseFlagPenalty);
+      const deduction = Math.min(earnedSoFar, count * config.falseFlagPenalty);
+      const parts: string[] = [];
+      if (falseFlags.length) {
+        parts.push(
+          `${falseFlags.length} item${falseFlags.length === 1 ? "" : "s"} flagged that ${falseFlags.length === 1 ? "isn't an issue" : "aren't issues"}: ${falseFlags
+            .map((f) => itemLabel(f.target))
+            .join(", ")}.`,
+        );
+      }
+      if (wrongConfirm) parts.push("Confirmed that nothing is wrong, but the document has issues.");
+      if (deduction < count * config.falseFlagPenalty) parts.push("Deduction capped at the points earned.");
       result.push({
         id: "false-flags",
         label: "False flags",
         max: 0,
         earned: 0 - round2(deduction), // 0 - x, not -x: no -0 when nothing was earned
-        note: `${falseFlags.length} item${falseFlags.length === 1 ? "" : "s"} flagged that ${falseFlags.length === 1 ? "isn't an issue" : "aren't issues"}: ${falseFlags
-          .map((f) => itemLabel(f.target))
-          .join(", ")}.${deduction < falseFlags.length * config.falseFlagPenalty ? " Deduction capped at the points earned." : ""}`,
+        note: parts.join(" "),
       });
     }
 

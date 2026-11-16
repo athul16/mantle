@@ -8,6 +8,8 @@ import { journalEntryServer, type JournalEntryConfig, type JournalEntryKey } fro
 import type { JournalEntryAnswer } from "@/lib/engine/step-types/journal_entry/public";
 import { documentReviewServer, type DocumentReviewConfig, type DocumentReviewKey } from "@/lib/engine/step-types/document_review/server";
 import type { DocumentReviewAnswer } from "@/lib/engine/step-types/document_review/public";
+import { multipleChoiceServer, type MultipleChoiceConfig, type MultipleChoiceKey } from "@/lib/engine/step-types/multiple_choice/server";
+import { rapidRoundServer, type RapidRoundConfig, type RapidRoundKey } from "@/lib/engine/step-types/rapid_round/server";
 import { fillTemplate } from "@/lib/engine/server/template";
 import type { Step, Variant } from "@/lib/engine/types";
 import type { StoredStepScore } from "./summary";
@@ -19,11 +21,15 @@ import type { StoredStepScore } from "./summary";
 export type StepRow = {
   id: string;
   label: string;
+  /** The question for this row when the label alone doesn't say it (rapid items, multiple choice), templates filled. */
+  prompt?: string;
   answer: string;
   expected: string;
   earned?: number;
   max?: number;
   note?: string;
+  /** Server-measured response time (rapid items). */
+  responseMs?: number;
 };
 
 export type StepDetail = {
@@ -140,6 +146,34 @@ export function describeStep(step: Step, variant: Variant | null, answer: unknow
 
     case "document_review":
       return { ...base, answerText: null, rows: documentReviewRows(config as DocumentReviewConfig, key as DocumentReviewKey | null, variant, answer, score) };
+
+    case "multiple_choice": {
+      const c = config as MultipleChoiceConfig;
+      const k = key as MultipleChoiceKey | null;
+      const fill = (t: string) => (variant ? fillTemplate(t, variant.values) : t);
+      const label = (id: string) => fill(c.options.find((o) => o.id === id)?.label ?? id);
+      const parsed = answer === undefined ? null : safeParse(() => multipleChoiceServer.parseAnswer(answer));
+      const picked = (parsed?.selected ?? []).filter((id) => c.options.some((o) => o.id === id));
+      return {
+        ...base,
+        answerText: null,
+        rows: withScore(
+          [
+            {
+              id: "answer",
+              label: "Answer",
+              prompt: fill(c.prompt),
+              answer: picked.length ? picked.map(label).join("; ") : NOT_ANSWERED,
+              expected: k ? k.correct.map(label).join("; ") : "—",
+            },
+          ],
+          score,
+        ),
+      };
+    }
+
+    case "rapid_round":
+      return { ...base, answerText: null, rows: rapidRoundRows(config as RapidRoundConfig, key as RapidRoundKey | null, variant, answer, score) };
 
     default:
       // Step types without a custom view yet (e.g. ones added after this
@@ -305,7 +339,8 @@ function documentReviewRows(
     }
   }
 
-  const rows: Omit<StepRow, "earned" | "max" | "note">[] = c.findings.map((f) => {
+  // A clean variant has no findings to show: one "Nothing wrong" row instead.
+  const rows: Omit<StepRow, "earned" | "max" | "note">[] = (k?.clean ? [] : c.findings).map((f) => {
     const fk = k?.findings[f.id];
     const j = credited.get(f.id);
     return {
@@ -317,6 +352,15 @@ function documentReviewRows(
         : "—",
     };
   });
+
+  if (k?.clean) {
+    rows.push({
+      id: "clean",
+      label: "Nothing wrong",
+      answer: parsed?.clean === true ? "Confirmed nothing wrong" : "(not confirmed)",
+      expected: "Confirm nothing is wrong",
+    });
+  }
 
   if (c.decision) {
     const option = (id: string) => fill(c.decision!.options.find((o) => o.id === id)?.label ?? id);
@@ -331,8 +375,68 @@ function documentReviewRows(
 
   const issueItems = new Set(Object.values(k?.findings ?? {}).flatMap((fk) => fk.targets));
   const falseFlags = k ? flags.filter((f, j) => !used.has(j) && !issueItems.has(f.target)) : [];
-  if (falseFlags.length || score?.items.some((i) => i.id === "false-flags")) {
-    rows.push({ id: "false-flags", label: "False flags", answer: falseFlags.map(showFlag).join("; ") || "—", expected: "None" });
+  // Confirming "nothing wrong" on a document with issues counts with the false flags.
+  const wrongConfirm = !!c.confirmClean && parsed?.clean === true && !!k && !k.clean;
+  if (falseFlags.length || wrongConfirm || score?.items.some((i) => i.id === "false-flags")) {
+    const given = [...falseFlags.map(showFlag), ...(wrongConfirm ? ["Confirmed nothing wrong"] : [])];
+    rows.push({ id: "false-flags", label: "False flags", answer: given.join("; ") || "—", expected: "None" });
   }
   return withScore(rows, score);
+}
+
+/**
+ * One row per rapid item: its prompt, the candidate's values, the key's values
+ * and the server-measured response time; then the score's response-time
+ * summary (no points).
+ */
+function rapidRoundRows(
+  c: RapidRoundConfig,
+  k: RapidRoundKey | null,
+  variant: Variant | null,
+  answer: unknown,
+  score: StoredStepScore | null,
+): StepRow[] {
+  const fill = (t: string) => (variant ? fillTemplate(t, variant.values) : t);
+  const parsed = answer === undefined ? null : safeParse(() => rapidRoundServer.parseAnswer(answer));
+  type Field = RapidRoundConfig["items"][number]["fields"][number];
+  const show = (f: Field, v: string | number | undefined): string => {
+    if (v === undefined) return "—";
+    if (f.kind === "choice") return typeof v === "string" ? fill(f.options.find((o) => o.id === v)?.label ?? v) : String(v);
+    if (typeof v !== "number") return String(v);
+    const text = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: f.decimals, maximumFractionDigits: f.decimals });
+    const sign = v < 0 ? "-" : "";
+    if (!f.unit) return sign + text;
+    return f.unit === "$" ? `${sign}$${text}` : `${sign}${text} ${f.unit}`;
+  };
+
+  const rows = c.items.map((item, i) => {
+    const given = parsed?.items[item.id];
+    const itemKey = k?.items[item.id];
+    const expected = itemKey
+      ? item.fields
+          .map((f) => {
+            const fk = itemKey[f.id];
+            if (!fk) return `${fill(f.label)}: ?`;
+            if ("choice" in fk) return `${fill(f.label)}: ${show(f, fk.choice)}`;
+            // A tolerance below the last shown decimal only absorbs rounding; don't show it.
+            const decimals = f.kind === "number" ? f.decimals : 2;
+            const tol = fk.tolerance >= 10 ** -decimals ? ` (± ${plain(fk.tolerance)})` : "";
+            return `${fill(f.label)}: ${show(f, fk.value)}${tol}`;
+          })
+          .join("; ")
+      : "—";
+    return {
+      id: item.id,
+      label: `Item ${i + 1}`,
+      prompt: fill(item.prompt),
+      answer: given ? item.fields.map((f) => `${fill(f.label)}: ${show(f, given.values[f.id])}`).join("; ") : NOT_ANSWERED,
+      expected,
+      ...(given ? { responseMs: given.ms } : {}),
+    };
+  });
+
+  const out = withScore(rows, score);
+  const timing = score?.items.find((i) => i.id === "timing");
+  if (timing) out.push({ id: "timing", label: timing.label, answer: timing.note ?? "", expected: "—" });
+  return out;
 }

@@ -53,6 +53,8 @@ export type TableContext = {
   timeLimitMinutes?: number;
   camera: boolean;
   screen: boolean;
+  fullscreen?: boolean;
+  microphone?: boolean;
 };
 
 /**
@@ -490,6 +492,8 @@ function InviteDrawer({ row, ctx, onClose }: { row: CandidateRow; ctx?: TableCon
             current={row.accommodations}
             camera={ctx.camera}
             screen={ctx.screen}
+            fullscreen={ctx.fullscreen}
+            microphone={ctx.microphone}
           />
         ) : null}
       </section>

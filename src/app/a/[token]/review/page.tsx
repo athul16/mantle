@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { getWorkspaceView } from "@/lib/candidate/attempt";
+import { getReview, getWorkspaceView } from "@/lib/candidate/attempt";
 import { pageForStatus, requireSessionPage } from "@/lib/candidate/pages";
 import { hasAnswer, stepKindLabel } from "../workspace/labels";
 import { LiveTimer } from "../workspace/parts";
@@ -19,7 +19,11 @@ export default async function ReviewPage({ params }: PageProps<"/a/[token]/revie
   const { session, attempt } = await requireSessionPage(token, ["in_progress"]);
   const view = await getWorkspaceView(session);
   if (!view) redirect(pageForStatus(token, attempt));
-  const rows = view.steps.map((s, i) => ({ step: s, n: i + 1, answered: hasAnswer(view.answers[s.id]) }));
+  // With timed sections, list every task of the sections reached; finished ones can't be reopened.
+  const review = view.flow ? await getReview(session) : null;
+  const rows = review
+    ? review.map((r, i) => ({ step: { id: r.stepId, title: r.title, type: r.type }, n: i + 1, answered: r.answered, open: r.open }))
+    : view.steps.map((s, i) => ({ step: s, n: i + 1, answered: hasAnswer(view.answers[s.id]), open: true }));
   const open = rows.filter((r) => !r.answered).length;
   const company = session.invite.companyName;
 
@@ -54,7 +58,7 @@ export default async function ReviewPage({ params }: PageProps<"/a/[token]/revie
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ step, n, answered }) => (
+              {rows.map(({ step, n, answered, open }) => (
                 <tr key={step.id}>
                   <td>
                     <span className="strong">
@@ -78,13 +82,17 @@ export default async function ReviewPage({ params }: PageProps<"/a/[token]/revie
                     )}
                   </td>
                   <td className="r">
-                    <Link
-                      href={`/a/${token}/workspace?task=${encodeURIComponent(step.id)}`}
-                      className={answered ? "btn btn-sm btn-ghost" : "btn btn-sm"}
-                      aria-label={`${answered ? "Open" : "Start"} ${step.title}`}
-                    >
-                      {answered ? "Open" : "Start"}
-                    </Link>
+                    {open ? (
+                      <Link
+                        href={`/a/${token}/workspace?task=${encodeURIComponent(step.id)}`}
+                        className={answered ? "btn btn-sm btn-ghost" : "btn btn-sm"}
+                        aria-label={`${answered ? "Open" : "Start"} ${step.title}`}
+                      >
+                        {answered ? "Open" : "Start"}
+                      </Link>
+                    ) : (
+                      <span className="xs muted">Section closed</span>
+                    )}
                   </td>
                 </tr>
               ))}

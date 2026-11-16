@@ -13,11 +13,15 @@ test.skip(process.platform !== "linux" && !process.env.E2E_LOCAL_SCREENSHOTS, "s
 
 const masks = (page: Page, ...extra: string[]) => [page.locator("time"), ...extra.map((t) => page.getByText(t, { exact: false }))];
 
+// A fixed, short start-by date: "7 days from today" changes length with the date, and a long date sits on the
+// landing page's wrapping edge, where a few pixels of font jitter flip the layout.
+const EXPIRES_AT = new Date("2099-05-04T09:00:00Z");
+
 test("company pages", async ({ page, data }) => {
   const co = await data.company({ name: "Northwind Audit" });
   const { assessmentId } = await data.assessment({ orgId: co.orgId, title: "Petty cash" });
   const { jobId } = await data.job({ orgId: co.orgId, assessmentId, title: "Audit intern" });
-  const invite = await data.invite({ orgId: co.orgId, jobId });
+  const invite = await data.invite({ orgId: co.orgId, jobId, expiresAt: EXPIRES_AT });
 
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
@@ -37,10 +41,14 @@ test("candidate pages", async ({ page, data, candidate }) => {
   const co = await data.company({ name: "Harbor Hiring" });
   const { assessmentId } = await data.assessment({ orgId: co.orgId, title: "Petty cash" });
   const { jobId } = await data.job({ orgId: co.orgId, assessmentId, title: "Audit intern" });
-  const invite = await data.invite({ orgId: co.orgId, jobId });
+  const invite = await data.invite({ orgId: co.orgId, jobId, expiresAt: EXPIRES_AT });
 
   await page.goto(invite.link);
   await expect(page.getByRole("heading", { level: 1, name: "Harbor Hiring invited you to an assessment" })).toBeVisible();
+  // The server renders dates in UTC with a " UTC" suffix and the browser swaps in local time after hydration;
+  // the two differ in width, so wait for the browser's version before comparing.
+  for (const time of await page.locator("time").all()) await expect(time).not.toHaveText(/UTC$/);
+  await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("candidate-landing.png", { mask: masks(page) });
 
   const code = await candidate.requestCode(invite);

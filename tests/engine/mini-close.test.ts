@@ -6,6 +6,7 @@ const { demoMiniClose } = await import("@/lib/engine/scenarios/demo-mini-close")
 const { listScenarios } = await import("@/lib/engine/scenarios");
 const { renderAttemptForCandidate } = await import("@/lib/engine/server/render");
 const { scoreAttempt, parseAnswerForStep } = await import("@/lib/engine/server/score");
+const { keyVariantScenario } = await import("./key-variants");
 
 type SheetKey = { tolerance: number; cells: Record<string, { value: number }> };
 type NumKey = { value: number };
@@ -49,7 +50,9 @@ describe("demo-mini-close generator", () => {
   });
 });
 
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct"]);
+/** Only id-shaped strings are skipped under those fields; a note or sentence there is still checked. */
+const ID_LIKE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 describe("what the candidate receives (every scenario, many seeds)", () => {
   // Every form an amount could take in serialized output: 120.1, 120.10, 1,120.10, 12010 (cents).
@@ -71,13 +74,42 @@ describe("what the candidate receives (every scenario, many seeds)", () => {
    * Tolerances are skipped, and so are ids the material lists on purpose (account codes, flaggable items,
    * reasons, decision options, debit/credit side): they're in every candidate's choices, so they reveal nothing.
    */
-  const keyLeaves = (key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") => {
-    if (PUBLIC_ID_FIELDS.has(field)) return out;
+  const keyLeaves = (
+    key: unknown,
+    out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] },
+    field = "",
+    publicIds = false,
+  ): { numbers: number[]; strings: string[] } => {
+    const ids = publicIds || PUBLIC_ID_FIELDS.has(field);
     if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);
-    else if (typeof key === "string") out.strings.push(key);
-    else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k);
+    else if (typeof key === "string") {
+      if (!(ids && ID_LIKE.test(key))) out.strings.push(key);
+    } else if (Array.isArray(key)) for (const v of key) keyLeaves(v, out, field, ids);
+    else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) keyLeaves(v, out, k, ids);
     return out;
   };
+
+  it("skips public ids (multiple_choice's correct options among them) but still checks text under those fields", () => {
+    expect(keyLeaves({ correct: ["ar", "cash"] }).strings).toEqual([]);
+    expect(keyLeaves({ targets: ["invoice_no"], reasons: ["dup"], note: "Paid on Oct 3." }).strings).toEqual(["Paid on Oct 3."]);
+    expect(keyLeaves({ correct: ["Paid on Oct 3."] }).strings).toEqual(["Paid on Oct 3."]);
+    expect(keyLeaves({ decision: { note: "Hold: billed over the PO" } }).strings).toEqual(["Hold: billed over the PO"]);
+    expect(keyLeaves({ correct: [{ value: 1234.5 }] }).numbers).toEqual([1234.5]);
+  });
+
+  it("multiple_choice and a clean document_review: the payload is the same whatever the key says", () => {
+    const payloads = new Set<string>();
+    const keys = new Set<string>();
+    for (const seed of SEEDS.slice(0, 60)) {
+      keys.add(JSON.stringify(keyVariantScenario.generate(seed).keys));
+      payloads.add(JSON.stringify(renderAttemptForCandidate(keyVariantScenario, seed, 60)));
+    }
+    expect(keys.size).toBeGreaterThan(10);
+    expect(payloads.size).toBe(1);
+    const [payload] = payloads;
+    expect(payload).toContain("Nothing wrong with this invoice");
+    expect(payload).not.toMatch(/"correct"|"clean"|"points"|"findings"|Paid on Oct 3/);
+  });
 
   for (const scenario of listScenarios()) {
     it(`${scenario.slug}: no derived key value, key note or rubric text in the payload`, () => {

@@ -18,7 +18,9 @@ import { getSignalCounts } from "./integrity";
 import { AddNoteForm, CriterionCell, CriterionPoints, DeleteNoteButton, RubricReviewForm, VoteButtons, type RubricCriterionInput } from "./report-forms";
 import { ReportTime } from "./report-time";
 import { percentiles } from "@/lib/results/candidate-table";
-import { CardTitle, ordinal, PointsBadge, ResultBadge } from "./report-ui";
+import { CardTitle, ordinal, PointsBadge } from "./report-ui";
+import { AnswerTable } from "./answer-table";
+import { TimingEvidence } from "./timing-evidence";
 
 export const metadata = { title: "Candidate report · Mantle" };
 
@@ -125,7 +127,11 @@ export default async function CandidateReportPage({ params }: PageProps<"/app/[o
             canSeeMedia={flags.canSeeMedia}
             camera={proctoring.camera}
             screen={proctoring.screen}
+            gaze={proctoring.gaze}
+            microphone={proctoring.microphone}
+            fullscreen={proctoring.fullscreen}
           />
+          <TimingEvidence startedAt={attempt.startedAt} timing={report.timing} />
           <TeamVotes orgId={orgId} attemptId={attempt.id} notes={report.notes} userId={user.id} myVote={myVote} />
           {deleteCard}
         </aside>
@@ -526,7 +532,6 @@ function StepSection({
   const headingId = `step-${step.id}-heading`;
   const isReply = step.type === "inbox_reply";
   const reviewable = !!s && (s.needsReview === true || !!s.review);
-  const hasAnswerColumn = step.rows.some((r) => r.answer !== "");
 
   const criteria: RubricCriterionInput[] = step.rows.map((r) => ({
     id: r.id,
@@ -607,37 +612,7 @@ function StepSection({
           </>
         )
       ) : step.rows.length ? (
-        <div style={{ overflowX: "auto" }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Item</th>
-                {hasAnswerColumn ? <th className="r">{first}</th> : null}
-                <th className={hasAnswerColumn ? "r" : undefined}>Expected</th>
-                <th style={{ width: 140 }}>Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {step.rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    {r.label}
-                    {r.note && !(r.earned !== undefined && r.max !== undefined && r.earned >= r.max) ? <div className="xs muted">{r.note}</div> : null}
-                  </td>
-                  {hasAnswerColumn ? (
-                    <td className="r tnum">{r.answer === "(not answered)" ? <span className="muted">—</span> : r.answer}</td>
-                  ) : null}
-                  <td className={hasAnswerColumn ? "r tnum muted" : "muted"}>{r.expected}</td>
-                  <td>
-                    {r.earned !== undefined && r.max !== undefined ? (
-                      <ResultBadge earned={r.earned} max={r.max} answered={r.answer !== "(not answered)" && r.answer !== ""} />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AnswerTable rows={step.rows} first={first} />
       ) : null}
     </section>
   );

@@ -27,7 +27,7 @@ const assessment: AssessmentSummary = {
   scenarioTitle: "Mini month-end close (v1)",
   timeLimitMinutes: 50,
   passScore: 70,
-  proctoring: { camera: false, screen: true },
+  proctoring: { camera: false, screen: true, fullscreen: false, microphone: false, gaze: false},
   lockedAt: null,
   createdAt: "2026-11-01T10:00:00Z",
 };
@@ -81,6 +81,49 @@ describe("ConfigureAssessmentForm: from the library", () => {
     expect(toggle("Entire-screen sharing")).toHaveAttribute("aria-checked", "false");
     await user.click(screen.getByRole("radio", { name: "Not monitored" }));
     expect(screen.queryByRole("switch", { name: "Camera snapshots" })).not.toBeInTheDocument();
+  });
+
+  it("offers full screen, microphone and gaze under Monitored; gaze needs the camera", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ message: "Created.", id: "as-9" });
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    expect(screen.queryByRole("switch", { name: "Require full screen" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    const gaze = "Gaze check (on-device: facing the screen, number of faces)";
+    expect(toggle("Require full screen")).toHaveAttribute("aria-checked", "false");
+    expect(toggle("Microphone (audio clips when speech is heard)")).toHaveAttribute("aria-checked", "false");
+    expect(toggle(gaze)).toBeDisabled();
+    await user.click(toggle("Camera snapshots"));
+    expect(toggle(gaze)).toBeEnabled();
+    await user.click(toggle(gaze));
+    await user.click(toggle("Require full screen"));
+    await user.click(toggle("Microphone (audio clips when speech is heard)"));
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
+    await waitFor(() => expect(createAssessment).toHaveBeenCalled());
+    expect(formDataOf(createAssessment)).toMatchObject({ monitoring: "monitored", camera: "on", fullscreen: "on", microphone: "on", gaze: "on" });
+  });
+
+  it("turning the camera off turns gaze off and stops sending it", async () => {
+    const user = userEvent.setup();
+    createAssessment.mockResolvedValueOnce({ message: "Created.", id: "as-9" });
+    render(<ConfigureAssessmentForm {...base} mode={create} />);
+    await user.click(screen.getByRole("radio", { name: "Monitored" }));
+    await user.click(toggle("Camera snapshots"));
+    await user.click(toggle("Gaze check (on-device: facing the screen, number of faces)"));
+    await user.click(toggle("Camera snapshots"));
+    expect(toggle("Gaze check (on-device: facing the screen, number of faces)")).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle("Microphone (audio clips when speech is heard)"));
+    await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
+    await waitFor(() => expect(createAssessment).toHaveBeenCalled());
+    expect(formDataOf(createAssessment)).not.toHaveProperty("gaze");
+    expect(formDataOf(createAssessment)).not.toHaveProperty("camera");
+  });
+
+  it("a microphone-only assessment opens as Monitored with its switches set", () => {
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false, fullscreen: true, microphone: true, gaze: false } })} />);
+    expect(screen.getByRole("radio", { name: "Monitored" })).toBeChecked();
+    expect(toggle("Microphone (audio clips when speech is heard)")).toHaveAttribute("aria-checked", "true");
+    expect(toggle("Require full screen")).toHaveAttribute("aria-checked", "true");
   });
 
   it("submits Not monitored with no camera or screen fields", async () => {
@@ -185,7 +228,7 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
   });
 
   it("opens an unmonitored assessment with Not monitored chosen", () => {
-    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false } })} />);
+    render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false, fullscreen: false, microphone: false, gaze: false} })} />);
     expect(screen.getByRole("radio", { name: "Not monitored" })).toBeChecked();
     expect(screen.queryByRole("switch", { name: "Entire-screen sharing" })).not.toBeInTheDocument();
   });
@@ -232,6 +275,9 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
     expect(name()).toBeDisabled();
     expect(timeLimit()).toBeDisabled();
     expect(toggle("Camera snapshots")).toBeDisabled();
+    expect(toggle("Require full screen")).toBeDisabled();
+    expect(toggle("Microphone (audio clips when speech is heard)")).toBeDisabled();
+    expect(toggle("Gaze check (on-device: facing the screen, number of faces)")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clone" })).toHaveClass("btn-primary");
     expect(screen.getByRole("link", { name: "Back" })).toBeVisible();
