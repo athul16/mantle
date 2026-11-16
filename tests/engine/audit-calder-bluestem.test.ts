@@ -6,34 +6,59 @@ const { auditCalderBluestem } = await import("@/lib/engine/scenarios/audit-calde
 const { getScenario, listScenarios } = await import("@/lib/engine/scenarios");
 const { renderAttemptForCandidate } = await import("@/lib/engine/server/render");
 const { scoreAttempt } = await import("@/lib/engine/server/score");
+const { resolveFlow, visibleMessageIds, validateSections } = await import("@/lib/engine/server/flow");
+const { getServerStepType } = await import("@/lib/engine/server/registry");
+const { fillTemplate, templateValues } = await import("@/lib/engine/server/template");
+import type { RapidChoiceField, RapidItem } from "@/lib/engine/step-types/rapid_round/public";
 
 /**
  * docs/07 Example 5: audit intern at Calder & Finch LLP, Bluestem
- * Manufacturing's December 31 year-end, phase A (no rapid rounds yet).
- * These tests vouch the sample from what the candidate sees (the rendered
- * documents and emails), then compare that with the server key, so the
- * material and the key can't drift apart.
+ * Manufacturing's December 31 year-end. Phase A (vouching, inbox, proposed
+ * adjustment, 70 points) plus phase B (three rapid rounds, 30 points, and
+ * timed sections). These tests solve the work from what the candidate sees
+ * (the rendered documents, emails and rapid items), then compare that with
+ * the server key, so the material and the key can't drift apart.
  */
 
 const scenario = auditCalderBluestem;
 const SEEDS = Array.from({ length: 200 }, (_, i) => `attempt-${i.toString(16).padStart(4, "0")}`);
-const PHASE_A_MAX = 70;
+const TOTAL_MAX = 100;
 const RUBRIC_MAX = 5 + 8; // controller reply + summary to Marcus
+const TIME_LIMIT = 52;
 
 const STEPS = [
+  ["rapid-tick", "rapid_round"],
   ["vouch-1", "document_review"],
   ["vouch-2", "document_review"],
   ["vouch-3", "document_review"],
   ["vouch-4", "document_review"],
+  ["rapid-cutoff", "rapid_round"],
   ["controller-reply", "inbox_reply"],
   ["exception-count", "numeric"],
   ["exception-total", "numeric"],
   ["bank-confirm", "document_review"],
+  ["rapid-sample", "rapid_round"],
   ["misstatement-summary", "spreadsheet"],
   ["proposed-aje", "journal_entry"],
   ["marcus-summary", "inbox_reply"],
 ] as const;
+const RAPID_STEPS = ["rapid-tick", "rapid-cutoff", "rapid-sample"] as const;
+type RapidId = (typeof RAPID_STEPS)[number];
+
+/** Section id, minutes, one at a time, steps (docs/07 Example 5, "Sections"). */
+const SECTIONS: [string, number, boolean, string[]][] = [
+  ["s-rapid-a", 6, false, ["rapid-tick"]],
+  ["s-vouch", 12, true, ["vouch-1", "vouch-2", "vouch-3", "vouch-4"]],
+  ["s-rapid-b", 6, false, ["rapid-cutoff"]],
+  ["s-inbox", 10, true, ["controller-reply", "exception-count", "exception-total", "bank-confirm"]],
+  ["s-rapid-c", 6, false, ["rapid-sample"]],
+  ["s-wrap", 12, false, ["misstatement-summary", "proposed-aje", "marcus-summary"]],
+];
+
 const MAX_BY_STEP: Record<string, number> = {
+  "rapid-tick": 10,
+  "rapid-cutoff": 10,
+  "rapid-sample": 10,
   "vouch-1": 5,
   "vouch-2": 5,
   "vouch-3": 5,
@@ -46,18 +71,21 @@ const MAX_BY_STEP: Record<string, number> = {
   "proposed-aje": 8,
   "marcus-summary": 8,
 };
-const AUTO_STEPS = STEPS.map(([id]) => id).filter((id) => id !== "controller-reply" && id !== "marcus-summary");
+const AUTO_STEPS: string[] = STEPS.map(([id]) => id).filter((id) => id !== "controller-reply" && id !== "marcus-summary");
 
-/** Arrival minute of each message and the step it delivers. */
-const TIMELINE: [string, number, string][] = [
-  ["m1", 0, "vouch-1"],
-  ["m2", 8, "controller-reply"],
-  ["m3", 15, "exception-count"],
-  ["m4", 16, "exception-total"],
-  ["m5", 22, "bank-confirm"],
-  ["m6", 28, "misstatement-summary"],
-  ["m7", 30, "proposed-aje"],
-  ["m8", 32, "marcus-summary"],
+/** Each message and the step it delivers; every one arrives when that step's section starts. */
+const MESSAGES: [string, string][] = [
+  ["m-tick", "rapid-tick"],
+  ["m1", "vouch-1"],
+  ["m-cutoff", "rapid-cutoff"],
+  ["m2", "controller-reply"],
+  ["m3", "exception-count"],
+  ["m4", "exception-total"],
+  ["m5", "bank-confirm"],
+  ["m-sample", "rapid-sample"],
+  ["m6", "misstatement-summary"],
+  ["m7", "proposed-aje"],
+  ["m8", "marcus-summary"],
 ];
 
 type Trap = "amount" | "cutoff" | "personal" | "support";
@@ -143,6 +171,93 @@ function solve(seed: string) {
   return { items, traps, clean, one, misstatement, total, ct, propose: total >= ct, bank };
 }
 
+/* ---------- Rapid rounds: render each item as the candidate gets it, then solve it from the screen ---------- */
+
+const RR = getServerStepType("rapid_round");
+
+/** Every item of a rapid step, rendered one at a time through the step type's sequence hook. */
+function rapidItems(seed: string, stepId: RapidId): RapidItem[] {
+  const variant = scenario.generate(seed);
+  const values = templateValues(variant.values);
+  const fill = (t: string) => fillTemplate(t, values);
+  const step = scenario.definition.steps.find((s) => s.id === stepId)!;
+  const cfg = RR.configSchema.parse(step.config);
+  const seq = RR.sequence!;
+  return Array.from({ length: seq.count(cfg) }, (_, i) => seq.renderItem(cfg, { variant, fill }, i) as RapidItem);
+}
+
+const choiceFields = (item: RapidItem) => item.fields as RapidChoiceField[];
+const field = (item: RapidItem, id: string) => choiceFields(item).find((f) => f.id === id)!;
+const yearOf = (date: string) => Number(date.slice(-4));
+const amountOf = (s: string) => cents(s)!;
+
+/**
+ * Tick and tie: schedule column against source-document column, rows
+ * Reference / party / Date / figure. Returns the options a careful auditor
+ * would pick, as a list, so a test can demand exactly one per field.
+ */
+function solveTick(item: RapidItem): Record<string, string[]> {
+  const t = item.exhibit!.table!;
+  expect(t.rows.length).toBe(4);
+  if (/not on file/i.test(t.rows[0][2])) return { result: ["exception"], reason: ["no_support"] };
+  const diffs = t.rows.map((r, i) => (r[1] !== r[2] ? i : -1)).filter((i) => i >= 0);
+  if (diffs.length === 0) return { result: ["agrees"], reason: ["na"] };
+  const reasons = diffs.map((i) => ({ 0: "ref", 1: "vendor", 2: "cutoff", 3: "amount" })[i]!);
+  return { result: ["exception"], reason: reasons };
+}
+
+/** Cutoff: ownership passes at shipment (FOB shipping point) or delivery (FOB destination). */
+function solveCutoff(item: RapidItem): Record<string, string[]> {
+  const row = (label: string) => item.exhibit!.rows!.find((r) => r.label === label)!.value;
+  const terms = row("Terms");
+  expect(terms).toMatch(/^FOB (shipping point|destination)$/);
+  const year = yearOf(terms === "FOB shipping point" ? row("Shipped") : row("Delivered"));
+  return { year: [`y${year}`], recorded: [yearOf(row("Recorded in GL")) === year ? "yes" : "no"] };
+}
+
+/** Sample selection: which line the rule picks, how many it picks, or which check number is missing. */
+function solveSample(item: RapidItem): Record<string, string[]> {
+  const f = choiceFields(item)[0];
+  const rows = item.exhibit!.table!.rows;
+  if (f.id === "missing") {
+    const nos = rows.map((r) => Number(r[0].replace("#", "")));
+    const missing: number[] = [];
+    for (let x = Math.min(...nos); x <= Math.max(...nos); x++) if (!nos.includes(x)) missing.push(x);
+    expect(missing.length).toBe(1);
+    return { missing: f.options.filter((o) => o.label === `#${missing[0]}`).map((o) => o.id) };
+  }
+  const thr = amountOf(item.prompt.match(/over (\$[\d,]+\.\d\d)/)![1]);
+  const [, k, start] = item.prompt.match(/every (\d+)(?:st|nd|rd|th) item number starting at #(\d+)/)!.map(Number);
+  const picked = rows.filter((r) => {
+    const no = Number(r[1].replace("#", ""));
+    return amountOf(r[2]) > thr || (no >= start && (no - start) % k === 0);
+  });
+  if (f.id === "line") return { line: picked.map((r) => r[0].toLowerCase()) };
+  return { count: f.options.filter((o) => o.label === String(picked.length)).map((o) => o.id) };
+}
+
+const SOLVERS: Record<RapidId, (item: RapidItem) => Record<string, string[]>> = {
+  "rapid-tick": solveTick,
+  "rapid-cutoff": solveCutoff,
+  "rapid-sample": solveSample,
+};
+type RapidKey = { items: Record<string, Record<string, { choice?: string; value?: number }>> };
+
+/** The candidate's rapid answers, solved from the screen (each field must have exactly one right option). */
+function rapidAnswers(seed: string, stepId: RapidId) {
+  const items: Record<string, { values: Record<string, string>; ms: number }> = {};
+  for (const item of rapidItems(seed, stepId)) {
+    const solved = SOLVERS[stepId](item);
+    const values: Record<string, string> = {};
+    for (const [fid, opts] of Object.entries(solved)) {
+      expect(opts.length, `${seed} ${item.id} ${fid}: ${opts}`).toBe(1);
+      values[fid] = opts[0];
+    }
+    items[item.id] = { values, ms: 6_000 };
+  }
+  return { items };
+}
+
 const entry = (dr: string, cr: string, amount: number, memo = "") => ({
   memo,
   lines: [
@@ -159,7 +274,7 @@ type Answers = Record<VouchId | "bank-confirm", ReviewAnswer> & {
   "misstatement-summary": { cells: Record<string, number | null> };
   "proposed-aje": { entries: ReturnType<typeof entry>[] };
   "marcus-summary": { body: string };
-};
+} & Record<RapidId, ReturnType<typeof rapidAnswers>>;
 
 /** A strong candidate's answers, built only from the screen. */
 function perfectAnswers(seed: string): Answers {
@@ -192,6 +307,9 @@ function perfectAnswers(seed: string): Answers {
       ],
     },
     "marcus-summary": { body: `Hi Marcus, 4 exceptions, total ${money(s.total)}. Thanks` },
+    "rapid-tick": rapidAnswers(seed, "rapid-tick"),
+    "rapid-cutoff": rapidAnswers(seed, "rapid-cutoff"),
+    "rapid-sample": rapidAnswers(seed, "rapid-sample"),
   };
 }
 
@@ -202,13 +320,12 @@ const autoPoints = (seed: string, a: unknown) => {
 };
 
 describe("audit-calder-bluestem: setup", () => {
-  it("is registered as v1, 50 minutes, accounting, phase A only (no sections), built step types", () => {
+  it("is registered as v1 (not yet published), 52 minutes, accounting, in timed sections", () => {
     expect(getScenario("audit-calder-bluestem", 1)).toBe(scenario);
     expect(listScenarios()).toContain(scenario);
     expect(scenario.version).toBe(1);
-    expect(scenario.timeLimitMinutes).toBe(50);
+    expect(scenario.timeLimitMinutes).toBe(TIME_LIMIT);
     expect(scenario.roleFamily).toBe("accounting");
-    expect(scenario.definition).not.toHaveProperty("sections");
     expect(scenario.definition.steps.map((s) => [s.id, s.type])).toEqual(STEPS.map(([id, type]) => [id, type]));
     expect(scenario.definition.intro).toMatch(/Calder & Finch LLP/);
     expect(scenario.definition.intro).toMatch(/Bluestem Manufacturing/);
@@ -218,7 +335,7 @@ describe("audit-calder-bluestem: setup", () => {
 
   it("renders for 200 seeds at every point in the timeline", () => {
     for (const seed of SEEDS) {
-      for (const minute of [0, 8, 15, 16, 22, 28, 30, 32, scenario.timeLimitMinutes]) {
+      for (const minute of [0, scenario.timeLimitMinutes]) {
         const view = renderAttemptForCandidate(scenario, seed, minute);
         expect(JSON.stringify(view)).not.toContain("{{");
       }
@@ -229,8 +346,13 @@ describe("audit-calder-bluestem: setup", () => {
     for (const seed of SEEDS.slice(0, 20)) {
       expect(scenario.generate(seed)).toEqual(scenario.generate(seed));
       expect(renderAttemptForCandidate(scenario, seed, 50)).toEqual(renderAttemptForCandidate(scenario, seed, 50));
+      for (const id of RAPID_STEPS) expect(rapidItems(seed, id)).toEqual(rapidItems(seed, id));
     }
     expect(new Set(SEEDS.map((s) => JSON.stringify(scenario.generate(s).values))).size).toBe(SEEDS.length);
+    for (const id of RAPID_STEPS) {
+      expect(new Set(SEEDS.slice(0, 50).map((s) => JSON.stringify(rapidItems(s, id)))).size, id).toBe(50);
+      expect(new Set(SEEDS.slice(0, 50).map((s) => JSON.stringify(scenario.generate(s).keys[id]))).size, id).toBe(50);
+    }
     const all = SEEDS.slice(0, 50).map((s) => solve(s));
     expect(new Set(all.map((s) => s.total)).size).toBeGreaterThan(45);
     expect(new Set(all.map((s) => s.one("personal").gl.payee)).size).toBeGreaterThan(1);
@@ -375,42 +497,79 @@ describe("audit-calder-bluestem: every variant is internally consistent", () => 
 });
 
 describe("audit-calder-bluestem: scoring", () => {
-  it("is out of 70 in phase A, and a blank attempt scores 0", () => {
+  it("is out of 100 (70 phase A + 3 rapid rounds × 10), exactly, and a blank attempt scores 0", () => {
     const blank = scoreAttempt(scenario, "abc", {});
     expect(blank.points).toBe(0);
-    expect(blank.maxPoints).toBe(PHASE_A_MAX);
+    expect(blank.maxPoints).toBe(TOTAL_MAX);
     for (const [id, max] of Object.entries(MAX_BY_STEP)) expect(blank.steps[id].maxPoints, id).toBe(max);
+    for (const id of RAPID_STEPS) expect(blank.steps[id].points).toBe(0);
     const part = (ids: string[]) => ids.reduce((t, id) => t + MAX_BY_STEP[id], 0);
     expect(part(["vouch-1", "vouch-2", "vouch-3", "vouch-4"])).toBe(25);
     expect(part(["controller-reply", "exception-count", "exception-total", "bank-confirm"])).toBe(15);
     expect(part(["misstatement-summary", "proposed-aje", "marcus-summary"])).toBe(30);
+    expect(part([...RAPID_STEPS])).toBe(30);
   });
 
   it("a perfect answer earns every automatic point, and the replies go to review", () => {
     for (const seed of SEEDS.slice(0, 100)) {
       const r = scoreAttempt(scenario, seed, perfectAnswers(seed));
       for (const id of AUTO_STEPS) expect(r.steps[id].points, `${seed} ${id}`).toBe(r.steps[id].maxPoints);
-      expect(autoPoints(seed, perfectAnswers(seed))).toBeCloseTo(PHASE_A_MAX - RUBRIC_MAX, 9);
+      expect(autoPoints(seed, perfectAnswers(seed))).toBeCloseTo(TOTAL_MAX - RUBRIC_MAX, 9);
       expect(r.steps["controller-reply"].needsReview).toBe(true);
       expect(r.steps["marcus-summary"].needsReview).toBe(true);
     }
   });
 
-  it("a perfect answer is the phase-A max once a reviewer gives both replies full marks", () => {
-    const r = scoreAttempt(scenario, "abc", perfectAnswers("abc"));
-    const reviewed = r.points + RUBRIC_MAX - r.steps["controller-reply"].points - r.steps["marcus-summary"].points;
-    expect(reviewed).toBeCloseTo(PHASE_A_MAX, 9);
+  it("a perfect answer is 100 once a reviewer gives both replies full marks", () => {
+    for (const seed of SEEDS.slice(0, 10)) {
+      const r = scoreAttempt(scenario, seed, perfectAnswers(seed));
+      const reviewed = r.points + RUBRIC_MAX - r.steps["controller-reply"].points - r.steps["marcus-summary"].points;
+      expect(reviewed, seed).toBeCloseTo(TOTAL_MAX, 9);
+    }
   });
 
   it("another seed's perfect answer doesn't score well (answers can't be shared)", () => {
     let total = 0;
     for (const seed of SEEDS.slice(1, 21)) total += autoPoints(seed, perfectAnswers(SEEDS[0]));
-    expect(total / 20).toBeLessThan((PHASE_A_MAX - RUBRIC_MAX) * 0.6);
+    expect(total / 20).toBeLessThan((TOTAL_MAX - RUBRIC_MAX) * 0.6);
+    let rapid = 0;
+    for (const seed of SEEDS.slice(1, 21)) {
+      const r = scoreAttempt(scenario, seed, perfectAnswers(SEEDS[0]));
+      rapid += RAPID_STEPS.reduce((t, id) => t + r.steps[id].points, 0);
+    }
+    expect(rapid / 20).toBeLessThan(30 * 0.7);
+  });
+
+  describe("rapid rounds: item weights and partial credit", () => {
+    it("the first five items of each round are worth 0.5, the other ten 0.75 (10 per round, no rounding)", () => {
+      const r = scoreAttempt(scenario, "abc", {});
+      for (const id of RAPID_STEPS) {
+        const items = r.steps[id].items.filter((i) => i.id !== "timing");
+        expect(items.map((i) => i.max)).toEqual([...Array(5).fill(0.5), ...Array(10).fill(0.75)]);
+        expect(items.every((i) => i.note?.includes("No answer"))).toBe(true);
+      }
+    });
+
+    it("one wrong field costs half its item; an unanswered item costs all of it", () => {
+      for (const seed of SEEDS.slice(0, 20)) {
+        for (const id of RAPID_STEPS) {
+          const a = clone(perfectAnswers(seed));
+          const items = rapidItems(seed, id);
+          const first = items[0];
+          const f = choiceFields(first)[0];
+          const right = a[id].items[first.id].values[f.id];
+          a[id].items[first.id].values[f.id] = f.options.find((o) => o.id !== right)!.id;
+          delete a[id].items[items[14].id];
+          const fields = first.fields.length;
+          expect(scoreAttempt(scenario, seed, a).steps[id].points, `${seed} ${id}`).toBe(10 - 0.5 / fields - 0.75);
+        }
+      }
+    });
   });
 
   describe("each trap answered wrongly costs exactly its points", () => {
     const seeds = SEEDS.slice(0, 40);
-    const full = PHASE_A_MAX - RUBRIC_MAX;
+    const full = TOTAL_MAX - RUBRIC_MAX;
 
     for (const t of TRAPS) {
       it(`vouching: missing the ${t} trap costs its 5 points`, () => {
@@ -605,30 +764,210 @@ describe("audit-calder-bluestem: nothing derived reaches the candidate", () => {
   });
 });
 
-describe("audit-calder-bluestem: timeline", () => {
-  const msgs = scenario.definition.messages;
+describe("audit-calder-bluestem: rapid rounds", () => {
+  const keyFor = (seed: string, id: RapidId) => scenario.generate(seed).keys[id] as RapidKey;
 
-  it("messages arrive over the 50 minutes, each delivering its task", () => {
-    expect(msgs.map((m) => [m.id, m.arriveAtMinute ?? 0, m.stepId])).toEqual(TIMELINE);
-    for (const m of msgs) expect(m.arriveAtMinute ?? 0).toBeLessThan(scenario.timeLimitMinutes - 10);
-    expect(msgs.find((m) => m.id === "m2")!.from).toMatch(/Controller, Bluestem Manufacturing/);
-    for (const id of ["m1", "m3", "m4", "m5", "m6", "m7", "m8"]) expect(msgs.find((m) => m.id === id)!.from).toMatch(/^Marcus/);
+  it("each round is 15 items × 20 seconds of choice fields, 10 points", () => {
+    for (const id of RAPID_STEPS) {
+      const step = scenario.definition.steps.find((s) => s.id === id)!;
+      const cfg = RR.configSchema.parse(step.config) as { secondsPerItem: number; items: { points: number; fields: { kind: string }[] }[] };
+      expect(cfg.secondsPerItem, id).toBe(20);
+      expect(cfg.items.length, id).toBe(15);
+      expect(cfg.items.reduce((t, i) => t + i.points, 0), id).toBe(10);
+      for (const item of cfg.items) for (const f of item.fields) expect(f.kind).toBe("choice");
+    }
   });
 
-  it("the four vouching pairs are open from the start; every other task waits for its message", () => {
-    for (const [, minute, stepId] of TIMELINE) {
-      const before = renderAttemptForCandidate(scenario, "abc", minute - 0.5).steps.map((s) => s.id);
-      const at = renderAttemptForCandidate(scenario, "abc", minute).steps.map((s) => s.id);
-      if (minute > 0) expect(before).not.toContain(stepId);
-      expect(at).toContain(stepId);
+  it("over 200 seeds every item is consistent: each field has exactly one right option, it's in the options, and the key agrees", () => {
+    for (const seed of SEEDS) {
+      for (const id of RAPID_STEPS) {
+        const key = keyFor(seed, id);
+        const items = rapidItems(seed, id);
+        expect(Object.keys(key.items).sort(), `${seed} ${id}`).toEqual(items.map((i) => i.id).sort());
+        for (const item of items) {
+          expect(JSON.stringify(item)).not.toContain("{{");
+          const solved = SOLVERS[id](item);
+          for (const f of choiceFields(item)) {
+            const k = key.items[item.id][f.id];
+            expect(k, `${seed} ${item.id} ${f.id}`).toBeDefined();
+            expect(f.options.map((o) => o.id), `${seed} ${item.id} ${f.id}`).toContain(k.choice);
+            expect(new Set(f.options.map((o) => o.label)).size, `${seed} ${item.id} labels unique`).toBe(f.options.length);
+            expect(solved[f.id], `${seed} ${item.id} ${f.id}`).toEqual([k.choice]);
+          }
+          expect(Object.keys(key.items[item.id]).sort()).toEqual(item.fields.map((f) => f.id).sort());
+        }
+      }
     }
-    expect(renderAttemptForCandidate(scenario, "abc", 0).steps.map((s) => s.id)).toEqual(["vouch-1", "vouch-2", "vouch-3", "vouch-4"]);
-    expect(renderAttemptForCandidate(scenario, "abc", 7).messages.map((m) => m.id)).toEqual(["m1"]);
+  });
+
+  it("tick and tie: five items agree, ten are exceptions with one difference each, and every reason occurs", () => {
+    for (const seed of SEEDS) {
+      const items = rapidItems(seed, "rapid-tick");
+      const solved = items.map(solveTick);
+      expect(solved.filter((s) => s.result[0] === "agrees").length, seed).toBe(5);
+      for (const r of ["amount", "cutoff", "vendor", "no_support"]) expect(solved.some((s) => s.reason[0] === r), `${seed} ${r}`).toBe(true);
+      const docs = new Set(items.map((i) => i.exhibit!.table!.columns[2]));
+      expect([...docs].sort(), seed).toEqual(["Bank confirmation", "Receiving report", "Vendor invoice"]);
+      for (const item of items) {
+        const [, , date, fig] = item.exhibit!.table!.rows;
+        expect(yearOf(date[1]), `${seed} ${item.id} schedule date`).toBe(2025);
+        const reason = solveTick(item).reason[0];
+        if (reason === "cutoff") expect(yearOf(date[2])).toBe(2026);
+        if (reason === "amount") expect(fig[1]).not.toBe(fig[2]);
+      }
+    }
+  });
+
+  it("cutoff: both years, both recorded outcomes and both FOB terms occur in every round; the invoice date sometimes misleads", () => {
+    let misleading = 0;
+    for (const seed of SEEDS) {
+      const items = rapidItems(seed, "rapid-cutoff");
+      const solved = items.map(solveCutoff);
+      for (const y of ["y2025", "y2026"]) {
+        for (const r of ["yes", "no"]) expect(solved.some((s) => s.year[0] === y && s.recorded[0] === r), `${seed} ${y} ${r}`).toBe(true);
+      }
+      const terms = new Set(items.map((i) => i.exhibit!.rows!.find((r) => r.label === "Terms")!.value));
+      expect(terms.size, seed).toBe(2);
+      for (const [i, item] of items.entries()) {
+        const row = (label: string) => item.exhibit!.rows!.find((r) => r.label === label)!.value;
+        for (const label of ["Shipped", "Delivered", "Invoice date", "Recorded in GL"]) {
+          expect(row(label), `${seed} ${item.id} ${label}`).toMatch(/^(12\/(1\d|2\d|3[01])\/2025|01\/(0\d|1[0-5])\/2026)$/);
+        }
+        if (`y${yearOf(row("Invoice date"))}` !== solved[i].year[0]) misleading++;
+      }
+    }
+    expect(misleading).toBeGreaterThan(SEEDS.length);
+  });
+
+  it("no field has the same right answer for every seed, and what a field offers doesn't depend on the seed except check numbers", () => {
+    for (const id of RAPID_STEPS) {
+      const base = rapidItems(SEEDS[0], id);
+      const others = SEEDS.slice(1, 30).map((seed) => rapidItems(seed, id));
+      for (const [i, item] of base.entries()) {
+        for (const f of choiceFields(item)) {
+          const answers = new Set(SEEDS.map((seed) => keyFor(seed, id).items[item.id][f.id].choice));
+          expect(answers.size, `${id} ${item.id} ${f.id}`).toBeGreaterThan(1);
+          for (const other of others) {
+            const o = field(other[i], f.id);
+            expect(o.options.map((x) => x.id)).toEqual(f.options.map((x) => x.id));
+            if (f.id !== "missing") expect(o.options).toEqual(f.options);
+          }
+        }
+      }
+    }
+  });
+
+  it("50 seeds: no rendered rapid item holds a key value, key string or scoring word", () => {
+    const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice"]);
+    const leaves = (key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, f = "") => {
+      if (PUBLIC_ID_FIELDS.has(f)) return out;
+      if (typeof key === "number" && (f === "value" || f === "amount")) out.numbers.push(key);
+      else if (typeof key === "string") out.strings.push(key);
+      else if (key && typeof key === "object") for (const [k, v] of Object.entries(key)) leaves(v, out, k);
+      return out;
+    };
+    const patterns = (value: number) =>
+      [value.toFixed(2), value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), String(Math.round(value * 100))]
+        .filter((f) => !/^\d{1,3}$/.test(f))
+        .map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
+    let checked = 0;
+    for (const seed of SEEDS.slice(0, 50)) {
+      const variant = scenario.generate(seed);
+      const shown = new Set(Object.values(variant.values).filter((x): x is number => typeof x === "number").map((c) => c / 100));
+      const { numbers, strings } = leaves(variant.keys);
+      const derived = numbers.filter((n) => n >= 1 && !shown.has(n));
+      expect(derived.length).toBeGreaterThan(0);
+      for (const id of RAPID_STEPS) {
+        for (const item of rapidItems(seed, id)) {
+          const payload = JSON.stringify(item);
+          expect(payload).not.toMatch(/choice|tolerance|points|"key"|"notes"/);
+          for (const n of derived) for (const p of patterns(n)) expect(payload, `${seed} ${item.id} leaks ${n}`).not.toMatch(p);
+          for (const s of strings) expect(payload, `${seed} ${item.id} leaks a key string`).not.toContain(s);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(50 * 45);
+  });
+});
+
+describe("audit-calder-bluestem: sections and timeline", () => {
+  const MIN = 60_000;
+  const t0 = Date.parse("2026-11-16T09:00:00Z");
+  const flowAt = (ms: number) => resolveFlow(scenario.definition, { startedAt: t0, now: t0 + ms, extraTimePercent: 0, events: [] });
+  const msgs = scenario.definition.messages;
+
+  it("six sections, 52 minutes in all, matching the time limit; validateSections passes", () => {
+    const sections = scenario.definition.sections!;
+    expect(sections.map((s) => [s.id, s.minutes, Boolean(s.oneAtATime), s.stepIds])).toEqual(SECTIONS);
+    expect(sections.reduce((t, s) => t + s.minutes, 0)).toBe(scenario.timeLimitMinutes);
+    expect(validateSections(scenario.definition, scenario.timeLimitMinutes)).toEqual([]);
+  });
+
+  it("one-at-a-time screens fill their section; rapid rounds fit theirs", () => {
+    for (const sec of scenario.definition.sections!) {
+      const steps = sec.stepIds.map((id) => scenario.definition.steps.find((s) => s.id === id)!);
+      if (sec.oneAtATime) expect(steps.reduce((t, s) => t + s.seconds!, 0), sec.id).toBe(sec.minutes * 60);
+      for (const s of steps.filter((x) => x.type === "rapid_round")) expect(15 * 20, s.id).toBeLessThanOrEqual(sec.minutes * 60);
+    }
+    const seconds = Object.fromEntries(scenario.definition.steps.filter((s) => s.seconds).map((s) => [s.id, s.seconds]));
+    expect(seconds).toEqual({
+      "vouch-1": 180,
+      "vouch-2": 180,
+      "vouch-3": 180,
+      "vouch-4": 180,
+      "controller-reply": 240,
+      "exception-count": 90,
+      "exception-total": 90,
+      "bank-confirm": 180,
+    });
+  });
+
+  it("every message is linked to a step and arrives as that step's section starts", () => {
+    expect(msgs.map((m) => [m.id, m.stepId])).toEqual(MESSAGES);
+    for (const m of msgs) expect(m.arriveAtMinute ?? 0, m.id).toBe(0);
+    expect(msgs.find((m) => m.id === "m2")!.from).toMatch(/Controller, Bluestem Manufacturing/);
+    for (const [id] of MESSAGES.filter(([id]) => id !== "m2")) expect(msgs.find((m) => m.id === id)!.from).toMatch(/^Marcus/);
+  });
+
+  it("left to run, each section opens on time with only its steps and brings its messages", () => {
+    const sectionOf = (stepId: string) => SECTIONS.find(([, , , ids]) => ids.includes(stepId))![0];
+    let start = 0;
+    const seen: string[] = [];
+    for (const [id, minutes, oneAtATime, stepIds] of SECTIONS) {
+      const now = start * MIN + 1_000;
+      const f = flowAt(now);
+      expect(f.section?.id, `${id} at ${start}`).toBe(id);
+      expect(f.visibleStepIds).toEqual(oneAtATime ? [stepIds[0]] : stepIds);
+      const arrived = visibleMessageIds(scenario.definition, f, t0, t0 + now);
+      const fresh = arrived.filter((m) => !seen.includes(m));
+      expect(fresh.sort(), id).toEqual(
+        MESSAGES.filter(([, step]) => sectionOf(step) === id)
+          .map(([m]) => m)
+          .sort(),
+      );
+      if (start > 0) {
+        const before = visibleMessageIds(scenario.definition, flowAt(now - 2_000), t0, t0 + now - 2_000);
+        for (const m of fresh) expect(before, `${m} before ${id}`).not.toContain(m);
+      }
+      seen.push(...fresh);
+      start += minutes;
+    }
+    expect(flowAt(TIME_LIMIT * MIN).done).toBe(true);
+    expect(seen.sort()).toEqual(MESSAGES.map(([m]) => m).sort());
+  });
+
+  it("the screens come one at a time: four vouching pairs, then controller, Marcus's two numbers and the bank confirmation", () => {
+    const vouch = (min: number) => flowAt((6 + min) * MIN + 1_000).screen?.stepId;
+    expect([vouch(0), vouch(3), vouch(6), vouch(9)]).toEqual(["vouch-1", "vouch-2", "vouch-3", "vouch-4"]);
+    const inbox = (min: number) => flowAt((24 + min) * MIN + 1_000).screen?.stepId;
+    expect([inbox(0), inbox(4), inbox(5.5), inbox(7)]).toEqual(["controller-reply", "exception-count", "exception-total", "bank-confirm"]);
   });
 
   it("Marcus greets the candidate by first name", () => {
-    expect(renderAttemptForCandidate(scenario, "abc", 0, { name: "Priya Raman" }).messages[0].body).toMatch(/^Hi Priya,\n/);
-    expect(renderAttemptForCandidate(scenario, "abc", 0).messages[0].body).toMatch(/^Hi there,\n/);
+    const view = renderAttemptForCandidate(scenario, "abc", 0, { name: "Priya Raman" });
+    expect(view.messages.find((m) => m.id === "m1")!.body).toMatch(/^Hi Priya,\n/);
+    expect(renderAttemptForCandidate(scenario, "abc", 0).messages.find((m) => m.id === "m1")!.body).toMatch(/^Hi there,\n/);
   });
 
   it("the controller asks to skip the unsupported item, and Marcus's messages carry this variant's figures", () => {
