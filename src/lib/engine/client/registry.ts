@@ -7,6 +7,8 @@ import { JournalEntryStep } from "../step-types/journal_entry/client";
 import { JOURNAL_ENTRY } from "../step-types/journal_entry/public";
 import { NumericStep } from "../step-types/numeric/client";
 import { NUMERIC } from "../step-types/numeric/public";
+import { RapidRoundStep } from "../step-types/rapid_round/client";
+import { RAPID_ROUND } from "../step-types/rapid_round/public";
 import { SpreadsheetStep } from "../step-types/spreadsheet/client";
 import { SPREADSHEET } from "../step-types/spreadsheet/public";
 import type { StepComponentProps } from "../types";
@@ -25,6 +27,7 @@ export const clientStepTypes: Record<string, AnyStepComponent> = {
   [SPREADSHEET]: SpreadsheetStep,
   [JOURNAL_ENTRY]: JournalEntryStep,
   [DOCUMENT_REVIEW]: DocumentReviewStep,
+  [RAPID_ROUND]: RapidRoundStep,
 };
 
 export function hasStepComponent(type: string): boolean {
