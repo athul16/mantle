@@ -1,10 +1,7 @@
 /** Candidate report for a rapid round: per-item answers next to the key with response times, and the Timing evidence card. */
 import { signInViaUi } from "../fixtures";
-import { chromiumOnly, expect, test } from "../support/test";
+import { expect, test } from "../support/test";
 import { timedCloseAttempt, timedCloseJob } from "../../tests/helpers/results";
-
-// Like the other company report specs: chromium only; the core happy paths cover firefox and webkit.
-chromiumOnly();
 
 test("a recruiter sees each rapid item's answer, the expected answer and the time, plus timing evidence", async ({ page, data, land }) => {
   const co = await data.company();
