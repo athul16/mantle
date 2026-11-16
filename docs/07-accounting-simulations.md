@@ -257,7 +257,7 @@ Each pair shows, per item, the GL line (ref, date, payee, description, account, 
 
 | Trap | What the candidate sees | Expected reason | Misstatement |
 | --- | --- | --- | --- |
-| Amount | GL amount has the hundreds and tens digits swapped against the invoice, GL higher (e.g. booked $2,481.50, invoice $2,418.50) | Amount doesn't agree to support | GL − invoice (a multiple of $90) |
+| Amount | GL amount has the hundreds and tens digits swapped against the invoice, GL higher (e.g. booked $2,418.50, invoice $2,148.50) | Amount doesn't agree to support | GL − invoice (a multiple of $90) |
 | Cutoff | Invoice dated 01/03/2026 for January 2–3 work, posted 12/28–12/31/2025 to Repairs & maintenance | Wrong period (cutoff) | Full amount |
 | Personal | Card receipt for a ski lodge family stay, jewelry, pet boarding or private boat storage, cardholder an officer, booked as "Client entertainment" | Not a business expense | Full amount |
 | No support | Round-number 12/31 manual accrual ("Q4 consulting"), no invoice, contract or engagement letter; client says the officer agreed it by phone | No support | Full amount |
