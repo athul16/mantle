@@ -32,6 +32,7 @@ const STEPS = [
   ["vouch-2", "document_review"],
   ["vouch-3", "document_review"],
   ["vouch-4", "document_review"],
+  ["vouch-conclusion", "multiple_choice"],
   ["rapid-cutoff", "rapid_round"],
   ["controller-reply", "inbox_reply"],
   ["exception-count", "numeric"],
@@ -39,6 +40,7 @@ const STEPS = [
   ["bank-confirm", "document_review"],
   ["rapid-sample", "rapid_round"],
   ["misstatement-summary", "spreadsheet"],
+  ["pass-or-propose", "multiple_choice"],
   ["proposed-aje", "journal_entry"],
   ["marcus-summary", "inbox_reply"],
 ] as const;
@@ -48,11 +50,11 @@ type RapidId = (typeof RAPID_STEPS)[number];
 /** Section id, minutes, one at a time, steps (docs/07 Example 5, "Sections"). */
 const SECTIONS: [string, number, boolean, string[]][] = [
   ["s-rapid-a", 6, false, ["rapid-tick"]],
-  ["s-vouch", 12, true, ["vouch-1", "vouch-2", "vouch-3", "vouch-4"]],
+  ["s-vouch", 12, true, ["vouch-1", "vouch-2", "vouch-3", "vouch-4", "vouch-conclusion"]],
   ["s-rapid-b", 6, false, ["rapid-cutoff"]],
   ["s-inbox", 10, true, ["controller-reply", "exception-count", "exception-total", "bank-confirm"]],
   ["s-rapid-c", 6, false, ["rapid-sample"]],
-  ["s-wrap", 12, false, ["misstatement-summary", "proposed-aje", "marcus-summary"]],
+  ["s-wrap", 12, false, ["misstatement-summary", "pass-or-propose", "proposed-aje", "marcus-summary"]],
 ];
 
 const MAX_BY_STEP: Record<string, number> = {
@@ -62,12 +64,14 @@ const MAX_BY_STEP: Record<string, number> = {
   "vouch-1": 5,
   "vouch-2": 5,
   "vouch-3": 5,
-  "vouch-4": 10,
+  "vouch-4": 5,
+  "vouch-conclusion": 5,
   "controller-reply": 5,
   "exception-count": 2,
   "exception-total": 3,
   "bank-confirm": 5,
-  "misstatement-summary": 14,
+  "misstatement-summary": 10,
+  "pass-or-propose": 4,
   "proposed-aje": 8,
   "marcus-summary": 8,
 };
@@ -100,6 +104,8 @@ type SheetKey = { cells: Record<string, { value: number }> };
 type NumKey = { value: number };
 type ReviewKey = { findings: Record<string, { targets: string[]; reasons: string[]; note?: string }>; decision?: string[] };
 type ReplyKey = { notes: Record<string, string> };
+type ChoiceCfg = { prompt: string; options: { id: string; label: string }[]; select: "single" | "multi" };
+type ChoiceKey = { correct: string[] };
 
 const cents = (s: string) => {
   const t = s.trim();
@@ -272,6 +278,8 @@ type Answers = Record<VouchId | "bank-confirm", ReviewAnswer> & {
   "exception-count": { value: number };
   "exception-total": { value: number };
   "misstatement-summary": { cells: Record<string, number | null> };
+  "vouch-conclusion": { selected: string[] };
+  "pass-or-propose": { selected: string[] };
   "proposed-aje": { entries: ReturnType<typeof entry>[] };
   "marcus-summary": { body: string };
 } & Record<RapidId, ReturnType<typeof rapidAnswers>>;
@@ -285,14 +293,14 @@ function perfectAnswers(seed: string): Answers {
     const it = s.one(t);
     vouch[it.step].flags.push({ target: `i${it.n}-gl`, reason: t, note: "" });
   }
-  vouch["vouch-4"].decision = "propose";
   const cells: Record<string, number | null> = {};
   for (const it of s.items) cells[`mis_${it.n}`] = classify(it) === "clean" ? 0 : dollars(s.misstatement(it));
   cells.total = dollars(s.total);
-  cells.propose = s.propose ? 1 : 0;
   const amt = s.one("amount");
   return {
     ...vouch,
+    "vouch-conclusion": { selected: ["propose"] },
+    "pass-or-propose": { selected: [s.propose ? "propose" : "pass"] },
     "controller-reply": { body: "Hi Renee, we can't skip or swap a sampled item. Could you send the contract or engagement letter instead? Thanks" },
     "exception-count": { value: 4 },
     "exception-total": { value: dollars(s.total) },
@@ -427,7 +435,8 @@ describe("audit-calder-bluestem: every variant is internally consistent", () => 
       expect(c("total")).toBe(s.total);
       for (const t of TRAPS) expect(c(`mis_${s.one(t).n}`), `${seed} ${t}`).toBe(s.misstatement(s.one(t)));
       for (const it of s.clean) expect(sheet).not.toHaveProperty(`mis_${it.n}`);
-      expect(sheet.propose.value).toBe(s.propose ? 1 : 0);
+      expect(sheet).not.toHaveProperty("propose");
+      expect((keys["pass-or-propose"] as ChoiceKey).correct, seed).toEqual([s.propose ? "propose" : "pass"]);
       expect(Math.round((keys["exception-total"] as NumKey).value * 100)).toBe(s.total);
       expect((keys["exception-count"] as NumKey).value).toBe(4);
     }
@@ -463,7 +472,8 @@ describe("audit-calder-bluestem: every variant is internally consistent", () => 
         expect(f.targets, `${seed} ${t}`).toContain(`i${it.n}-gl`);
         expect(f.reasons).toEqual([t]);
       }
-      expect((keys["vouch-4"] as ReviewKey).decision).toEqual(["propose"]);
+      for (const k of [1, 2, 3, 4]) expect((keys[`vouch-${k}`] as ReviewKey).decision, `${seed} vouch-${k}`).toBeUndefined();
+      expect((keys["vouch-conclusion"] as ChoiceKey).correct).toEqual(["propose"]);
     }
   });
 
@@ -504,9 +514,9 @@ describe("audit-calder-bluestem: scoring", () => {
     for (const [id, max] of Object.entries(MAX_BY_STEP)) expect(blank.steps[id].maxPoints, id).toBe(max);
     for (const id of RAPID_STEPS) expect(blank.steps[id].points).toBe(0);
     const part = (ids: string[]) => ids.reduce((t, id) => t + MAX_BY_STEP[id], 0);
-    expect(part(["vouch-1", "vouch-2", "vouch-3", "vouch-4"])).toBe(25);
+    expect(part(["vouch-1", "vouch-2", "vouch-3", "vouch-4", "vouch-conclusion"])).toBe(25);
     expect(part(["controller-reply", "exception-count", "exception-total", "bank-confirm"])).toBe(15);
-    expect(part(["misstatement-summary", "proposed-aje", "marcus-summary"])).toBe(30);
+    expect(part(["misstatement-summary", "pass-or-propose", "proposed-aje", "marcus-summary"])).toBe(30);
     expect(part([...RAPID_STEPS])).toBe(30);
   });
 
@@ -618,7 +628,7 @@ describe("audit-calder-bluestem: scoring", () => {
         const cells = a["misstatement-summary"].cells;
         cells[`mis_${it.n}`] = 0;
         cells.total = dollars(wrongTotal);
-        cells.propose = wrongTotal >= s.ct ? 1 : 0;
+        a["pass-or-propose"].selected = [wrongTotal >= s.ct ? "propose" : "pass"];
         a["exception-count"].value = 3;
         a["exception-total"].value = dollars(wrongTotal);
         a["proposed-aje"].entries.splice(1, 1);
@@ -653,19 +663,23 @@ describe("audit-calder-bluestem: scoring", () => {
       }
     });
 
-    it("the wrong pass/propose call costs 4", () => {
+    it("the wrong pass/propose call costs 4, and so does no call", () => {
       for (const seed of seeds) {
         const a = clone(perfectAnswers(seed));
-        a["misstatement-summary"].cells.propose = solve(seed).propose ? 0 : 1;
+        a["pass-or-propose"].selected = [solve(seed).propose ? "pass" : "propose"];
+        expect(autoPoints(seed, a), seed).toBeCloseTo(full - 4, 9);
+        a["pass-or-propose"].selected = [];
         expect(autoPoints(seed, a), seed).toBeCloseTo(full - 4, 9);
       }
     });
 
     it("the wrong sample conclusion costs 5; replacing the exception items is wrong", () => {
       for (const seed of seeds) {
-        const a = clone(perfectAnswers(seed));
-        a["vouch-4"].decision = "replace";
-        expect(autoPoints(seed, a), seed).toBeCloseTo(full - 5, 9);
+        for (const wrong of ["replace", "no_exceptions", "client_fix"]) {
+          const a = clone(perfectAnswers(seed));
+          a["vouch-conclusion"].selected = [wrong];
+          expect(autoPoints(seed, a), `${seed} ${wrong}`).toBeCloseTo(full - 5, 9);
+        }
       }
     });
 
@@ -891,6 +905,54 @@ describe("audit-calder-bluestem: rapid rounds", () => {
   });
 });
 
+describe("audit-calder-bluestem: the two calls are multiple choice", () => {
+  const choice = (seed: string, id: string) => screen(seed).step(id).config as ChoiceCfg;
+
+  it("pass or propose: one pick from two options, no number cell left in the summary", () => {
+    const cfg = choice("abc", "pass-or-propose");
+    expect(cfg.select).toBe("single");
+    expect(cfg.options).toEqual([
+      { id: "pass", label: "Pass: below clearly trivial" },
+      { id: "propose", label: "Propose the adjustment" },
+    ]);
+    const sheet = JSON.stringify(screen("abc").step("misstatement-summary").config);
+    expect(sheet).not.toMatch(/Propose \(1\)|pass \(0\)|"propose"/i);
+  });
+
+  it("the sample conclusion is its own screen after the last pair; no vouching pair asks for a decision", () => {
+    const cfg = choice("abc", "vouch-conclusion");
+    expect(cfg.select).toBe("single");
+    expect(cfg.options.map((o) => o.id)).toEqual(["no_exceptions", "propose", "replace", "client_fix"]);
+    expect(cfg.options.find((o) => o.id === "propose")!.label).toBe("Exceptions noted: document them and work out the adjustment");
+    for (const k of [1, 2, 3, 4]) expect((screen("abc").step(`vouch-${k}`).config as ReviewCfg).decision, `vouch-${k}`).toBeUndefined();
+  });
+
+  it("each call scores right and wrong per seed: pass and propose both come up as the right answer", () => {
+    const right = new Set<string>();
+    for (const seed of SEEDS.slice(0, 60)) {
+      const s = solve(seed);
+      const call = s.propose ? "propose" : "pass";
+      right.add(call);
+      const score = (selected: string[]) => scoreAttempt(scenario, seed, { "pass-or-propose": { selected } }).steps["pass-or-propose"];
+      expect(score([call]).points, seed).toBe(4);
+      expect(score([call === "pass" ? "propose" : "pass"]).points, seed).toBe(0);
+      expect(score([]).points).toBe(0);
+      const concl = (selected: string[]) => scoreAttempt(scenario, seed, { "vouch-conclusion": { selected } }).steps["vouch-conclusion"].points;
+      expect(concl(["propose"])).toBe(5);
+      expect(concl(["replace"])).toBe(0);
+    }
+    expect([...right].sort()).toEqual(["pass", "propose"]);
+  });
+
+  it("what the candidate sees of either call is the same for every seed, so the right option can't leak", () => {
+    const base = { pp: JSON.stringify(choice(SEEDS[0], "pass-or-propose")), vc: JSON.stringify(choice(SEEDS[0], "vouch-conclusion")) };
+    for (const seed of SEEDS.slice(1, 60)) {
+      expect(JSON.stringify(choice(seed, "pass-or-propose")), seed).toBe(base.pp);
+      expect(JSON.stringify(choice(seed, "vouch-conclusion")), seed).toBe(base.vc);
+    }
+  });
+});
+
 describe("audit-calder-bluestem: sections and timeline", () => {
   const MIN = 60_000;
   const t0 = Date.parse("2026-11-16T09:00:00Z");
@@ -912,10 +974,11 @@ describe("audit-calder-bluestem: sections and timeline", () => {
     }
     const seconds = Object.fromEntries(scenario.definition.steps.filter((s) => s.seconds).map((s) => [s.id, s.seconds]));
     expect(seconds).toEqual({
-      "vouch-1": 180,
-      "vouch-2": 180,
-      "vouch-3": 180,
-      "vouch-4": 180,
+      "vouch-1": 165,
+      "vouch-2": 165,
+      "vouch-3": 165,
+      "vouch-4": 165,
+      "vouch-conclusion": 60,
       "controller-reply": 240,
       "exception-count": 90,
       "exception-total": 90,
@@ -957,9 +1020,9 @@ describe("audit-calder-bluestem: sections and timeline", () => {
     expect(seen.sort()).toEqual(MESSAGES.map(([m]) => m).sort());
   });
 
-  it("the screens come one at a time: four vouching pairs, then controller, Marcus's two numbers and the bank confirmation", () => {
+  it("the screens come one at a time: four vouching pairs and the conclusion, then controller, Marcus's two numbers and the bank confirmation", () => {
     const vouch = (min: number) => flowAt((6 + min) * MIN + 1_000).screen?.stepId;
-    expect([vouch(0), vouch(3), vouch(6), vouch(9)]).toEqual(["vouch-1", "vouch-2", "vouch-3", "vouch-4"]);
+    expect([vouch(0), vouch(2.75), vouch(5.5), vouch(8.25), vouch(11)]).toEqual(["vouch-1", "vouch-2", "vouch-3", "vouch-4", "vouch-conclusion"]);
     const inbox = (min: number) => flowAt((24 + min) * MIN + 1_000).screen?.stepId;
     expect([inbox(0), inbox(4), inbox(5.5), inbox(7)]).toEqual(["controller-reply", "exception-count", "exception-total", "bank-confirm"]);
   });
