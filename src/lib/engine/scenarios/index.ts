@@ -7,6 +7,7 @@ import { demoEntriesReview } from "./demo-entries-review";
 import { demoMiniClose } from "./demo-mini-close";
 import { demoPettyCash } from "./demo-petty-cash";
 import { demoTimedClose } from "./demo-timed-close";
+import { ediscoveryLarchReview } from "./ediscovery-larch-review";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 
@@ -19,6 +20,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${harborLaneBankRec.slug}@v${harborLaneBankRec.version}`]: harborLaneBankRec,
   [`${auditCalderBluestem.slug}@v${auditCalderBluestem.version}`]: auditCalderBluestem,
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
+  [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
 };
 

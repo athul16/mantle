@@ -44,9 +44,9 @@ interface StepScore {
 | `document_review` | Flag issues in invoices, receipts, records | Issue flags + reason | MVP |
 | `multiple_choice` | Quick knowledge checks | Exact | MVP |
 | `numeric` | Single calculations (e.g., dosage) | Tolerance | MVP |
-| `ordering` | Sequence steps of a procedure | Position-weighted | Later |
+| `ordering` | Sequence steps of a procedure, a medical chronology | Exact position and/or pairwise | Built |
 
-First two to build for the skeleton: `inbox_reply` and `spreadsheet`. Built so far: `numeric`, `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`, `rapid_round`, `multiple_choice` (see "As built" below).
+First two to build for the skeleton: `inbox_reply` and `spreadsheet`. Built so far: `numeric`, `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`, `rapid_round`, `multiple_choice`, `ordering` (see "As built" below).
 
 ## Variants (anti-leak)
 
@@ -100,6 +100,7 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 | `document_review` | A document (header fields, line table, totals, footnote) with a Flag toggle on every item; reason list; optional decision; optional "nothing wrong here" confirm | `{ flags: [{ target, reason, note }], decision, clean? }`, one flag per item | See below |
 | `multiple_choice` | Prompt (the group's name) and options as radios (`select: "single"`) or checkboxes (`"multi"`) | `{ selected: [optionId] }` | See below |
 | `rapid_round` | One quick item at a time with its own countdown | `{ items: { [itemId]: { values, ms } } }` | Per item, plus a timing line; see "Timed sections and rapid rounds" |
+| `ordering` | 6 to 12 items (label, optional detail) in the authored order, each with a drag handle and Up / Down buttons | `{ order: [itemId] }`, first to last | See below |
 
 **`journal_entry` scoring.** The config lists the expected entries (`id`, `label`, `points`, default 3); the key gives each one's lines as `{ accounts, side, amount }`, where `accounts` may list several acceptable accounts (docs/07: COGS or Accounts payable for the #1043 fix). Key entries must balance. Per expected entry:
 
@@ -128,7 +129,13 @@ Each has `public.ts` (candidate config, answer schema), `client.tsx` (view) and 
 - Multi: each right option picked earns `points / (right options)`; each wrong option picked costs `points / (wrong options)`, so picking every option earns 0. Floored at 0, rounded to 0.01. When every option is right, wrong picks can't happen.
 - Picks that aren't options are ignored. The note lists the picks and, unless full marks, the expected options.
 
-Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`, `choice`, `correct`) are skipped, but only id-shaped strings in them: a note or sentence under one of those fields is still checked. Keys whose secret is *which* public id is right (`multiple_choice`) or whether a document is clean can't be caught by a string search, so a test-only scenario (`tests/engine/key-variants.ts`) keeps the values fixed and varies only the keys, and the tests require the payload and DOM to be identical across seeds.
+**`ordering`.** For sequencing tasks (steps of a procedure, a medical chronology). Config: `prompt`, label and detail (all may hold `{{templates}}`), `items: [{ id, label, detail? }]` (6 to 12, unique ids), `positionPoints` and `pairwisePoints` (each default 0; at least one above 0). Key: `{ order: [itemId] }`, every item exactly once. The public config is the prompt and the items in the authored order, so keep that order unrelated to the key (a generator varies which item is which per seed); the prompt shows in the brief column.
+
+- View: a numbered list labelled "Your order". Each row has a drag handle that uses pointer events (mouse, pen and touch; `touch-action: none` on the handle only) and Up / Down buttons. With the handle focused, the arrow keys move the row one place and Home / End move it to the top or bottom; focus stays on the moved row and every move is announced in a status region. Each move saves the whole order. Until the first move, a "Keep this order" button saves the order as shown, so a candidate who thinks it is already right can still answer.
+- Scoring: "Items in the right position" earns `positionPoints × (items in their exact place) ÷ items`; "Pairs in the right order" (Kendall-style) earns `pairwisePoints × (pairs in the right relative order) ÷ all pairs`. Only parts worth points are listed; each is rounded to 0.01. One swap of neighbours costs two positions but only one pair, so pairwise credit is the forgiving part; the reverse order earns 0 on both (bar the middle item's position when the count is odd).
+- `parseAnswer` checks the shape (item-id strings, each once, at most 12). An answer that isn't every item of the step exactly once (`orderingAnswerSchemaFor(itemIds)`) scores 0, as does no answer. Notes give the counts and, unless full marks, the expected order.
+
+Leak tests (`tests/engine/mini-close.test.ts`, `tests/components/engine/no-key-in-dom.test.tsx`) check every key `value` / `amount` and every key string against the payload and DOM across many seeds. Key fields that only hold ids the candidate already chooses from (`accounts`, `side`, `targets`, `reasons`, `decision`, `choice`, `correct`, `order`) are skipped, but only id-shaped strings in them: a note or sentence under one of those fields is still checked. Keys whose secret is *which* public id is right (`multiple_choice`) or whether a document is clean can't be caught by a string search, so a test-only scenario (`tests/engine/key-variants.ts`) keeps the values fixed and varies only the keys, and the tests require the payload and DOM to be identical across seeds.
 
 ### Timed sections and rapid rounds
 
