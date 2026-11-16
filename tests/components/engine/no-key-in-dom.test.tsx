@@ -31,7 +31,7 @@ function leakPatterns(value: number): RegExp[] {
  * material lists on purpose (account codes, flaggable items, reasons, decision options, debit/credit side)
  * are skipped: they're in every candidate's choices, so they reveal nothing.
  */
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct"]);
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct", "order"]);
 /** Only id-shaped strings are skipped under those fields; a note or sentence there is still checked. */
 const ID_LIKE = /^[A-Za-z0-9_.-]{1,64}$/;
 function keyLeaves(
