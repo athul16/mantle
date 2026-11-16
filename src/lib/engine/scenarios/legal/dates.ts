@@ -106,6 +106,23 @@ export interface FederalHoliday {
  * (New Year's Day on a Saturday is observed December 31).
  */
 export function federalHolidays(year: number): FederalHoliday[] {
+  return holidayTable(year).map((h) => ({ ...h }));
+}
+
+const tables = new Map<number, readonly FederalHoliday[]>();
+const byObservedDay = new Map<IsoDate, FederalHoliday>();
+
+/** Cached per year: scenario generators look days up thousands of times. */
+function holidayTable(year: number): readonly FederalHoliday[] {
+  const cached = tables.get(year);
+  if (cached) return cached;
+  const table = Object.freeze(computeHolidays(year).map((h) => Object.freeze(h)));
+  tables.set(year, table);
+  for (const h of table) byObservedDay.set(h.date, h);
+  return table;
+}
+
+function computeHolidays(year: number): FederalHoliday[] {
   if (!Number.isInteger(year) || year < 1971 || year > 2199) throw new RangeError(`federalHolidays: unsupported year ${year}`);
   const actuals: [string, IsoDate][] = [
     ["New Year's Day", iso(year, 1, 1)],
@@ -131,7 +148,10 @@ export function legalHoliday(date: IsoDate): FederalHoliday | undefined {
   const year = Number(date.slice(0, 4));
   toTime(date); // validates
   // An observed day can belong to next year's holiday (December 31 for New Year's Day).
-  return [...federalHolidays(year), ...federalHolidays(year + 1)].find((h) => h.date === date);
+  holidayTable(year);
+  holidayTable(year + 1);
+  const h = byObservedDay.get(date);
+  return h ? { ...h } : undefined;
 }
 
 export function isLegalHoliday(date: IsoDate): boolean {
@@ -172,10 +192,10 @@ export function courtDaysAfter(date: IsoDate, n: number): IsoDate {
 export function holidaysBetween(from: IsoDate, to: IsoDate): FederalHoliday[] {
   const [y0, y1] = [Number(from.slice(0, 4)), Number(to.slice(0, 4))];
   const all: FederalHoliday[] = [];
-  for (let y = y0; y <= y1 + 1; y++) all.push(...federalHolidays(y));
+  for (let y = y0; y <= y1 + 1; y++) all.push(...holidayTable(y));
   toTime(from);
   toTime(to);
-  return all.filter((h) => h.date >= from && h.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  return all.filter((h) => h.date >= from && h.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((h) => ({ ...h }));
 }
 
 export interface DeadlineInput {
