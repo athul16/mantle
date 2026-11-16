@@ -8,14 +8,17 @@ export function StepView({
   step,
   answer,
   onChange,
+  onCommit,
   disabled,
 }: {
   step: PublicStep;
   answer?: unknown;
   onChange(answer: unknown): void;
+  /** Submit at once, no debounce (rapid items). */
+  onCommit?(answer: unknown): void;
   disabled?: boolean;
 }) {
-  const element = renderStepElement(step.type, { config: step.config, answer, onChange, disabled });
+  const element = renderStepElement(step.type, { config: step.config, answer, onChange, onCommit, disabled });
   return (
     element ?? (
       <p className="small badc" style={{ padding: 24 }}>

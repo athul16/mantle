@@ -30,7 +30,7 @@ function leakPatterns(value: number): RegExp[] {
  * material lists on purpose (account codes, flaggable items, reasons, decision options, debit/credit side)
  * are skipped: they're in every candidate's choices, so they reveal nothing.
  */
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice"]);
 function keyLeaves(key: unknown, out: { numbers: number[]; strings: string[] } = { numbers: [], strings: [] }, field = "") {
   if (PUBLIC_ID_FIELDS.has(field)) return out;
   if (typeof key === "number" && (field === "value" || field === "amount")) out.numbers.push(key);

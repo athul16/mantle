@@ -49,7 +49,7 @@ describe("demo-mini-close generator", () => {
   });
 });
 
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision"]);
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice"]);
 
 describe("what the candidate receives (every scenario, many seeds)", () => {
   // Every form an amount could take in serialized output: 120.1, 120.10, 1,120.10, 12010 (cents).
