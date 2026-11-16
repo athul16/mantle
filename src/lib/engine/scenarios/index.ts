@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ServerScenario } from "../server/scenario";
+import { auditCalderBluestem } from "./audit-calder-bluestem";
 import { demoEntriesReview } from "./demo-entries-review";
 import { demoMiniClose } from "./demo-mini-close";
 import { demoPettyCash } from "./demo-petty-cash";
@@ -14,6 +15,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${demoEntriesReview.slug}@v${demoEntriesReview.version}`]: demoEntriesReview,
   [`${demoTimedClose.slug}@v${demoTimedClose.version}`]: demoTimedClose,
   [`${harborLaneBankRec.slug}@v${harborLaneBankRec.version}`]: harborLaneBankRec,
+  [`${auditCalderBluestem.slug}@v${auditCalderBluestem.version}`]: auditCalderBluestem,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {

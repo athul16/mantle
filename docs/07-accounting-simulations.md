@@ -232,6 +232,97 @@ Accepted for v1 (forced by the current step types):
 - Accounts payable is accepted for the check-error entry without the explanation, because the journal step can't read the memo.
 - Process signals come from attempt events, not the scenario.
 
+## Example 5: Audit intern, year-end fieldwork at Calder & Finch (~50 min, phase A)
+
+**Status: draft: needs accountant review.** Built as `audit-calder-bluestem` v1 in `src/lib/engine/scenarios/audit-calder-bluestem.ts`, tests in `tests/engine/audit-calder-bluestem.test.ts`. Extends Example 2 (vouching) into a full session with the Example 4 message pattern. Numbers below describe the structure; every amount, payee, officer, date, document number, and which item in which pair holds which trap is seeded per candidate.
+
+**Setup:** "You're an audit intern at Calder & Finch LLP. It's fieldwork week on the December 31, 2025 year-end audit of Bluestem Manufacturing. Your senior, Marcus Avery, will send you work through the session, and the client's team will be in touch too."
+
+### Timeline
+
+| Minute | From | Delivers |
+| --- | --- | --- |
+| 0 | Marcus | Vouch a sample of 8 operating-expense entries (four pairs, all open from the start) |
+| 8 | Renee Okafor, Controller | "Can you just skip that one and pick a different entry?" (the unsupported accrual) |
+| 15 | Marcus | How many exceptions? |
+| 16 | Marcus | And the total dollar misstatement? |
+| 22 | Marcus | The bank confirmation came back $X higher / lower than the cash lead schedule |
+| 28 | Marcus | Materiality memo: overall, performance (75%) and clearly trivial (5%); pass below clearly trivial, propose at or above |
+| 30 | Marcus | Draft the adjusting entries |
+| 32 | Marcus | Summary for partner review |
+
+### Part 1 · Expense vouching (25 points, `document_review` × 4)
+
+Each pair shows, per item, the GL line (ref, date, payee, description, account, amount) and the support row (vendor invoice, card receipt, or "No support provided"). The candidate flags the GL line of each exception with a reason. One trap per pair:
+
+| Trap | What the candidate sees | Expected reason | Misstatement |
+| --- | --- | --- | --- |
+| Amount | GL amount has the hundreds and tens digits swapped against the invoice, GL higher (e.g. booked $2,418.50, invoice $2,148.50) | Amount doesn't agree to support | GL − invoice (a multiple of $90) |
+| Cutoff | Invoice dated 01/03/2026 for January 2–3 work, posted 12/28–12/31/2025 to Repairs & maintenance | Wrong period (cutoff) | Full amount |
+| Personal | Card receipt for a ski lodge family stay, jewelry, pet boarding or private boat storage, cardholder an officer, booked as "Client entertainment" | Not a business expense | Full amount |
+| No support | Round-number 12/31 manual accrual ("Q4 consulting"), no invoice, contract or engagement letter; client says the officer agreed it by phone | No support | Full amount |
+
+The four clean items agree on amount, date, payee and period. One clean option is a real client dinner booked to entertainment with attendees and business purpose on the receipt, so "entertainment" alone isn't the tell. After the last pair the candidate concludes on the sample: **"Exceptions noted: document them and work out the adjustment"** (not "no exceptions", "replace those items", or "ask the client to fix them").
+
+### Part 2 · Inbox under pressure (15 points)
+
+- **Controller (`inbox_reply`, 5):** politely declines to skip or swap the sampled item (2); asks for alternative support: engagement letter or contract, emails agreeing the fee, evidence the work was done, the invoice when it arrives (2); courteous, no promises (1).
+- **Marcus's questions (`numeric` × 2):** count of exceptions, always 4 (2); total misstatement (3).
+- **Bank confirmation (`document_review`, 5):** flag the confirmed balance, lead balance or difference as "Balances don't agree" (2); next step: **get the client's December 31 bank reconciliation, agree the confirmed balance to it and vouch the reconciling items** (3). Wrong: adjust cash to the confirmation, pass as immaterial, ask the client to have the bank change it. The payroll account agrees and is a false-flag trap.
+
+### Part 3 · Proposed adjustment (30 points)
+
+- **Summary of misstatements (`spreadsheet`, 14):** one row per sampled item; the four exception cells (2 each), the total (2), and the call: 1 = propose, 0 = pass (4). Clean items aren't scored. Total = sum of the four planted errors for every seed. The threshold is seeded so roughly half of candidates should pass and half propose.
+- **Adjusting entries (`journal_entry`, 4 × 2):**
+
+| Entry | Debit | Credit |
+| --- | --- | --- |
+| Amount | Accounts payable (Cash accepted) | The expense account booked |
+| Cutoff | Accounts payable (Accrued liabilities accepted) | Repairs & maintenance |
+| Personal | Due from officer | Meals & entertainment |
+| No support | Accrued liabilities | Professional fees |
+
+- **Summary to Marcus (`inbox_reply`, 8):** count, total and pass/propose call (3); a line on each exception (3); short and organized (2).
+
+### Scoring, phase A (70 of 100 points)
+
+| Area | Points |
+| --- | --- |
+| Vouching: 4 exceptions × 5 (half for the right item with the wrong reason; −1 per false flag) | 20 |
+| Vouching: conclusion on the sample | 5 |
+| Reply to the controller (reviewer) | 5 |
+| Exception count / total misstatement | 2 / 3 |
+| Bank confirmation: flag / next step | 2 / 3 |
+| Summary of misstatements: 4 items × 2, total 2, pass or propose 4 | 14 |
+| Adjusting entries: 4 × 2 | 8 |
+| Summary to Marcus (reviewer) | 8 |
+
+A perfect attempt shows 57 automatic points until a reviewer marks the two replies.
+
+### Phase B TODO: rapid rounds (30 points)
+
+Needs timed sections and the `rapid_round` step type (in progress on another branch). Then add three rapid rounds and bump to a new version:
+
+1. **Tick-and-tie**, 15 items × 20 s: does this figure agree to that source?
+2. **Cutoff call**, 15 items × 20 s: which year does this invoice or shipment belong in?
+3. **Sample selection**, 15 items × 20 s: is this item in the population / a valid selection?
+
+### Accepted for v1 (forced by the current step types)
+
+- The pass/propose call is a number cell (1 or 0) in the summary spreadsheet; there is no multiple-choice step type yet.
+- Each vouching pair holds exactly one exception, because `document_review` findings are fixed in the config. Trap types and positions move per seed.
+- The controller mentions one missing item, not two, so the four planted traps stay as specified.
+- Message senders (Marcus Avery, Renee Okafor) are fixed: `from` lines aren't templated. Everything inside the messages is seeded.
+- Marcus's numbers are asked mid-task, so a candidate still vouching can come back and change them before submitting.
+
+### For the accountant reviewing this draft
+
+- Treating the whole unsupported accrual as a known misstatement, reversed against Accrued liabilities.
+- The personal expense debited to Due from officer (not officer compensation).
+- The cutoff entry against Accounts payable or Accrued liabilities.
+- The engagement rule "pass below clearly trivial, propose at or above", with clearly trivial at 5% and performance materiality at 75% of overall. A real team would also weigh a 4-of-8 exception rate (projection, control findings); Marcus says he handles projection.
+- The bank confirmation's expected next step.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.
