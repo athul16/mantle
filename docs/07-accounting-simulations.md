@@ -322,24 +322,75 @@ Needs timed sections and the `rapid_round` step type (in progress on another bra
 - The cutoff entry against Accounts payable or Accrued liabilities.
 - The engagement rule "pass below clearly trivial, propose at or above", with clearly trivial at 5% and performance materiality at 75% of overall. A real team would also weigh a 4-of-8 exception rate (projection, control findings); Marcus says he handles projection.
 - The bank confirmation's expected next step.
-## Example 6: Corporate AP intern, payment run day (~50 min, phase A)
+## Example 6: Corporate AP intern, payment run day (52 min, 100 points)
 
-**Status: draft: needs accountant review.** Built as `corporate-ap-ridgeway` v1 in `src/lib/engine/scenarios/corporate-ap-ridgeway.ts`, tests in `tests/engine/corporate-ap-ridgeway.test.ts`. Phase A only: the parts that use existing step types, 70 points, as a normal scenario without sections. The three rapid rounds (30 points) come in phase B (see the TODO at the end).
+**Status: draft: needs accountant review.** Built as `corporate-ap-ridgeway` v1 in `src/lib/engine/scenarios/corporate-ap-ridgeway.ts`, tests in `tests/engine/corporate-ap-ridgeway.test.ts`. Six timed sections (`06-assessment-engine.md`, "Timed sections and rapid rounds"): three rapid rounds (30 points) between the phase A work (70 points). Not published yet.
 
 **Setup:** "You're an accounts payable intern in the in-house finance team at Ridgeway Outdoor Supply, an outdoor gear retailer. Your manager is Priya Desai, the AP lead. Today is the mid-month payment run."
 
-Seeded per candidate: every amount, quantity, vendor and contact name, email domain, phone number, invoice / PO / receiving report number and date, and **which of the four match documents holds which trap**. Numbers below are one variant (seed `abc`).
+Seeded per candidate: every amount, quantity, vendor and contact name, email domain, phone number, invoice / PO / receiving report number and date, **which of the four match documents holds which trap**, and every rapid item (its amounts and names, and which item comes when). Numbers below are one variant (seed `abc`).
+
+### Sections
+
+Sections run back to back; a finished section can't be reopened. The overall timer never pauses. Total 52 minutes (`timeLimitMinutes` 52; `validateSections` passes).
+
+| # | Section | Minutes | Steps | Points |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round A: journal entries | 6 | `rapid-je` (15 items × 20 s) | 10 |
+| 2 | Three-way match, one screen at a time | 12 | `match-1` … `match-4` (2.5 min each), then `post-bills` (2 min) | 25 |
+| 3 | Rapid round B: pay or hold | 6 | `rapid-pay` (15 × 20 s) | 10 |
+| 4 | AP inbox, one screen at a time | 10 | `vendor-reply` (3 min), `run-total` (3 min), `bank-change` (4 min) | 15 |
+| 5 | Rapid round C: cash application | 6 | `rapid-cash` (15 × 20 s) | 10 |
+| 6 | Vendor statement | 12 | `statement-rec`, `statement-reply` | 30 |
+
+The four match screens are 2.5 minutes, not 3, so the posting step fits in the section's 12 minutes (the screens add up to the section exactly). A rapid round's 15 items take 5 minutes, inside the 6-minute section.
 
 ### Messages
 
-| Minute | From | Delivers |
+Messages linked to a step arrive relative to their section's start (so they come earlier when a candidate finishes a section early).
+
+| Arrives | From | Delivers |
 | --- | --- | --- |
-| 0 | Priya: match queue for today's run, the AP policy ("pay only when PO, receiving report and invoice agree on quantity and price and we haven't paid it before; any difference, however small, goes on hold"), and two bills she approved yesterday that are already in the run | Three-way match 1 (2–4 and the posting are open from the start) |
-| 15 | The short-shipped vendor's AR clerk: "Is invoice TP-26323 for $1,392.23 in today's run?" | Reply to the vendor |
-| 22 | Priya forwards an AP-inbox email: "Updated remittance details" | Bank-change review |
-| 28 | Priya: "Total approved for today's run? Number only." | Run total |
-| 32 | Priya: a fifth vendor's statement doesn't agree with our AP subledger | Statement rec |
-| 33 | Priya: "Send me a short note, under 120 words: the balance we owe, what to ask them for, and the entry we need." | Note to Priya |
+| Section 2 + 0 | Priya: match queue for today's run, the AP policy ("pay only when PO, receiving report and invoice agree on quantity and price and we haven't paid it before; any difference, however small, goes on hold"), and two bills she approved yesterday that are already in the run | Three-way match |
+| Section 4 + 0 | The short-shipped vendor's AR clerk: "Is invoice TP-26323 for $1,392.23 in today's run?" | Reply to the vendor |
+| Section 4 + 0 | Priya forwards an AP-inbox email: "Updated remittance details" | Bank-change review |
+| Section 4 + 0 | Priya: "Total approved for today's run? Number only." with the four invoices from the match queue (vendor, number, total) for reference | Run total |
+| Section 6 + 0 | Priya: a fifth vendor's statement doesn't agree with our AP subledger | Statement rec |
+| Section 6 + 1 | Priya: "Send me a short note, under 120 words: the balance we owe, what to ask them for, and the entry we need." | Note to Priya |
+
+The inbox messages all arrive when the inbox section opens: its screens can be moved on early, and a screen shouldn't open before its brief. Because the match screens are closed by then, the inbox carries what it needs: the vendor reply shows the held invoice's match record (item, invoiced, received), and the run-total email lists all four invoices without saying which was approved.
+
+### Rapid rounds (30 points)
+
+Each round is 15 items × 20 seconds. Items 3, 6, 9, 12 and 15 hold the harder kinds and are worth 1 point; the other ten are worth ½, so each round is exactly 10. The order within each tier is shuffled per seed. Each item has two pick-one fields scored separately (half the item each). The step type adds a 0-point response-time line (median and unanswered count).
+
+**A · Journal entry flash** (`rapid-je`). A one-line transaction with a seeded amount; Debit and Credit from one short chart of 13 accounts (Cash, Accounts receivable, Supplies, Prepaid insurance, Equipment, Accounts payable, Wages payable, Unearned revenue, Service revenue, Wages expense, Utilities expense, Supplies expense, Insurance expense).
+
+| Tier | Transactions (10 of 12 quick ones per candidate; all 5 harder ones) |
+| --- | --- |
+| ½ point | Paid for 12 months of store insurance (Prepaid insurance / Cash); received from a customer on account (Cash / AR); bought store supplies on credit (Supplies / AP); paid a supplier for a recorded bill (AP / Cash); paid this week's wages (Wages expense / Cash); billed a customer for ski tuning (AR / Service revenue); cash for bike repairs today (Cash / Service revenue); paid the electricity bill (Utilities expense / Cash); received the electricity bill, to pay next month (Utilities expense / AP); bought store supplies for cash (Supplies / Cash); bought a display rack for cash or on account (Equipment / Cash or AP) |
+| 1 point | Customer paid in advance for a repair (Cash / Unearned revenue); a month of prepaid insurance expired (Insurance expense / Prepaid insurance); finished prepaid repair work (Unearned revenue / Service revenue); wages earned, paid next month (Wages expense / Wages payable); store supplies used up (Supplies expense / Supplies) |
+
+**B · Pay or hold** (`rapid-pay`). An invoice exhibit (vendor, invoice number and date, amount, PO) and one fact. The round's intro states the rules: pay only against a PO; over $5,000 needs Priya's approval; bank details changed by email are verified by phone first; never pay the same bill twice. Fields: Pay / Hold, and the reason (Nothing wrong, Bank details changed by email, No purchase order, Over the $5,000 approval limit, Same as an invoice already paid). Only one thing is wrong with any invoice, and only over-limit invoices are over $5,000 (the others run up to $4,950).
+
+| Tier | Cases per candidate | Expected |
+| --- | --- | --- |
+| ½ point | 3 × vendor's bank details changed yesterday by email | Hold, bank details |
+| ½ point | 3 × PO "None" (ordered by phone) | Hold, no purchase order |
+| ½ point | 4 × "Goods received in full; the PO and the invoice agree" | Pay, nothing wrong |
+| 1 point | 2 × "Last payment to this vendor: invoice (another number) for the same amount, dated the same day, paid" | Hold, already paid |
+| 1 point | 2 × $5,001–9,800 with a clean fact | Hold, over the limit |
+| 1 point | 1 × last payment to this vendor for a different amount and date (looks like the duplicate case) | Pay, nothing wrong |
+
+**C · Cash application** (`rapid-cash`). Covering the receivables desk: a customer payment, its remittance advice and the customer's three open invoices. Fields: which invoices to apply it to (three seeded sets of invoices, or "None of these: hold it as unapplied cash") and what's left (Nothing / Short-pay: leave the shortfall open on the invoice / Unapplied cash: hold it and ask the customer). Every one of the seven sets of the open invoices adds up to a different amount, so at most one set matches a payment exactly; the options' ids are the same for every candidate, and the right one moves between them.
+
+| Tier | Cases per candidate | Expected |
+| --- | --- | --- |
+| ½ point | 3 × remittance names one invoice, payment equals it | That invoice; nothing left |
+| ½ point | 3 × no remittance, payment equals exactly one invoice | That invoice; nothing left |
+| ½ point | 4 × remittance names two invoices, payment equals both | Both; nothing left |
+| 1 point | 3 × remittance names one invoice "less $X for damaged items", payment = invoice − X (3–12%, at least $5) | That invoice; short-pay |
+| 1 point | 2 × no remittance, payment more than 15% away from every set of invoices | None; unapplied cash |
 
 ### Part 1 · Three-way match (25 points)
 
@@ -383,19 +434,23 @@ Scoring: each of the four planted items 4, each adjusted balance 2. The keying e
 
 `inbox_reply` to Priya (10), under ~120 words: states the balance we owe (7,148.98) and that the difference is explained 3; asks the vendor for a copy of invoice NPW-47229 (and checks the goods arrived before booking) and of credit memo CM-1706 3; names the entries 2: book the credit memo (Dr AP / Cr Merchandise Inventory), correct the keyed invoice (here Dr Merchandise Inventory / Cr AP 180.00), record the missing invoice once received and approved; no entry for the payment in transit; brief and forwardable 2.
 
-### Scoring, phase A (70 points)
+### Scoring (100 points)
 
 | Area | What earns points | Points |
 | --- | --- | --- |
+| Rapid A: JE flash | Debit and credit, half the item each; 10 items × ½ + 5 × 1 | 10 |
 | Three-way match | Per document: the right flag and reason 3 (half for the right item with another reason), Pay / Hold 2; × 4 | 20 |
 | Posting | The clean invoice to Inventory, Supplies and AP | 5 |
+| Rapid B: pay or hold | Decision and reason, half the item each | 10 |
 | Vendor reply | Rubric (reviewer) | 5 |
 | Run total | Pre-approved bills + clean invoice | 4 |
 | Bank-change email | Domain 1.5, bank change 1.5, pressure / new contact 1, decision 2 | 6 |
+| Rapid C: cash application | Invoices and what's left, half the item each | 10 |
 | Statement rec | Four planted items 4 each, both adjusted balances 2 each | 20 |
 | Note to Priya | Rubric (reviewer) | 10 |
+| **Total** | | **100** |
 
-A perfect attempt shows 55 automatic points until a reviewer marks the two replies. Each trap answered wrongly costs exactly its own points (tested): paying the duplicate, the short shipment or the price variance costs that document's 5; holding the clean invoice costs 5; updating the bank details without flags costs 6, and calling the number in the email or replying to it costs the 2 decision points. Knock-on effects are scored where they land: a run total that includes a held invoice loses the 4 numeric points.
+A perfect attempt shows 85 automatic points until a reviewer marks the two replies. Each trap answered wrongly costs exactly its own points (tested): paying the duplicate, the short shipment or the price variance costs that document's 5; holding the clean invoice costs 5; updating the bank details without flags costs 6, and calling the number in the email or replying to it costs the 2 decision points. Knock-on effects are scored where they land: a run total that includes a held invoice loses the 4 numeric points.
 
 ### Judgment calls for the accountant review
 
@@ -405,16 +460,13 @@ A perfect attempt shows 55 automatic points until a reviewer marks the two repli
 - Merchandise goes to inventory (perpetual system), store-use items to Store Supplies Expense. The journal step asks for one debit line per account, because splitting inventory over two lines costs the leftover-line penalty.
 - The unreceived invoice is added on our side of the rec (we owe it once received and approved), and the credit memo is booked against Merchandise Inventory (returned goods). An accountant may prefer a purchase returns account or to leave the unreceived invoice as a vendor-side item until it's verified.
 - The phishing email is auto-scored as a `document_review` rather than a written reply, so the trap can be tested exactly. A candidate who would also forward it to IT or security gets no extra credit.
-
-### TODO, phase B (30 points, after the sections engine and `rapid_round` merge)
-
-Three timed rapid rounds, 15 items × 20 seconds each, 10 points each:
-
-1. **JE flash**: pick the debit and credit for a one-line AP event (e.g. invoice for store supplies, payment of an invoice, credit memo for returned goods, early-payment discount taken).
-2. **Pay or hold**: one-line PO / receipt / invoice summaries; Pay or Hold.
-3. **Cash application**: match a vendor payment or remittance to the invoice(s) it pays.
-
-Phase B turns the scenario into sections (match queue, inbox, rapid rounds, statement) and brings it to 100 points.
+- Time: the sections add up to 52 minutes, not 50, to keep 6-minute rapid rounds and 12-minute match and statement sections. The match screens are 2.5 minutes each (not 3) so the posting step gets 2 minutes.
+- The JE flash uses its own short chart, where supplies bought are an asset (Supplies) and expensed when used. The three-way match posts store-use items straight to Store Supplies Expense. Both are common; a reviewer may want one treatment across the whole test.
+- JE flash revenue items (ski tuning, bike repairs) give a retailer a service-revenue line; the round is about debit/credit mechanics, not Ridgeway's revenue mix.
+- Pay or hold: the "near miss" (a prior payment to the same vendor for a different amount and date) is a Pay. Over-limit invoices are held, not paid "pending approval". A bank-details change is held even when the invoice is otherwise fine.
+- Cash application sits in an AP scenario (covering the receivables desk). A short-pay is applied to the invoice with the shortfall left open; an unidentifiable payment is held as unapplied cash, not applied to the oldest invoice. Some teams apply on-account cash oldest-first.
+- The rapid rounds weight the harder kinds (accruals and deferrals; duplicates, over-limit and the near miss; short-pays and unapplied cash) at 1 point and the rest at ½. A uniform ⅔ point would not add up to exactly 10.
+- Sections close their screens, so the inbox shows the held invoice's match record in the vendor-reply prompt and the four queue invoices in the run-total email. The run total still depends on the candidate's own match decisions.
 
 ## Step types needed
 
