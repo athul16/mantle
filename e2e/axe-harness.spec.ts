@@ -20,3 +20,14 @@ test("role locators by name still work after axe on a section labelled by its he
   await expect(page.getByRole("group", { name: "Answered quickly" })).toContainText("1 answer");
   expect(crashed, "page crashed").toBe(false);
 });
+
+test("axe still resolves aria-labelledby for names", async ({ page }, testInfo) => {
+  const withButton = (labelledBy: string) =>
+    `<!doctype html><html lang="en"><head><title>Report</title></head><body><main>
+      <span id="hire-label">Hire</span><button aria-labelledby="${labelledBy}"></button>
+    </main></body></html>`;
+  await page.setContent(withButton("hire-label"));
+  await axeSerious(page, testInfo);
+  await page.setContent(withButton("missing-label"));
+  await expect(axeSerious(page, testInfo)).rejects.toThrow(/button-name/);
+});
