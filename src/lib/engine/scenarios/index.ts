@@ -9,6 +9,7 @@ import { demoPettyCash } from "./demo-petty-cash";
 import { demoTimedClose } from "./demo-timed-close";
 import { ediscoveryLarchReview } from "./ediscovery-larch-review";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
+import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -20,6 +21,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${auditCalderBluestem.slug}@v${auditCalderBluestem.version}`]: auditCalderBluestem,
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
+  [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
