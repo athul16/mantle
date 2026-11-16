@@ -9,6 +9,8 @@ import { MultipleChoiceStep } from "../step-types/multiple_choice/client";
 import { MULTIPLE_CHOICE } from "../step-types/multiple_choice/public";
 import { NumericStep } from "../step-types/numeric/client";
 import { NUMERIC } from "../step-types/numeric/public";
+import { OrderingStep } from "../step-types/ordering/client";
+import { ORDERING } from "../step-types/ordering/public";
 import { RapidRoundStep } from "../step-types/rapid_round/client";
 import { RAPID_ROUND } from "../step-types/rapid_round/public";
 import { SpreadsheetStep } from "../step-types/spreadsheet/client";
@@ -31,6 +33,7 @@ export const clientStepTypes: Record<string, AnyStepComponent> = {
   [DOCUMENT_REVIEW]: DocumentReviewStep,
   [RAPID_ROUND]: RapidRoundStep,
   [MULTIPLE_CHOICE]: MultipleChoiceStep,
+  [ORDERING]: OrderingStep,
 };
 
 export function hasStepComponent(type: string): boolean {
