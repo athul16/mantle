@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Icon } from "@/components/icons";
 import type { StepComponentProps } from "../../types";
 import type { DocumentFlag, DocumentReviewAnswer, DocumentReviewPublicConfig } from "./public";
@@ -13,6 +13,9 @@ const BAD_BG = "var(--bad-bg)";
  * with a Flag toggle on every header field, line and total. A flagged item
  * asks for a reason and an optional note. Optional final decision below the
  * document. The prompt is shown by the page (the workspace's brief column).
+ * When the config offers it, a "nothing wrong here" confirm lets the candidate
+ * say the document is clean instead of flagging something; confirming and
+ * flagging exclude each other.
  */
 export function DocumentReviewStep({
   config,
@@ -22,12 +25,16 @@ export function DocumentReviewStep({
 }: StepComponentProps<DocumentReviewPublicConfig, DocumentReviewAnswer>) {
   const [flags, setFlags] = useState<DocumentFlag[]>(() => answer?.flags ?? []);
   const [decision, setDecision] = useState<string | null>(() => answer?.decision ?? null);
+  const [clean, setClean] = useState<boolean>(() => answer?.clean === true);
+  const cleanHintId = useId();
   const doc = config.document;
 
-  const emit = (nextFlags: DocumentFlag[], nextDecision: string | null) => {
+  // `clean` is sent only when the config offers the confirm, so other answers keep their old shape.
+  const emit = (nextFlags: DocumentFlag[], nextDecision: string | null, nextClean = clean) => {
     setFlags(nextFlags);
     setDecision(nextDecision);
-    onChange({ flags: nextFlags, decision: nextDecision });
+    setClean(nextClean);
+    onChange({ flags: nextFlags, decision: nextDecision, ...(config.confirmClean ? { clean: nextClean } : {}) });
   };
   const flagOf = (id: string) => flags.find((f) => f.target === id);
   const toggle = (id: string) =>
@@ -35,6 +42,7 @@ export function DocumentReviewStep({
   const patch = (id: string, p: Partial<DocumentFlag>) =>
     emit(flags.map((f) => (f.target === id ? { ...f, ...p } : f)), decision);
   const full = flags.length >= config.maxFlags;
+  const confirmed = !!config.confirmClean && clean;
 
   // Plain render helpers, not components: a component defined in render remounts
   // every keystroke and the note input would lose focus.
@@ -46,7 +54,7 @@ export function DocumentReviewStep({
         className="btn btn-sm"
         aria-pressed={on}
         aria-label={`Flag ${name}`}
-        disabled={disabled || (!on && full)}
+        disabled={disabled || (!on && (full || confirmed))}
         onClick={() => toggle(id)}
         style={on ? FLAGGED : undefined}
       >
@@ -193,6 +201,29 @@ export function DocumentReviewStep({
             </p>
           ) : null}
         </article>
+
+        {config.confirmClean ? (
+          <div className="card" style={{ maxWidth: 860, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 6, flex: "none" }}>
+            <label className="row g10 strong" style={{ cursor: disabled || flags.length > 0 ? "not-allowed" : "pointer" }}>
+              <input
+                type="checkbox"
+                checked={clean}
+                disabled={disabled || flags.length > 0}
+                aria-describedby={flags.length > 0 ? cleanHintId : undefined}
+                onChange={(e) => emit(flags, decision, e.target.checked)}
+                style={{ accentColor: "var(--accent)", margin: 0, width: 16, height: 16 }}
+              />
+              {config.confirmClean.label}
+            </label>
+            {flags.length > 0 ? (
+              <p id={cleanHintId} className="xs muted">
+                Remove your flags to confirm the document is clean.
+              </p>
+            ) : confirmed ? (
+              <p className="xs muted">Remove the confirmation to flag items.</p>
+            ) : null}
+          </div>
+        ) : null}
 
         {config.decision ? (
           <fieldset className="card" style={{ maxWidth: 860, padding: "20px 20px", margin: 0, display: "flex", flexDirection: "column", gap: 12, flex: "none" }}>
