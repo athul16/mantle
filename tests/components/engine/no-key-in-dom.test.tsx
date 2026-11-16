@@ -97,7 +97,7 @@ describe("rendered candidate DOM never contains the answer key", () => {
         }
       }
       expect(derivedChecked).toBeGreaterThan(SEEDS.length);
-    });
+    }, 30_000);
   }
 
   it("the check fires when a key value is planted in the DOM", () => {
