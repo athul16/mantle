@@ -2,11 +2,9 @@
 import type { Page } from "@playwright/test";
 import { signInViaUi } from "../fixtures";
 import { hold, isServerAction } from "../support/hold";
-import { chromiumOnly, expect, test } from "../support/test";
+import { expect, test } from "../support/test";
 import type { TestData } from "../../tests/helpers/factories";
 import { RUBRIC, REPLY_BODY, miniCloseJob, miniCloseScore, scoredAttempt } from "../../tests/helpers/results";
-
-chromiumOnly();
 
 const resultRow = (page: Page, text: string) => page.getByRole("row").filter({ hasText: text });
 // First cell is the select checkbox; the name is a link (to the report) or a button (opens the invite drawer).
