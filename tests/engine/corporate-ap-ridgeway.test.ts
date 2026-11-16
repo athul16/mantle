@@ -209,7 +209,7 @@ function rapidItems(seed: string, stepId: RapidStepId): RapidItem[] {
   const fill = (t: string) => fillTemplate(t, values);
   const config = rapidConfig(stepId);
   const seq = rapidRoundServer.sequence!;
-  return Array.from({ length: seq.count(config) }, (_, i) => seq.renderItem(config, { variant, fill }, i));
+  return Array.from({ length: seq.count(config) }, (_, i) => seq.renderItem(config, { variant, fill }, i) as RapidItem);
 }
 
 type RapidKey = { items: Record<string, Record<string, { choice?: string; value?: number }>> };
@@ -1059,7 +1059,7 @@ describe("corporate-ap-ridgeway: rapid rounds", () => {
   it("cash application: exact single and paired invoices, short-pays and unapplied cash all show up", () => {
     const kinds = new Set<string>();
     for (const seed of SEEDS.slice(0, 50)) for (const s of solveRapid(seed, "rapid-cash")) kinds.add(s.kind);
-    expect([...kinds].sort()).toEqual(["pair", "single-noref", "single-ref", "short", "unapplied"]);
+    expect([...kinds].sort()).toEqual(["pair", "short", "single-noref", "single-ref", "unapplied"]);
   });
 
   it("ten quick items worth half a point and five harder ones worth one, in every round", () => {

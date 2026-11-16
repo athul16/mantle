@@ -7,20 +7,26 @@ import { DOCUMENT_REVIEW } from "../step-types/document_review/public";
 import { INBOX_REPLY } from "../step-types/inbox_reply/public";
 import { JOURNAL_ENTRY } from "../step-types/journal_entry/public";
 import { NUMERIC } from "../step-types/numeric/public";
+import { RAPID_ROUND } from "../step-types/rapid_round/public";
 import { SPREADSHEET } from "../step-types/spreadsheet/public";
 
 /**
  * docs/07 Example 6: corporate AP intern at Ridgeway Outdoor Supply, payment
- * run day. PHASE A: the parts built from existing step types, 70 points:
- * three-way match 25, inbox under pressure 15, vendor statement rec 30. The
- * three rapid rounds (30 points) come in phase B, once the sections engine
- * and the rapid_round step type have merged.
+ * run day, in six timed sections (52 minutes, 100 points): rapid round A,
+ * JE flash (10) → three-way match, one screen at a time (25) → rapid round B,
+ * pay or hold (10) → inbox under pressure, one screen at a time (15) → rapid
+ * round C, cash application (10) → vendor statement rec and note (30).
  *
- * Seeded per candidate: every amount, quantity, vendor and contact name,
- * domain, phone number, invoice / PO / receiving number and date, and which of
- * the four match documents holds which trap (short shipment, price above PO,
- * invoice already paid, clean match). The keys are built from the same values
- * as the material, so the statement rec always ties.
+ * Seeded per candidate: every amount, quantity, vendor, customer and contact
+ * name, domain, phone number, invoice / PO / receiving number and date, which
+ * of the four match documents holds which trap (short shipment, price above
+ * PO, invoice already paid, clean match), and which rapid item comes when.
+ * The keys are built from the same values as the material, so the statement
+ * rec always ties.
+ *
+ * Rapid rounds: 15 items × 20 s. Every third item (3, 6, 9, 12, 15) is a
+ * harder kind worth 1 point, the other ten are worth ½, so each round is
+ * exactly 10. The order is shuffled per seed within each tier.
  *
  * Shaped by the current step types (draft: needs accountant review):
  * - `document_review` needs at least one finding per document, so the clean
@@ -28,8 +34,11 @@ import { SPREADSHEET } from "../step-types/spreadsheet/public";
  *   agree". Pay / Hold is the decision.
  * - Posting a held invoice too isn't penalised by `journal_entry` (extra
  *   entries score 0 and are listed for the reviewer).
- * - Both written replies need a reviewer, so a perfect phase-A attempt shows
- *   55 automatic points until they are marked.
+ * - Both written replies need a reviewer, so a perfect attempt shows 85
+ *   automatic points until they are marked.
+ * - Sections close their screens, so the inbox carries what it needs from the
+ *   match queue: the vendor reply shows the held invoice's match record and
+ *   Priya's run-total email lists the four invoices (not which was approved).
  */
 
 const ACCOUNTS = [
@@ -106,6 +115,7 @@ function matchStep(k: number) {
   return {
     id: `match-${k}`,
     type: DOCUMENT_REVIEW,
+    seconds: 150,
     title: `Three-way match: {{${p}_vendor}}`,
     config: {
       prompt: [
@@ -199,16 +209,332 @@ const initials = (name: string) =>
 
 const phone = (rng: Rng, area: number) => `(${area}) 555-01${String(rng.int(0, 99)).padStart(2, "0")}`;
 
+// ---- Rapid rounds ----
+
+const RAPID_ITEMS = 15;
+/** Items 3, 6, 9, 12 and 15 hold the harder kinds and are worth 1; the rest ½. 10 points a round. */
+const isHardSlot = (i: number) => i % 3 === 2;
+const slotNo = (i: number) => String(i + 1).padStart(2, "0");
+
+/** Fills the 15 slots: easy items in the easy slots, hard ones in the hard slots, each list already shuffled. */
+function fillSlots<T>(easy: T[], hard: T[]): T[] {
+  const e = [...easy];
+  const h = [...hard];
+  const out = Array.from({ length: RAPID_ITEMS }, (_, i) => (isHardSlot(i) ? h.shift() : e.shift()));
+  if (out.some((x) => x === undefined) || e.length || h.length) throw new Error("corporate-ap-ridgeway: rapid slots don't fill");
+  return out as T[];
+}
+
+function rapidItems(prefix: string, item: (n: string, i: number) => object) {
+  return Array.from({ length: RAPID_ITEMS }, (_, i) => ({ id: `${prefix}-${slotNo(i)}`, ...item(slotNo(i), i), points: isHardSlot(i) ? 1 : 0.5 }));
+}
+
+const JE_ACCOUNTS = [
+  { id: "cash", label: "Cash" },
+  { id: "accounts_receivable", label: "Accounts receivable" },
+  { id: "supplies", label: "Supplies" },
+  { id: "prepaid_insurance", label: "Prepaid insurance" },
+  { id: "equipment", label: "Equipment" },
+  { id: "accounts_payable", label: "Accounts payable" },
+  { id: "wages_payable", label: "Wages payable" },
+  { id: "unearned_revenue", label: "Unearned revenue" },
+  { id: "service_revenue", label: "Service revenue" },
+  { id: "wages_expense", label: "Wages expense" },
+  { id: "utilities_expense", label: "Utilities expense" },
+  { id: "supplies_expense", label: "Supplies expense" },
+  { id: "insurance_expense", label: "Insurance expense" },
+] as const;
+type JeAccount = (typeof JE_ACCOUNTS)[number]["id"];
+
+/** One-line transaction: text with the amount, the dollar range, and the entry. */
+type JeEvent = [text: (amount: string) => string, range: [number, number], debit: JeAccount, credit: JeAccount];
+
+const JE_EASY: JeEvent[] = [
+  [(a) => `Paid ${a} for 12 months of store insurance, starting next month.`, [1_200, 6_000], "prepaid_insurance", "cash"],
+  [(a) => `Received ${a} from a customer on account.`, [300, 4_000], "cash", "accounts_receivable"],
+  [(a) => `Bought ${a} of store supplies on credit.`, [80, 900], "supplies", "accounts_payable"],
+  [(a) => `Paid ${a} to a supplier for a bill we already recorded.`, [300, 5_000], "accounts_payable", "cash"],
+  [(a) => `Paid employees ${a} of wages for this week.`, [2_000, 9_000], "wages_expense", "cash"],
+  [(a) => `Billed a customer ${a} for ski tuning, due in 30 days.`, [150, 1_500], "accounts_receivable", "service_revenue"],
+  [(a) => `Received ${a} in cash for bike repairs done today.`, [40, 600], "cash", "service_revenue"],
+  [(a) => `Paid this month's ${a} electricity bill.`, [300, 1_400], "utilities_expense", "cash"],
+  [(a) => `Bought a display rack (equipment) for ${a}, paid in cash.`, [400, 3_500], "equipment", "cash"],
+  [(a) => `Received this month's ${a} electricity bill, to be paid next month.`, [300, 1_400], "utilities_expense", "accounts_payable"],
+  [(a) => `Bought ${a} of store supplies, paid in cash.`, [40, 400], "supplies", "cash"],
+  [(a) => `Bought a display rack (equipment) for ${a} on account.`, [400, 3_500], "equipment", "accounts_payable"],
+];
+
+/** Deferrals and accruals: the harder half-dozen. */
+const JE_HARD: JeEvent[] = [
+  [(a) => `A customer paid ${a} in advance for a repair we'll do next month.`, [100, 1_200], "cash", "unearned_revenue"],
+  [(a) => `One month of the prepaid insurance, ${a}, has now expired.`, [100, 500], "insurance_expense", "prepaid_insurance"],
+  [(a) => `Finished ${a} of repair work the customer had paid for in advance.`, [100, 1_200], "unearned_revenue", "service_revenue"],
+  [(a) => `Employees earned ${a} of wages this month that we'll pay next month.`, [800, 4_000], "wages_expense", "wages_payable"],
+  [(a) => `Month-end count: ${a} of store supplies were used up this month.`, [60, 700], "supplies_expense", "supplies"],
+];
+
+const PAY_REASONS = [
+  { id: "ok", label: "Nothing wrong" },
+  { id: "bank", label: "Bank details changed by email" },
+  { id: "no_po", label: "No purchase order" },
+  { id: "over_limit", label: "Over the $5,000 approval limit" },
+  { id: "duplicate", label: "Same as an invoice already paid" },
+];
+type PayCase = "ok" | "bank" | "no_po" | "over_limit" | "duplicate" | "near_miss";
+const PAY_EASY: PayCase[] = ["bank", "bank", "bank", "no_po", "no_po", "no_po", "ok", "ok", "ok", "ok"];
+const PAY_HARD: PayCase[] = ["duplicate", "duplicate", "over_limit", "over_limit", "near_miss"];
+
+const CUSTOMERS = [
+  "Bend Valley Scouts",
+  "Cascade Outdoor School",
+  "Hood River Ski Patrol",
+  "Willamette Rowing Club",
+  "Coastal Search & Rescue",
+  "Riverside Parks & Recreation",
+  "Silver Falls Summer Camp",
+  "Eastside Climbing Gym",
+  "Three Sisters Guiding",
+  "McKenzie River Outfitters",
+];
+type CashCase = "single_ref" | "single_noref" | "pair" | "short" | "unapplied";
+const CASH_EASY: CashCase[] = ["single_ref", "single_ref", "single_ref", "single_noref", "single_noref", "single_noref", "pair", "pair", "pair", "pair"];
+const CASH_HARD: CashCase[] = ["short", "short", "short", "unapplied", "unapplied"];
+const CASH_LETTERS = ["a", "b", "c"] as const;
+/** The seven non-empty sets of the three open invoices, as index lists. */
+const INVOICE_SETS = [1, 2, 3, 4, 5, 6, 7].map((mask) => [0, 1, 2].filter((i) => mask & (1 << i)));
+const listNames = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+const rapidJeStep = {
+  id: "rapid-je",
+  type: RAPID_ROUND,
+  title: "Rapid round: journal entries",
+  config: {
+    intro: "Journal entry flash: 15 one-line transactions, 20 seconds each. Pick the account to debit and the account to credit.",
+    secondsPerItem: 20,
+    items: rapidItems("je", (n) => ({
+      prompt: `{{je_${n}}}`,
+      fields: [
+        { id: "debit", label: "Debit", kind: "choice", options: JE_ACCOUNTS },
+        { id: "credit", label: "Credit", kind: "choice", options: JE_ACCOUNTS },
+      ],
+    })),
+  },
+};
+
+const rapidPayStep = {
+  id: "rapid-pay",
+  type: RAPID_ROUND,
+  title: "Rapid round: pay or hold",
+  config: {
+    intro: [
+      "Pay or hold: 15 invoices due in today's run, 20 seconds each. Each shows the invoice and one fact about it.",
+      "Ridgeway's rules: pay only against a purchase order; invoices over $5,000 need Priya's approval first; bank details changed by email are verified by phone before any payment; never pay the same bill twice.",
+      "Choose Pay or Hold, and the reason.",
+    ].join("\n"),
+    secondsPerItem: 20,
+    items: rapidItems("ph", (n) => ({
+      prompt: `{{ph_${n}_fact}}`,
+      exhibit: {
+        title: `Invoice {{ph_${n}_inv}}`,
+        rows: [
+          { label: "Vendor", value: `{{ph_${n}_vendor}}` },
+          { label: "Invoice date", value: `{{ph_${n}_date}}` },
+          { label: "Amount", value: `{{ph_${n}_amt|money}}` },
+          { label: "Purchase order", value: `{{ph_${n}_po}}` },
+        ],
+      },
+      fields: [
+        {
+          id: "decision",
+          label: "Decision",
+          kind: "choice",
+          options: [
+            { id: "pay", label: "Pay" },
+            { id: "hold", label: "Hold" },
+          ],
+        },
+        { id: "reason", label: "Reason", kind: "choice", options: PAY_REASONS },
+      ],
+    })),
+  },
+};
+
+const rapidCashStep = {
+  id: "rapid-cash",
+  type: RAPID_ROUND,
+  title: "Rapid round: cash application",
+  config: {
+    intro: [
+      "Cash application: you're covering the receivables desk. 15 customer payments, 20 seconds each.",
+      "Choose the open invoices each payment pays, and what happens to anything left over.",
+    ].join("\n"),
+    secondsPerItem: 20,
+    items: rapidItems("ca", (n) => ({
+      prompt: "A customer payment came in. Which open invoices does it pay?",
+      exhibit: {
+        title: `Payment from {{ca_${n}_customer}}`,
+        rows: [
+          { label: "Payment received", value: `{{ca_${n}_pay|money}}` },
+          { label: "Remittance advice", value: `{{ca_${n}_memo}}` },
+        ],
+        table: {
+          columns: ["Open invoice", "Date", "Amount"],
+          rows: [1, 2, 3].map((j) => [`{{ca_${n}_i${j}_no}}`, `{{ca_${n}_i${j}_date}}`, `{{ca_${n}_i${j}|money}}`]),
+        },
+      },
+      fields: [
+        {
+          id: "apply",
+          label: "Apply the payment to",
+          kind: "choice",
+          options: [
+            ...CASH_LETTERS.map((l) => ({ id: l, label: `{{ca_${n}_opt_${l}}}` })),
+            { id: "none", label: "None of these: hold it as unapplied cash" },
+          ],
+        },
+        {
+          id: "rest",
+          label: "Anything left over?",
+          kind: "choice",
+          options: [
+            { id: "none", label: "Nothing: the invoices are paid in full" },
+            { id: "short", label: "Short-pay: leave the shortfall open on the invoice" },
+            { id: "unapplied", label: "Unapplied cash: hold it and ask the customer" },
+          ],
+        },
+      ],
+    })),
+  },
+};
+
+type RapidKeyItems = Record<string, Record<string, { choice: string }>>;
+
+/** JE flash: values and key. */
+function buildJe(rng: Rng, v: Record<string, string | number>): RapidKeyItems {
+  const events = fillSlots(rng.shuffle(JE_EASY).slice(0, 10), rng.shuffle(JE_HARD));
+  return Object.fromEntries(
+    events.map(([text, [lo, hi], debit, credit], i) => {
+      v[`je_${slotNo(i)}`] = text(formatCents(rng.cents(lo, hi)));
+      return [`je-${slotNo(i)}`, { debit: { choice: debit }, credit: { choice: credit } }];
+    }),
+  );
+}
+
+/** Pay or hold: one invoice and one fact each. Only the over-limit case is over $5,000. */
+function buildPay(rng: Rng, v: Record<string, string | number>): RapidKeyItems {
+  const cases = fillSlots(rng.shuffle(PAY_EASY), rng.shuffle(PAY_HARD));
+  const vendorNames = [...VENDORS.map((x) => x.name), ...SERVICE_VENDORS];
+  return Object.fromEntries(
+    cases.map((c, i) => {
+      const n = slotNo(i);
+      const vendor = rng.pick(vendorNames);
+      const no = rng.int(10_000, 89_999);
+      const day = rng.int(1, 8);
+      const amount = c === "over_limit" ? rng.cents(5_001, 9_800) : rng.cents(250, 4_950);
+      const received = `Goods received in full on Nov ${day + rng.int(0, 2)}; the PO and the invoice agree.`;
+      const prior = (amt: number, date: string, paid: string) =>
+        `Last payment to ${vendor}: invoice ${initials(vendor)}-${no - rng.int(40, 900)} for ${formatCents(amt)}, dated ${date}, paid ${paid}.`;
+      const fact: Record<PayCase, () => string> = {
+        ok: () => received,
+        over_limit: () => received,
+        bank: () => `${vendor}'s bank details were changed yesterday by email.`,
+        no_po: () => "The store manager ordered this by phone; no purchase order was raised.",
+        duplicate: () => prior(amount, `Nov ${day}`, `Nov ${day + rng.int(2, 4)}`),
+        near_miss: () => {
+          const d = rng.int(1, 20);
+          let other = rng.cents(250, 4_950);
+          if (other === amount) other += 1_000;
+          return prior(other, `Oct ${d}`, `Oct ${d + rng.int(5, 10)}`);
+        },
+      };
+      Object.assign(v, {
+        [`ph_${n}_vendor`]: vendor,
+        [`ph_${n}_inv`]: `${initials(vendor)}-${no}`,
+        [`ph_${n}_date`]: `Nov ${day}`,
+        [`ph_${n}_amt`]: amount,
+        [`ph_${n}_po`]: c === "no_po" ? "None" : `PO ${rng.int(4100, 4899)}`,
+        [`ph_${n}_fact`]: fact[c](),
+      });
+      const reason = c === "near_miss" ? "ok" : c;
+      return [`ph-${n}`, { decision: { choice: reason === "ok" ? "pay" : "hold" }, reason: { choice: reason } }];
+    }),
+  );
+}
+
+/** Cash application: three open invoices, one payment, a remittance line, and three candidate sets of invoices. */
+function buildCash(rng: Rng, v: Record<string, string | number>): RapidKeyItems {
+  const cases = fillSlots(rng.shuffle(CASH_EASY), rng.shuffle(CASH_HARD));
+  return Object.fromEntries(
+    cases.map((c, i) => {
+      const n = slotNo(i);
+      const sumOf = (amounts: number[], set: number[]) => set.reduce((t, j) => t + amounts[j], 0);
+      const target = c === "unapplied" ? null : c === "pair" ? rng.shuffle([0, 1, 2]).slice(0, 2).sort() : [rng.int(0, 2)];
+      let amounts: number[] = [];
+      let pay = 0;
+      let deduction = 0;
+      for (let tries = 0; ; tries++) {
+        if (tries > 200) throw new Error("corporate-ap-ridgeway: no cash application variant");
+        amounts = [0, 1, 2].map(() => rng.cents(180, 4_200));
+        const sums = INVOICE_SETS.map((s) => sumOf(amounts, s));
+        if (new Set(sums).size !== sums.length) continue;
+        if (c === "unapplied") {
+          pay = rng.cents(150, 6_000);
+          if (sums.every((s) => Math.abs(s - pay) > s * 0.15)) break;
+        } else if (c === "short") {
+          const full = sumOf(amounts, target!);
+          deduction = Math.max(500, Math.round((full * rng.int(3, 12)) / 100));
+          pay = full - deduction;
+          if (!sums.includes(pay)) break;
+        } else {
+          pay = sumOf(amounts, target!);
+          break;
+        }
+      }
+      const first = rng.int(20_000, 89_000);
+      const nos = [first, first + rng.int(3, 40), first + rng.int(41, 90)].map((x) => `ROS-${x}`);
+      const days = [rng.int(1, 9), rng.int(10, 19), rng.int(20, 30)];
+      const named = (set: number[]) => listNames(set.map((j) => nos[j]));
+      const memo: Record<CashCase, () => string> = {
+        single_ref: () => `Paying invoice ${named(target!)}.`,
+        pair: () => `Paying invoices ${named(target!)}.`,
+        short: () => `Paying invoice ${named(target!)}, less ${formatCents(deduction)} for damaged items we're returning.`,
+        single_noref: () => "None came with the payment.",
+        unapplied: () => "None came with the payment.",
+      };
+      const key = (set: number[]) => set.join();
+      const distractors = rng.shuffle(INVOICE_SETS.filter((s) => !target || key(s) !== key(target))).slice(0, target ? 2 : 3);
+      const options = rng.shuffle(target ? [target, ...distractors] : distractors);
+      Object.assign(v, {
+        [`ca_${n}_customer`]: rng.pick(CUSTOMERS),
+        [`ca_${n}_pay`]: pay,
+        [`ca_${n}_memo`]: memo[c](),
+        ...Object.fromEntries(
+          [0, 1, 2].flatMap((j) => [
+            [`ca_${n}_i${j + 1}_no`, nos[j]],
+            [`ca_${n}_i${j + 1}_date`, `Oct ${days[j]}`],
+            [`ca_${n}_i${j + 1}`, amounts[j]],
+          ]),
+        ),
+        ...Object.fromEntries(CASH_LETTERS.map((l, j) => [`ca_${n}_opt_${l}`, named(options[j])])),
+      });
+      const apply = target ? CASH_LETTERS[options.findIndex((s) => key(s) === key(target))] : "none";
+      const rest = c === "short" ? "short" : c === "unapplied" ? "unapplied" : "none";
+      return [`ca-${n}`, { apply: { choice: apply }, rest: { choice: rest } }];
+    }),
+  );
+}
+
 export const corporateApRidgeway = defineScenario({
   slug: "corporate-ap-ridgeway",
   version: 1,
   title: "Ridgeway Outdoor Supply: AP payment run",
   roleFamily: "accounting",
-  timeLimitMinutes: 50,
+  timeLimitMinutes: 52,
   definition: {
     intro:
-      "You're an accounts payable intern in the in-house finance team at Ridgeway Outdoor Supply, an outdoor gear retailer. Your manager is Priya Desai, the AP lead. Today is the mid-month payment run: invoices, vendor emails and a vendor statement will reach your inbox over the next 50 minutes.",
+      "You're an accounts payable intern in the in-house finance team at Ridgeway Outdoor Supply, an outdoor gear retailer. Your manager is Priya Desai, the AP lead. Today is the mid-month payment run. The work comes in six timed parts, 52 minutes in all: three rapid rounds of quick items, the three-way match queue, the AP inbox and a vendor statement. A finished part can't be reopened.",
     steps: [
+      rapidJeStep,
       matchStep(1),
       matchStep(2),
       matchStep(3),
@@ -216,6 +542,7 @@ export const corporateApRidgeway = defineScenario({
       {
         id: "post-bills",
         type: JOURNAL_ENTRY,
+        seconds: 120,
         title: "Post approved invoices to AP",
         config: {
           prompt: [
@@ -228,12 +555,14 @@ export const corporateApRidgeway = defineScenario({
           expected: [{ id: "approved", label: "Approved invoice posted to AP", points: 5 }],
         },
       },
+      rapidPayStep,
       {
         id: "vendor-reply",
         type: INBOX_REPLY,
+        seconds: 180,
         title: "Reply to {{short_vendor}}",
         config: {
-          prompt: "Reply to the vendor about their invoice.",
+          prompt: "Reply to the vendor about their invoice.\nMatch record for invoice {{short_inv}}: {{short_item}}, invoiced {{short_billed}}, received {{short_recv}}.",
           to: "{{short_contact}}, {{short_vendor}}",
           subject: "RE: Invoice {{short_inv}}: in today's payment run?",
           maxChars: 2_000,
@@ -264,6 +593,7 @@ export const corporateApRidgeway = defineScenario({
       {
         id: "run-total",
         type: NUMERIC,
+        seconds: 180,
         title: "Total for today's run",
         config: {
           prompt: "Priya: total approved for today's payment run? Number only.",
@@ -275,6 +605,7 @@ export const corporateApRidgeway = defineScenario({
       {
         id: "bank-change",
         type: DOCUMENT_REVIEW,
+        seconds: 240,
         title: "Request to change a vendor's bank details",
         config: {
           prompt: [
@@ -335,6 +666,7 @@ export const corporateApRidgeway = defineScenario({
           },
         },
       },
+      rapidCashStep,
       {
         id: "statement-rec",
         type: SPREADSHEET,
@@ -455,7 +787,7 @@ export const corporateApRidgeway = defineScenario({
           "{{short_contact}}",
           "Accounts Receivable, {{short_vendor}}",
         ].join("\n"),
-        arriveAtMinute: 15,
+        arriveAtMinute: 0,
         stepId: "vendor-reply",
       },
       {
@@ -467,15 +799,27 @@ export const corporateApRidgeway = defineScenario({
           "",
           "Priya",
         ].join("\n"),
-        arriveAtMinute: 22,
+        arriveAtMinute: 0,
         stepId: "bank-change",
       },
       {
         id: "m4",
         from: "Priya Desai, AP Lead, Ridgeway Outdoor Supply",
         subject: "Run total?",
-        body: ["Quick one for the treasury request: total approved for today's run? Number only.", "", "Priya"].join("\n"),
-        arriveAtMinute: 28,
+        body: [
+          "Quick one for the treasury request: total approved for today's run? Number only.",
+          "",
+          "This morning's match queue, for reference:",
+          "• {{d1_vendor}}: invoice {{d1_inv}}, {{d1_total|money}}",
+          "• {{d2_vendor}}: invoice {{d2_inv}}, {{d2_total|money}}",
+          "• {{d3_vendor}}: invoice {{d3_inv}}, {{d3_total|money}}",
+          "• {{d4_vendor}}: invoice {{d4_inv}}, {{d4_total|money}}",
+          "",
+          "Plus my two bills from yesterday.",
+          "",
+          "Priya",
+        ].join("\n"),
+        arriveAtMinute: 0,
         stepId: "run-total",
       },
       {
@@ -487,7 +831,7 @@ export const corporateApRidgeway = defineScenario({
           "",
           "Priya",
         ].join("\n"),
-        arriveAtMinute: 32,
+        arriveAtMinute: 0,
         stepId: "statement-rec",
       },
       {
@@ -499,9 +843,17 @@ export const corporateApRidgeway = defineScenario({
           "",
           "Priya",
         ].join("\n"),
-        arriveAtMinute: 33,
+        arriveAtMinute: 1,
         stepId: "statement-reply",
       },
+    ],
+    sections: [
+      { id: "s-rapid-a", title: "Rapid round: journal entries", minutes: 6, stepIds: ["rapid-je"] },
+      { id: "s-match", title: "Three-way match", minutes: 12, stepIds: ["match-1", "match-2", "match-3", "match-4", "post-bills"], oneAtATime: true },
+      { id: "s-rapid-b", title: "Rapid round: pay or hold", minutes: 6, stepIds: ["rapid-pay"] },
+      { id: "s-inbox", title: "AP inbox", minutes: 10, stepIds: ["vendor-reply", "run-total", "bank-change"], oneAtATime: true },
+      { id: "s-rapid-c", title: "Rapid round: cash application", minutes: 6, stepIds: ["rapid-cash"] },
+      { id: "s-statement", title: "Vendor statement", minutes: 12, stepIds: ["statement-rec", "statement-reply"] },
     ],
   },
 
@@ -681,9 +1033,17 @@ export const corporateApRidgeway = defineScenario({
     const merchTotal = clean.lines.filter((l) => !l.store).reduce((s, l) => s + l.amt, 0);
     const suppliesTotal = clean.lines.filter((l) => l.store).reduce((s, l) => s + l.amt, 0);
 
+    // ---- Rapid rounds, drawn after everything above so the rest of the material is unchanged per seed ----
+    const rapidKeys = {
+      "rapid-je": { items: buildJe(rng, v) },
+      "rapid-pay": { items: buildPay(rng, v) },
+      "rapid-cash": { items: buildCash(rng, v) },
+    };
+
     return {
       values: v,
       keys: {
+        ...rapidKeys,
         ...Object.fromEntries(docs.map((doc) => [`match-${doc.k}`, matchKey(doc)])),
         "post-bills": {
           entries: {
