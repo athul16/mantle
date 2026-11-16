@@ -8,6 +8,7 @@ import { demoMiniClose } from "./demo-mini-close";
 import { demoPettyCash } from "./demo-petty-cash";
 import { demoTimedClose } from "./demo-timed-close";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
+import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -18,6 +19,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${harborLaneBankRec.slug}@v${harborLaneBankRec.version}`]: harborLaneBankRec,
   [`${auditCalderBluestem.slug}@v${auditCalderBluestem.version}`]: auditCalderBluestem,
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
+  [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {

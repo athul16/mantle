@@ -113,10 +113,11 @@ function readProduction(doc: Doc) {
     if (withheld && (thirdParty || !privileged)) issue = "waived";
     return { id: r.id, start, end, type, privileged, thirdParty, withheld, issue };
   });
-  const bates = rows.slice(1).flatMap((r, i) => {
+  type BatesIssue = { kind: "bates_gap" | "bates_dup"; id: string; prev: string };
+  const bates = rows.slice(1).flatMap((r, i): BatesIssue[] => {
     const prev = rows[i];
-    if (r.start > prev.end + 1) return [{ kind: "bates_gap" as const, id: r.id, prev: prev.id }];
-    if (r.start <= prev.end) return [{ kind: "bates_dup" as const, id: r.id, prev: prev.id }];
+    if (r.start > prev.end + 1) return [{ kind: "bates_gap", id: r.id, prev: prev.id }];
+    if (r.start <= prev.end) return [{ kind: "bates_dup", id: r.id, prev: prev.id }];
     return [];
   });
   return { firm, client, rows, bates };
@@ -124,7 +125,6 @@ function readProduction(doc: Doc) {
 
 // ---- Cite-check ----
 
-type Authority = { name: string; volume: number; reporter: string; first: number; paren: string; year: number };
 const yearOf = (paren: string) => Number(paren.match(/(\d{4})$/)![1]);
 
 /** The verified research file from the attorney's message. */
@@ -372,9 +372,9 @@ function solveProcedure(item: RapidItem): Solved {
   if (f.kind === "number") {
     const rogs = item.prompt.match(/^Morrow served (\d+) interrogatories .* How many more may it serve/);
     if (rogs) return { kind: "interrogatories", values: { answer: 25 - Number(rogs[1]) } };
-    const depo = item.prompt.match(/has run (\d+) hours (\d+) minutes on the record\. .*how many minutes are left/);
-    expect(depo, `${item.id} number item: ${item.prompt}`).not.toBeNull();
-    return { kind: "depo-time", values: { answer: 7 * 60 - (Number(depo![1]) * 60 + Number(depo![2])) } };
+    const depos = item.prompt.match(/^Morrow has taken (\d+) depositions .* How many more may Morrow take without leave/);
+    expect(depos, `${item.id} number item: ${item.prompt}`).not.toBeNull();
+    return { kind: "depositions", values: { answer: 10 - Number(depos![1]) } };
   }
   const rules = PROCEDURE_RULES.filter(([, re]) => re.test(item.prompt));
   expect(rules.length, `${item.id}: one rule for "${item.prompt}"`).toBe(1);
@@ -894,7 +894,7 @@ describe("litigation-morrow-tidewater: rapid rounds", () => {
     const hardKinds: Record<RapidStepId, string[]> = {
       "rapid-deadlines": ["holiday", "mail"],
       "rapid-citations": ["pin", "wex-court", "wex-ok", "wrong-court"],
-      "rapid-procedure": [...PROCEDURE_RULES.filter((r) => r[3] === "hard").map((r) => r[0]), "interrogatories", "depo-time"],
+      "rapid-procedure": [...PROCEDURE_RULES.filter((r) => r[3] === "hard").map((r) => r[0]), "interrogatories", "depositions"],
     };
     for (const id of RAPID_STEPS) {
       const points = rapidConfig(id).items.map((i) => i.points);
@@ -922,7 +922,7 @@ describe("litigation-morrow-tidewater: rapid rounds", () => {
     expect([...kinds].sort()).toEqual(["first-page", "name", "ok", "pin", "reporter", "wex-court", "wex-ok", "wrong-court", "year"]);
   });
 
-  it("procedure: two number items (interrogatory limit, deposition time) in fixed slots every seed", () => {
+  it("procedure: two number items (interrogatory limit, deposition limit) in fixed slots every seed", () => {
     for (const seed of SEEDS.slice(0, 50)) {
       const solved = solveRapid(seed, "rapid-procedure");
       expect(solved.filter((s) => typeof s.values.answer === "number").map((s) => s.item.id)).toEqual(["lp-06", "lp-12"]);
