@@ -137,8 +137,10 @@ function code(doc: Doc, p: Protocol): Coding {
   return { responsive, privileged, topic: responsive ? topic : null, hot: HOT.test(words), why };
 }
 
-/** Everything the candidate sees after the whole attempt. */
-function screen(seed: string) {
+/** Everything the candidate sees after the whole attempt (cached: the tests only read it). */
+const screens = new Map<string, ReturnType<typeof readScreen>>();
+const screen = (seed: string) => screens.get(seed) ?? screens.set(seed, readScreen(seed)).get(seed)!;
+function readScreen(seed: string) {
   const view = renderAttemptForCandidate(scenario, seed, END);
   const step = (id: string) => {
     const s = view.steps.find((x) => x.id === id);
@@ -243,7 +245,6 @@ type ReviewConfig = {
   reasons: { id: string; label: string }[];
 };
 type ReviewKey = { findings: Record<string, { targets: string[]; reasons: string[]; note?: string }> };
-type Flag = { target: string; reason: string; note: string };
 
 /** QC: each row recoded under the protocol, and the teammate's miscodes with the reason. */
 function solveQc(seed: string) {
@@ -385,8 +386,10 @@ function solvePartial(seed: string) {
   return { kase, id: mcPick(cfg, (l) => label.test(l), `${seed} partial ${kase}`) };
 }
 
-/** A strong candidate's answers, built only from the screen. */
-function perfectAnswers(seed: string) {
+/** A strong candidate's answers, built only from the screen (cached; callers clone before changing them). */
+const perfect = new Map<string, ReturnType<typeof solvePerfect>>();
+const perfectAnswers = (seed: string) => perfect.get(seed) ?? perfect.set(seed, solvePerfect(seed)).get(seed)!;
+function solvePerfect(seed: string) {
   const qc = solveQc(seed);
   const log = solveLog(seed);
   const est = solveEstimate(seed);
