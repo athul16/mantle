@@ -66,7 +66,6 @@ const TRAPS: Trap[] = ["amount", "cutoff", "personal", "support"];
 type Row = { id: string; cells: string[] };
 type Doc = { title: string; columns: string[]; rows: Row[]; totals: { id: string; label: string; value: string }[] };
 type ReviewCfg = { prompt: string; document: Doc; reasons: { id: string }[]; decision?: { options: { id: string; label: string }[] } };
-type SheetCell = { kind: "text"; text: string } | { kind: "input"; id: string } | { kind: "empty" };
 type KeyLine = { accounts: string[]; side: "debit" | "credit"; amount: number };
 type JeKey = { entries: Record<string, { lines: KeyLine[] }> };
 type SheetKey = { cells: Record<string, { value: number }> };
@@ -165,7 +164,8 @@ type Answers = Record<VouchId | "bank-confirm", ReviewAnswer> & {
 /** A strong candidate's answers, built only from the screen. */
 function perfectAnswers(seed: string): Answers {
   const s = solve(seed);
-  const vouch = Object.fromEntries([1, 2, 3, 4].map((k) => [`vouch-${k}`, { flags: [], decision: null }])) as Record<VouchId, ReviewAnswer>;
+  const blank = (): ReviewAnswer => ({ flags: [], decision: null });
+  const vouch: Record<VouchId, ReviewAnswer> = { "vouch-1": blank(), "vouch-2": blank(), "vouch-3": blank(), "vouch-4": blank() };
   for (const t of TRAPS) {
     const it = s.one(t);
     vouch[it.step].flags.push({ target: `i${it.n}-gl`, reason: t, note: "" });
