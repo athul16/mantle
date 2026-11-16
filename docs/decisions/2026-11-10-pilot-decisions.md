@@ -27,6 +27,43 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Decide first:** D3, D2, D1, D13 and D12. D3 gates the first real candidate, D2 and D1 decide whether to change what PRs #25 and #27 already built, and D13 and D12 are schema changes that get harder once real companies and invites exist.
 
+## Decided 2026-11-10
+
+All sixteen are decided. Each section below has the choice and the reason under "Your decision". In short:
+
+| # | Decision | Differs from recommendation? |
+|---|---|---|
+| D1 | B: MFA for admins and recruiters (viewers when `viewers_see_media` is on); no Microsoft sign-in unless asked | No |
+| D2 | C: photos/screens 90 days, results 365 days; keep #25's delete-the-row | Yes: no anonymised invite row |
+| D3 | No paid lawyer yet; free checks; NC-only pilot; lawyer before charging, leaving NC, or AI scoring | Yes: free checks instead of a paid review |
+| D4 | Timer never pauses; flag camera/share downtime on the report | Yes: option A plus a flag, not C |
+| D5 | C: recruiter must pick monitored or not | No |
+| D6 | A: keep as built, tune after ~30 attempts | No |
+| D7 | A: no face check in the pilot | No |
+| D8 | B: shadow scoring with Sonnet 5.5, shown to no one | No |
+| D9 | B: per-invite extra time + camera waiver, logged; firm email shown | No |
+| D10 | B: fix first name and date order, publish after accountant review | No |
+| D11 | (a), (b1), (c2) separate `auto_score` column | No |
+| D12 | A: both fixes in one migration | No |
+| D13 | A (B if the pilot is days away) | No |
+| D14 | Holding off; first round free, ask firms | Yes: no price set yet |
+| D15 | A: 30 minutes, measure completion | No |
+| D16 | C: deferred | No |
+
+J1 to J8, C1 to C5 and E1 to E7 are confirmed as built.
+
+### Build work these decisions create
+
+1. **MFA for recruiters** (D1): extend PR #27's admin-only rule to recruiters, and to viewers when `viewers_see_media` is on.
+2. **Two retention clocks** (D2): a media retention value (90) next to results (365); purge snapshots/screens on the first, rows on the second; update the notice text and bump the consent version.
+3. **Downtime flag** (D4): record camera/screen-share down periods, add a report flag with total downtime; fix docs/04's "the test pauses".
+4. **Monitored / not monitored choice** (D5): replace the pre-ticked boxes in `assessment-forms.tsx` with a required choice.
+5. **Accommodations** (D9): per-invite extra time and monitoring waiver, logged on the report; company contact email in the notice and verify page.
+6. **Harbor Lane fixes** (D10): first-name templating and date order.
+7. **`auto_score` column** (D11 c2), then **shadow AI scorer** (D8) writing to its own column.
+8. **Invite migration** (D12): `last_sent_at`, `sent_count`, partial unique index.
+9. **Auth hardening PR** (D13): Q3 button pages, Q4 last-admin trigger, Q5 `profiles`; Q2 code after Resend.
+
 ## Decisions
 
 ### D1. Who must use MFA, and add "Sign in with Microsoft"?
@@ -49,7 +86,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 > **Status 2026-11-10:** PR #27 (merged) built option A: admins only must use an authenticator app. Picking B means a small follow-up to also force recruiters (and viewers when `viewers_see_media` is on).
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **B.** Admins and recruiters must use an authenticator-app code; viewers too when `viewers_see_media` is on. Recruiters see the same candidate photos as admins, so they need the same protection. No Sign in with Microsoft unless the pilot firm asks for it. Follow-up to PR #27.
 
 ### D2. Default retention period and what deletion keeps
 
@@ -71,7 +108,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 > **Status 2026-11-10:** PR #25 (merged) built option A: one setting, default 180 days (30 to 730), and a purge that **deletes** the invite row (no anonymised shell) plus notes and votes; the audit log keeps a no-PII record. Picking C needs a second retention value for snapshots; keeping an anonymised row reverses the PR's choice (its reasoning: a blank shell leaves empty rows in job lists).
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **C.** Two clocks: snapshots and screenshots deleted at 90 days, results at 365 days. Photos are the most sensitive data we hold, and employers must keep hiring records for a year; competitors delete photos at 30 to 90 days. Keep PR #25's delete-the-row approach (no anonymised invite shell); notes and votes go with the candidate.
 
 ### D3. Candidate consent and monitoring wording; legal review
 
@@ -103,7 +140,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 > **Status 2026-11-10:** PR #25 changes the notice to "kept for N days after your assessment ends, then deleted" (from the org setting) and bumps `MONITORING_CONSENT_VERSION`. The lawyer should review that wording.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **No paid lawyer yet; NC-only pilot.** Free checks first: compare our notice with HackerRank's, Codility's and CoderPad's; check every promise in the notice matches what the app actually does; have the pilot firm's HR/legal review it; ask UNC law clinics and Launch Chapel Hill. Pay for a lawyer before any of: charging money, candidates outside NC, or turning on AI scoring.
 
 ### D4. Pause the timer while camera or screen share is down?
 
@@ -121,7 +158,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** C with a 5-minute total cap, and show the paused time on the report. It keeps the docs/04 promise, and the cap stops anyone gaming it. If there is no time before the pilot, do A and show the downtime on the report, then add C or B after.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **Don't pause.** The timer always runs. Add a flag on the report when the camera (or screen share) goes off, with how long it was down. Update docs/04, which still says the test pauses.
 
 ### D5. Proctoring on by default for new assessments?
 
@@ -139,7 +176,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** C. Monitoring then only happens when someone chose it, which also helps the consent story in D3. Switch to A if pilot recruiters keep forgetting to turn it on.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **C.** The recruiter must pick Monitored or Not monitored, with nothing preselected. Nobody gets watched by accident, and firms want more candidates to finish.
 
 ### D6. Require full screen? Rule thresholds?
 
@@ -157,7 +194,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** A. Review flag rates after about 30 pilot attempts, ask the recruiter which flags were useful, then tune. Choose B or C only if the pilot firm asks for stricter rules.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **A.** Keep as built: full screen optional, thresholds unchanged. Tune the flag rules after about 30 real attempts. Forcing full screen breaks the calculator and screen readers.
 
 ### D7. Face check (no face / several faces)
 
@@ -175,7 +212,7 @@ Sixteen decisions. Ten are needed before the pilot, two during it, four can wait
 
 **Recommendation:** A for the pilot, then B after the lawyer confirms that face counting with no stored template falls outside BIPA. The case for building it gets stronger if recruiters in the pilot say snapshot review is too slow.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **A. Not for the pilot.** Face counting is too close to Illinois face-scan law (BIPA) without legal sign-off.
 
 ### D8. AI rubric scorer for written replies
 
@@ -202,7 +239,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** B during the pilot with Claude Sonnet 5.5, then C once AI and human scores agree on most criteria. Even at scale, Sonnet costs pennies per candidate. Keep D off the table. Revisit the model if Haiku 5.5 matches Sonnet's agreement rate in the shadow data. Keeping the automatic and reviewed scores apart (D11c) is what makes this comparison possible.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **B. Shadow mode** with Claude Sonnet 5.5: scores every reply silently, shown to no one. Proves accuracy against human scores before we trust it; costs pennies per reply.
 
 ### D9. Accommodations (no webcam, extra time, screen reader)
 
@@ -220,7 +257,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** B, and put the company's contact email in the notice and on the verify page. It is the common pattern and is small. Move to C if pilot candidates struggle to reach the company.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **B.** Per-invite extra time and camera/screen-share waiver, set by the recruiter and logged on the report. Show the firm's contact email to candidates (notice and verify page). Employers are legally required to accommodate.
 
 ### D10. Harbor Lane bank rec v1: accept the gaps or extend the step types?
 
@@ -238,7 +275,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** B, then publish once the accountant has reviewed it. Candidates see the first-name greeting and the dates, and the scoring differences are documented and fair to everyone in the round. Choose C only if the accountant says the row hints make it too easy.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **B.** Fix first-name greeting and the date order, then publish after the accountant reviews it. Switch to C only if the accountant says the row labels make it too easy.
 
 ### D11. Report data rules from PR #19
 
@@ -258,7 +295,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** Keep (a) and (b1). Choose (c2), because the AI scorer decision (D8) needs the original automatic score next to the human one, and adding a column is cheapest before real data exists.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **Keep (a) and (b1); do (c2):** a separate `auto_score` column next to the final `score`. We need both scores side by side to check the AI scorer in D8.
 
 ### D12. Invite schema: "last sent" date (S1) and duplicate batches (S2)
 
@@ -276,7 +313,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** A, in one migration. The index has to be added before there are any real duplicate rows. Choose C only if no migration slot is left before the pilot.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **A.** `last_sent_at` (+ `sent_count`) and the partial unique index on `invites (job_id, lower(email))` in one migration, before real invites exist.
 
 ### D13. Company sign-up and team rules (Q2, Q3, Q4, Q5, Q7)
 
@@ -302,7 +339,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** A. Q3 matters most, because accounting firms run Microsoft 365, and Q4 and Q5 are migrations that are cheapest before real companies exist. Q7 needs only a "decided" note. Choose B if the pilot is days away.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **A** (B if the pilot is days away). Q3 is the must-have: Microsoft link scanners use up teammate invites, and our targets run Microsoft 365. Q4 and Q5 in the same PR. Q2 as a 6-digit code once Resend is live. Q7 confirmed as built.
 
 ### D14. Pilot pricing and terms
 
@@ -321,7 +358,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** A. Pilot terms: one round free, a cap on completions, feedback calls, permission to use the firm as a reference, and data handled per D2 and D3. Per-completion pricing fits firms that hire in bursts, and free viewer seats get hiring managers in. Set the post-pilot price after asking "what did your last bad hire cost?" in the pitch meeting. Change to C if campus-round firms (TJT, BRC) say they think in rounds.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **Holding off.** First round free; ask pilot firms what they would pay. No pricing code needed yet. Context: competitors charge roughly $10 to $25 per candidate. HackerRank $100/month for 120 candidates a year, then $20 each; Codility $1,200/year for 120; TestGorilla yearly plans from $2,580, one credit per candidate; TestDome pay-per-candidate packs with no contract (100 for $1,000). Most require yearly contracts; packs fit firms like ours that hire in bursts.
 
 ### D15. Simulation length
 
@@ -339,7 +376,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** A. Measure invite-to-start, start-to-finish, time used and where people stop, from the attempt events we already record. Go longer only if completion stays above about 80% and the firm wants more signal.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **A.** Keep 30 minutes and measure completion in the pilot. Drop-off rises past about 40 minutes.
 
 ### D16. Second vertical: pharma scope
 
@@ -357,7 +394,7 @@ Model and price per million tokens (input / output), from [claude.com/pricing](h
 
 **Recommendation:** C now, leaning B. It reuses the engine work, and compliance-heavy employers already pay for proof of skill. Confirm by asking two or three pharma contacts the same "last three hires" question from docs/09.
 
-**Your decision:** _(blank)_
+**Your decision (2026-11-10):** **C. Deferred**; accounting only for now.
 
 ## Batch 3 judgment calls
 
@@ -375,7 +412,7 @@ Already built; revisit only if you disagree.
 
 ## Provisional calls to confirm (already built, not blocking)
 
-From `2026-11-09-stage-a-open-decisions.md`, built as described. Confirm or change:
+From `2026-11-09-stage-a-open-decisions.md`, built as described. **All confirmed as built (2026-11-10).**
 - J1 invite expiry at job deadline (end of day, recruiter time zone), else 14 days
 - J2 a batch with any bad email is rejected whole
 - J3 re-invite skipped if invited, started or completed; allowed after revoke or expiry
@@ -403,7 +440,8 @@ From `2026-11-09-stage-a-open-decisions.md`, built as described. Confirm or chan
 - [ ] Supabase: upgrade to Pro (Free pauses after 7 idle days); Authentication → URL Configuration (Site URL, redirect URLs); confirm TOTP MFA is enabled
 - [ ] Vercel: add `CRON_SECRET` (`openssl rand -hex 32`) when PR #25 merges, or the daily purge refuses every call; also add it to `.env.example`; check every env var in `01-architecture-and-hosting.md`, plus `EMAIL_FROM`, which the code reads but that table doesn't list
 - [ ] Accountant reviews `harbor-lane-bank-rec`; then `pnpm scenarios:publish`
-- [ ] Lawyer reviews the consent and monitoring notice and retention promise (D3)
-- [ ] Pick and contact the first pilot company (`09-go-to-market.md`)
+- [ ] D3 free checks: compare our notice with HackerRank's, Codility's and CoderPad's; check each promise in the notice against what the app does; pilot firm's HR/legal reviews it; ask UNC law clinics and Launch Chapel Hill
+- [ ] Paid lawyer review before charging money, candidates outside NC, or turning on AI scoring (D3)
+- [ ] Pick and contact the first pilot company (`09-go-to-market.md`); ask what they would pay (D14)
 - [x] Apply `20261110200000_retention.sql` (PR #25) to the cloud (applied 2026-11-10)
 - [ ] Later: find a pharmacist reviewer
