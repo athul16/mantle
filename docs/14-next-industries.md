@@ -1,116 +1,120 @@
 # 14 · Next industries to pitch
 
-Which industries to take the simulations to after accounting, pharma and paralegal (those three are planned and not covered here). Research as of Nov 2026 from vendor sites, trade press and industry surveys. Most "shortage" figures come from recruiters, vendors or trade bodies with an interest in the story; treat them as direction, not proof. Authoring prompts for each pick: `15-simulation-prompts.md`.
+Which roles to take the simulations to after accounting, pharma and paralegal (those three are planned and not covered here). Tech roles are out of scope. Research as of Nov 2026 from vendor sites, trade press, BLS and industry surveys. Many figures come from recruiters, vendors or test-prep sites; treat them as direction, not proof.
 
-## What makes an industry a fit
+Authoring prompts: `15-simulation-prompts.md` (first wave, this ranking) and `16-simulation-prompts-shortage-markets.md` (second wave).
 
-| Test | Why |
-| --- | --- |
-| The work is documents, numbers and messages | The engine has `inbox_reply`, `spreadsheet`, `document_review`, `numeric`, `multiple_choice`, `ordering`, `rapid_round`. No code execution, no CAD, no audio |
-| A bad hire is expensive and shows up late | Same pitch as accounting: "know before the offer". Works where errors cost money, licences or clients |
-| Employers say they can't find skilled people | The buyer wants proof of skill, not a filter for volume |
-| Today's screening is resumes, interviews or multiple choice | Multiple choice is what AI answers easily; a seeded, timed simulation is the replacement |
-| Buyers are reachable | Mid-size firms and staffing agencies with a named decision-maker, as in `09-go-to-market.md` |
-| The rules are public and stable | Scenarios cite real rules; fast-changing ones (tariff rates, contribution limits) must be supplied inside the scenario |
+## How the picks are ranked
+
+The priority is **roles hired in large numbers that draw far more applicants than anyone can read**. That is a different market from "can't find skilled people", and the pitch is different:
+
+| | Applicant-overload roles (first wave) | Shortage roles (second wave) |
+| --- | --- | --- |
+| Buyer's pain | 300 applications per opening, many AI-written and identical; recruiters can't tell who can do the work | Few qualified applicants; a bad hire is costly |
+| Pitch | "Cut the pile to the 20 who can do the job, with a test AI-written applications can't fake" | "Know before the offer whether they can do it" |
+| What matters in the product | Seeded variants, fast server-timed rounds, proctoring, automatic scoring, a ranked results table | Depth and realism |
+| Pricing pressure | Per-candidate pricing gets expensive at volume; a per-job or per-round price fits better | Per candidate is fine |
+
+Ranking tests, in order: (1) openings per year, (2) applicants per opening, (3) whether a job simulation already owns the role, (4) whether the buyer is reachable, (5) fit to the engine's step types.
+
+## The applicant flood, in numbers
+
+| Measure | Figure | Source |
+| --- | --- | --- |
+| Applications per job, all roles | 244 average in 2025 | Greenhouse (6,000+ companies) |
+| Applications per hire | 291, three times the level of five years ago | Ashby, 2026 |
+| Entry-level and remote postings | 400 to 1,000+ reported | Secondary summaries |
+| UK graduate roles | 140 applications per vacancy (86 in 2022/23); retail, FMCG and tourism up to 290 | Institute of Student Employers |
+| Entry-level postings | Down about 35% since 2023 while applications rose | Secondary summary |
+| Recruiter time | 34% of US recruiters spend up to half their week filtering junk applications | Greenhouse |
+| Bank internships | JPMorgan about 630,000 applications for 4,100 places; Goldman over 360,000, under 1% accepted | Fortune and secondary reports; totals vary by source |
+| Professional services | PwC about 304,000 applications for 7,400 places; McKinsey about 200,000 a year | One secondary compilation |
+| Applicants per LinkedIn posting by function | Marketing 97, finance 71, accounting 43 | ResumeTarget analysis, 2025. Ashby's medians point the other way (marketing 15, finance 8); the two disagree |
+
+US openings per year, 2024 to 2034 (BLS): management analysts 98,100; market research analysts and marketing specialists 87,200; human resources specialists 81,800; project management specialists 78,200; claims adjusters, examiners and investigators 21,600 (employment falling 5%). Not found in this pass: financial analysts, buyers and purchasing agents, loan officers.
+
+## First wave, in lead order
+
+| # | Role | Openings and applicants | Who tests it today | Reachable buyer | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| 1 | **Marketing coordinator / marketing analyst** | 87,200 openings a year; highest applicants per posting of any named function in the LinkedIn data; consumer-brand graduate roles up to 290 applications | Generic libraries only: Vervoe (10 to 12 questions), Testlify, TestGorilla, HireQuotient. No seeded simulation found | Every company with a marketing team; agencies; consumer brands. The hiring manager feels the pile directly | **Best lead.** Large, open, and the work (campaign numbers, launch QA, invoices) fits the engine |
+| 2 | **Business / operations analyst, junior consultant** | 98,100 openings a year (management analysts) plus 78,200 project roles; the most extreme applicant ratios outside banking | Top firms run their own screens (McKinsey Solve, BCG Casey) and vendor aptitude tests (SHL, Cappfinity, SOVA, Pymetrics). Those are reasoning tests and games, not the job | Mid-size consultancies, Big Four-style advisory practices below the firm level, and corporate strategy and operations teams | **Open below the top tier.** Horizontal: nearly every pilot company hires this role |
+| 3 | **HR / people operations coordinator** | 81,800 openings a year; "coordinator" and "assistant" titles are where the flood is worst | Generic admin simulations (eSkill, HR Avatar "Workplace Simulation: Administration") | The HR team is both buyer and user, so the sale is one conversation. Staffing agencies | **Open.** Smaller volume per company, easiest sale |
+| 4 | **Bank analyst programme: commercial banking and credit** | The largest applicant pools anywhere (see table above) | Large banks are locked into SHL, HireVue and Pymetrics. Regional banks and credit unions: nothing found | Regional and community banks, credit unions, asset managers. Not the global banks at first | **Open in the middle of the market.** Reuses the accounting content skills |
+| 5 | **Assistant buyer / merchandise planner (retail and consumer goods)** | Up to 290 applications per graduate role, the highest sector in the ISE data (UK) | Numerical and personality tests, some in-house retail maths exercises. No simulation vendor found | Retailers and consumer brands with trainee schemes; several run annual intakes | **Open.** Evidence is UK-heavy; check US intake sizes before pitching |
+| 6 | **Insurance claims representative trainee** | 21,600 openings a year; carriers hire trainees in classes on "degree or three years' experience" terms, which draws a broad pool | HireVue Virtual Job Tryout and HR Avatar cover the contact-centre end | Regional carriers, third-party administrators, independent adjusting firms | **Partly open.** Hiring volume at the big carriers was not confirmed in this pass, and BLS projects decline |
+
+### Why this order
+
+1. Marketing and the analyst role are the two largest pools of openings, both flooded, and neither has a real simulation. Marketing goes first because no incumbent of any kind sits on the mid-market buyer; the analyst role has aptitude-test incumbents at the top firms.
+2. HR is third on volume but first on ease: the person drowning in applications is the person who buys.
+3. Banking has the biggest numbers but the biggest employers are the least reachable, the same reason the Big 4 are excluded in `09-go-to-market.md`.
+4. Retail and claims are real but rest on thinner evidence.
+
+## Second wave: shortage markets
+
+Still good markets, but the opposite problem (few applicants), so they move behind the first wave. Prompts: `16-simulation-prompts-shortage-markets.md`.
+
+| Role | Signal | Simulations found |
+| --- | --- | --- |
+| Commercial insurance associate underwriter | About 70% of underwriting executives worried about long-term talent (Pacific Life) | Training only (Attensi, LMA/IUA) |
+| Construction project engineer, estimator | AGC 2026: 82% of firms have salaried openings; 87% of those say they are as hard or harder to fill | None |
+| Wealth management client service associate | RIAs need about 70,000 new staff in five years (Schwab) | None found |
+| Trade compliance entry analyst | DHL adding 200+ customs agents and entry writers | None found |
+| AML / KYC analyst | Four months or more to fill analyst roles (WorkFusion/Celent) | Training only |
 
 ## Competitor landscape
 
 ### Horizontal simulation platforms (the real threat)
 
-None of these was found to own any industry below, but all could build into one. The defence is depth: per-candidate seeded variants whose answer keys always tie, server-timed rapid rounds, and traps a practitioner recognises.
+None was found owning a role above; all could build into one. The defence is per-candidate seeded variants whose keys always tie, server-timed rapid rounds, and traps a practitioner recognises.
 
 | Vendor | What it does | Notes |
 | --- | --- | --- |
-| Skillfully | Custom AI-built simulations per employer (SkillsOS) | Vendor materials name Bloomberg, McKinsey and Athena as customers. Closest in concept |
-| Vervoe | Work-sample tests with AI grading, 300+ templates | Standardised templates, limited customisation per one comparison |
-| HireVue Virtual Job Tryout, Harver | Job tryouts, mostly high-volume roles (contact centre, retail, claims intake) | Enterprise sales; not aimed at skilled specialist roles |
-| CodeSignal for Financial Services | Spreadsheet simulations and written tasks on top of its coding product | Watch for finance roles |
-| Canditech | Job simulations, has a finance hiring page | Little public detail |
-| MeritFirst | Assessments from "real work"; $6M seed (8VC, Slow Ventures); focus on finance and venture-backed startups | Sources disagree on the raise date (Oct 2025 or July 2026) |
-| HeyMilo | AI interview agents plus an "AI scenario assessment"; $6M in June 2026 | Interview-first |
+| Skillfully | Custom AI-built simulations per employer | Names Bloomberg, McKinsey and Athena as customers. Closest in concept |
+| Vervoe | Work-sample tests with AI grading, 300+ templates | Short standard templates |
+| HireVue Virtual Job Tryout, Harver | Job tryouts for high-volume roles (contact centre, retail, claims intake) | Enterprise sales |
+| CodeSignal for Financial Services | Spreadsheet simulations and written tasks | Watch for bank roles |
+| MeritFirst | Assessments from "real work"; $6M seed (8VC, Slow Ventures); finance and startups | Raise date differs by source |
+| Canditech, HeyMilo | Job simulations; AI interview agents with scenario assessments | Little public detail on roles |
 
-### Vertical simulation vendors (take these industries off the list)
+### Aptitude and game incumbents (large employers)
 
-| Vendor | Vertical | Notes |
-| --- | --- | --- |
-| HackerRank, CodeSignal, Codility and others | Software, data | Saturated |
-| Colare | Hardware engineering (CAD, PCB, FEA); $2.5M pre-seed, launched Oct 2026 | Half its clients are aerospace and defence. Needs tooling we don't have |
-| AmplifyME | Investment banking, markets, trading | Used by global banks for campus hiring and assessment |
-| Take2 AI | Sales (role-play simulations); reported $14M Series A | Saturated |
-| Attensi | Training simulators (underwriting for Hiscox, financial crime) | Training, not hiring. Shows the buyers accept simulations |
+SHL, Cappfinity, SOVA, Pymetrics, Arctic Shores, HireVue. They hold the global banks, the Big Four and the top consulting firms. They measure reasoning and traits, not the work, which is the argument against them; displacing them is an enterprise sale and not a first step.
 
-### Generic test libraries (present everywhere, weak)
+### Vertical simulation vendors (out of scope or taken)
 
-HR Avatar, eSkill, iMocha, Testlify, Xobin, TestGorilla, Mercer Mettl, HireQuotient, ProProfs, Criteria and Pmaps each list a test for almost every role below. They are 20 to 60 multiple-choice questions, sometimes with an animated situational clip (HR Avatar's claims adjuster test). Same position as the accounting vendors in `09-go-to-market.md`: they prove the buyer already pays for testing, and they are what we replace.
+Software and data (HackerRank, CodeSignal, Codility), hardware engineering (Colare), investment banking and trading (AmplifyME), sales (Take2 AI).
 
-## Verdict by industry
+### Generic test libraries
 
-"Open" means no simulation-based hiring product was found for the role. It does not mean no competition: the generic libraries are in every row.
-
-| # | Industry and first role | Demand signal | Hiring simulations found | Engine fit | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| 1 | **Commercial insurance**: underwriting assistant / associate underwriter (then claims adjuster) | Sedgwick: nearly 25% of adjusters expected to retire by end of 2027. Pacific Life: about 70% of underwriting executives worried about long-term talent. Jacobson/Aon: over half of carriers plan to add staff | None for hiring. HR Avatar animated claims test; Attensi and the London market (LMA/IUA) use simulations for training and outreach | Very high: submissions, loss runs, rating math, authority rules | **Open. Pitch first** |
-| 2 | **Construction**: project engineer, estimator | AGC/NCCER 2026 (1,830 respondents): 82% of firms have salaried openings; 87% of those say they are as hard or harder to fill than last year; half say candidates lack the skills | None. Civil engineering quizzes only | Very high: submittals, change orders, pay applications, takeoff math | **Open. Pitch first** |
-| 3 | **Trade compliance and customs brokerage**: entry writer, classification analyst | DHL adding 200+ customs agents and entry writers in the US, FedEx hiring brokerage roles (FreightWaves). Broker exam pass rate reported at 15 to 20% (unverified). Official headcount data is too old to confirm a national shortage | None found at all, not even a generic test | Very high: invoice vs entry checks, valuation, classification by rule | **Wide open, small market** |
-| 4 | **Financial crime compliance**: AML / KYC analyst | WorkFusion/Celent: four months or more to fill analyst roles. Barclay Simpson: 61% of employers say shortages hurt team performance, 60% plan to add headcount; overall market "stable" (UK-heavy data) | None for hiring. Multiple-choice tests (iMocha, Pmaps, Testlify); simulations only in training | High: alert triage, KYC files, transaction review | **Open**, slower buyers (banks); start with fintechs and staffing firms |
-| 5 | **Commercial banking**: credit analyst | Weak. ABA and ICBA surveys show general talent pressure at community banks; nothing specific to credit analysts | None. AmplifyME covers investment banking, not commercial credit | Very high: spreading, ratios, borrowing base. Closest to the accounting sims already built | **Open, demand unproven.** Cheap to build; validate with two or three bank conversations first |
-| 6 | **Wealth management**: paraplanner, client service associate at RIAs | Schwab: RIAs need about 70,000 new staff in five years. McKinsey: about 100,000 advisors short by 2034. RIAs dropping CFP requirements to widen the pool | None found (the search returned nothing on assessments for these roles, which is weak evidence of absence) | High: account paperwork, RMDs, rebalancing, wire-fraud judgment | **Open.** Buyers look like CPA firms: small, local, reachable |
-
-### Second tier
-
-| Industry | Why not yet |
-| --- | --- |
-| Commercial real estate analyst | Firms already run their own Excel take-home modelling tests. Our `spreadsheet` step checks values in keyed cells, not a free-form model, so we would test less than they already do |
-| Medical coding and revenue cycle | Many multiple-choice vendors, AAPC credentials, and employers write in-house tests. Code sets change yearly (candidates complain vendor tests use old ones). Lower-wage, less "high talent" |
-| Supply chain planner, procurement buyer | Generic tests exist; the buyer is spread across every industry, so there is no focused first market |
-| Mortgage underwriter, processor | Cyclical hiring; multiple-choice tests exist (Erekrut, Xobin) |
-
-### Rejected
-
-| Industry | Reason |
-| --- | --- |
-| Software, data, cybersecurity | Saturated |
-| Hardware engineering | Colare; needs CAD and PCB tooling |
-| Investment banking, trading | AmplifyME, in-house modelling tests, MeritFirst and CodeSignal moving in |
-| Sales, customer support | Take2, HireVue, Harver |
-| Management consulting | Top firms have in-house tools (and Skillfully names McKinsey); boutiques rely on case interviews |
-| Actuarial | The exam series is the credential employers trust |
-
-## Recommended order
-
-1. **Commercial insurance.** Clearest retirement-driven shortage, large employers and many regional carriers, agencies and third-party administrators, and buyers already accept simulations for training.
-2. **Construction.** Strongest survey evidence, thousands of mid-size general contractors, and no vendor in sight. Triangle-area contractors make a local first list like the accounting one.
-3. **Wealth management.** Same buyer shape as CPA firms, so the accounting playbook transfers.
-4. **Trade compliance.** Nobody is there; the 2026 tariff changes make the pain current. Small market, so build one simulation and test demand.
-5. **Commercial credit.** Reuses the accounting content skills; hold until a bank says it has the problem.
-6. **Financial crime compliance.** Real need, but bank procurement and model-risk reviews are slow. Go through fintechs or compliance staffing firms.
+HR Avatar, eSkill, iMocha, Testlify, Xobin, TestGorilla, Mercer Mettl, HireQuotient, ProProfs, Criteria and Pmaps list a 10 to 60 question test for nearly every role here. They prove the buyer already pays for testing, and they are what we replace.
 
 ## Pitch lines
 
-| Industry | Line |
+| Role | Line |
 | --- | --- |
-| Insurance | "See whether a trainee can read a loss run and stay inside authority before you spend a year training them." |
-| Construction | "Find out before the offer whether a project engineer catches the overbilled pay application." |
-| Wealth management | "Know your next associate will call the client back before sending the wire." |
-| Trade compliance | "Test entry writers on a real entry packet, not on whether they can recite the GRIs." |
-| Commercial credit | "Watch an analyst spread a real set of financials and find the covenant breach." |
-| Financial crime | "Measure alert decisions and their reasons, not AML trivia." |
+| Marketing | "300 applicants, one afternoon: see who catches the wrong promo code before launch." |
+| Business analyst | "A reasoning test tells you they're clever. This tells you whether the number on the slide is right." |
+| HR coordinator | "You read applications all day. Let the work sample read them for you." |
+| Bank analyst | "Watch an analyst spread real financials and find the covenant breach." |
+| Assistant buyer | "Retail maths under trade-meeting pressure, with a different sheet for every candidate." |
+| Claims trainee | "Find out before the training class who verifies coverage before promising payment." |
 
 ## Open questions
 
-- Insurance: start with underwriting or claims? Underwriting fits the engine better; claims has the sharper retirement numbers.
-- Is the staffing-agency channel as strong here as in accounting (insurance and construction both have specialist recruiters)?
-- Values sections (see `15-simulation-prompts.md`): fixed library for v1; do pilot companies want their own values, and should values points count in the total?
-- Each vertical needs a practitioner to review content, as with the accountant review pack.
-- Legal review of situational-judgment content before it is used to rank candidates.
+- Pricing for volume: per job or per round instead of per candidate?
+- Load: a 500-candidate round in one week has not been tested (see `01-architecture-and-hosting.md` on caching).
+- Completion rates: a 50-minute test sent to 300 applicants needs a drop-off check in the first pilot; a 20-minute first-stage cut may be needed.
+- Values sections: fixed library for v1; should values points count in the total, and can companies choose their own?
+- HR and claims content cites US federal rules; legal review before use outside that.
+- US intake sizes for retail trainee schemes and claims trainee classes were not confirmed.
 
 ## Sources
 
-- Simulation startups: [Colare launch (TNW)](https://thenextweb.com/news/colare-2-5m-hardware-engineer-hiring-tests), [MeritFirst (8VC)](https://8vc.com/resources/from-credentials-to-credibility-introducing-meritfirst), [Take2 AI](https://pulse2.com/take2-ai-sales-recruiting-platform-company-raises-3-million), [HeyMilo](https://pulse2.com/heymilo-ai-raises-6-million-to-expand-agentic-recruiting-platform-and-launch-new-ai-hiring-agents/amp/), [Skillfully](https://claude.com/customers/skillfully), [Vervoe comparison](https://vervoe.com/compare/testgorilla-alternative), [CodeSignal financial services](https://codesignal.com/solutions/financial-services/), [Canditech finance](https://www.canditech.io/use-cases/hiring-finance-employees/), [AmplifyME](https://finextra.com/pressarticle/100258/amplifyme-launches-banking-simulator)
-- Insurance: [Jacobson 2026 outlook](https://www.jacobsononline.com/blog/study-reflects-a-steady-insurance-talent-outlook-for-2026/), [hiring optimism (Risk & Insurance)](https://riskandinsurance.com/insurance-industry-shows-strong-hiring-optimism-despite-persistent-talent-challenges/), [property claims talent loss](https://riskandinsurance.com/property-claims-face-mounting-pressure-from-talent-loss-ai-gaps-and-climate-volatility/), [adjuster shortage](https://www.insurancebusinessmag.com/us/news/workers-comp/claims-adjuster-shortage-puts-workers-comp-renewals-at-risk-596798.aspx), [HR Avatar claims test](https://www.hravatar.com/ta/tests/6228/claims-adjuster-examiner-investigator.html), [Attensi underwriter simulator](https://insurancenewsnet.com/oarticle/attensi-creates-worlds-first-underwriter-simulator-to-tackle-skills-gap-in-insurance-sector), [LMA/IUA simulations](https://www.insurancebusinessmag.com/uk/news/breaking-news/lma-and-iua-extend-job-simulations-to-underwriting-592373.aspx)
-- Construction: [AGC 2026 workforce survey](https://www.agc.org/sites/default/files/users/user21902/2026%20Workforce%20Survey%20National%20Release%20(5).pdf), [skills employers can't find (Davron)](https://www.davron.net/construction-hiring-2026-skills-employers-struggling-to-find/), [HR Avatar civil engineer test](https://www.hravatar.com/ta/tests/5986/engineer-civil.html)
-- Trade compliance: [DHL customs hiring (FreightWaves)](https://www.freightwaves.com/news/dhl-surges-customs-agent-hiring-as-tariffs-confuse-importers), [customs broker job market 2026](https://www.gaiadynamics.ai/blog/the-customs-broker-job-market-in-2026), [Buffalo cross-border talent](https://kitalent.com/articles/buffalo-cross-border-logistics-talent)
-- Financial crime: [Barclay Simpson 2026 guide](https://www.barclaysimpson.com/salary-guides/2026-financial-crime-salary-guide/), [WorkFusion on staffing](https://www.workfusion.com/blog/the-unvirtuous-cycle-of-staffing-challenges-for-financial-crime-compliance-teams/), [Quantexa on AML talent](https://www.quantexa.com/blog/inside-the-aml-talent-market-trends-challenges-and-opportunities/), [iMocha compliance test](https://www.imocha.io/tests/banking-compliance-skills-test)
-- Banking: [ABA community bank survey](https://bankingjournal.aba.com/2026/03/aba-survey-most-community-banks-see-growth-opportunities-in-2026/), [ICBA CEO outlook](https://www.icba.org/w/community-bank-ceo-outlook-2026-challenges-opportunities)
-- Wealth management: [RIA staffing need](https://www.investmentnews.com/practice-management/how-career-changers-are-helping-to-fill-the-advice-industrys-talent-shortage/265974), [RIAs drop CFP requirements](https://www.wealthmanagement.com/recruiting/ria-firms-drop-cfp-requirements-in-84-of-hires), [junior advisors and AI](https://www.investmentnews.com/transformation/junior-advisors-still-in-demand-as-ai-reshapes-ria-training/268382)
-- Second tier: [CRE technical interviews (A.CRE)](https://www.adventuresincre.com/how-to-prepare-for-a-real-estate-technical-interview/), [medical coding tests (eSkill)](https://eskill.com/blog/use-medical-coding-tests-to-make-better-hires/), [supply chain test (eSkill)](https://www.eskill.com/assessments/supply-chain-management), [mortgage underwriter test (Erekrut)](https://www.erekrut.com/skill-assessments/mortgage-underwriter-early-professional-skillproof-assessment)
+- Volume: [Greenhouse CEO on the application flood (Fortune)](https://fortune.com/2026/07/27/greenhouse-ceo-daniel-chait-ai-doom-loop-job-seekers-spam-interview-applications-unemployment/), [application volume summary (Metaview)](https://content.metaview.ai/application-volume-recruiting-agentic-ai/), [LinkedIn posting analysis (ResumeTarget)](https://www.resumetarget.com/job-market/usa), [BambooHR state of hiring 2026](https://www.bamboohr.com/resources/data-at-work/data-stories/state-of-hiring-2026), [ISE: how employers manage record applications](https://ise.org.uk/knowledge/insights/543/how_employers_are_actually_managing_record_applications), [ISE via Times Higher Education](https://www.timeshighereducation.com/news/employers-cut-student-work-experience-roles-demand-rises), [entry-level flood](https://polandinsight.com/entry-level-jobs-flooded-with-applicants-as-ai-reshapes-the-labour-market-81741/)
+- Banking and professional services: [Goldman internship applications (Fortune)](https://fortune.com/2025/06/16/goldman-sachs-internship-summer-analysts-wall-street-tpg-olaplex-red-lobster), [acceptance rates compilation](https://whali.co.uk/blog/internship-acceptance-rates-2026), [bank online assessments](https://www.preplounge.com/en/blog/finance/investment-banking/interview/online-assessments), [consulting screens by firm](https://managementconsulted.com/consulting-tests-assessments/)
+- BLS: [management analysts](https://www.bls.gov/ooh/business-and-financial/management-analysts.htm), [market research analysts](https://www.bls.gov/ooh/business-and-financial/market-research-analysts.htm), [openings in bachelor's-level occupations](https://www.bls.gov/opub/ted/2026/projected-job-openings-in-occupations-typically-requiring-a-bachelors-degree-2024-34.htm), [project management specialists](https://www.bls.gov/ooh/business-and-financial/project-management-specialists.htm), [claims adjusters](https://www.bls.gov/ooh/Business-and-Financial/Claims-adjusters-appraisers-examiners-and-investigators.htm)
+- Role tests today: [Vervoe library](https://vervoe.com/assessment-library/?page=19), [Testlify marketing coordinator](https://testlify.com/test-library/marketing-coordinator/), [eSkill job simulations](https://eskill.com/job-task-simulations), [HR Avatar administration simulation](https://hravatar.com/ta/tests/6208/workplace-simulation-administration.html), [Asda buying programme](https://www.brightnetwork.co.uk/graduate-jobs/asda/buying-graduate-programme-2027), [HR Avatar claims test](https://www.hravatar.com/ta/tests/6228/claims-adjuster-examiner-investigator.html)
+- Simulation startups: [Colare (TNW)](https://thenextweb.com/news/colare-2-5m-hardware-engineer-hiring-tests), [MeritFirst (8VC)](https://8vc.com/resources/from-credentials-to-credibility-introducing-meritfirst), [Take2 AI](https://pulse2.com/take2-ai-sales-recruiting-platform-company-raises-3-million), [HeyMilo](https://pulse2.com/heymilo-ai-raises-6-million-to-expand-agentic-recruiting-platform-and-launch-new-ai-hiring-agents/amp/), [Skillfully](https://claude.com/customers/skillfully), [CodeSignal financial services](https://codesignal.com/solutions/financial-services/), [AmplifyME](https://finextra.com/pressarticle/100258/amplifyme-launches-banking-simulator)
+- Second wave: [AGC 2026 workforce survey](https://www.agc.org/sites/default/files/users/user21902/2026%20Workforce%20Survey%20National%20Release%20(5).pdf), [insurance hiring outlook](https://riskandinsurance.com/insurance-industry-shows-strong-hiring-optimism-despite-persistent-talent-challenges/), [DHL customs hiring](https://www.freightwaves.com/news/dhl-surges-customs-agent-hiring-as-tariffs-confuse-importers), [RIA staffing need](https://www.investmentnews.com/practice-management/how-career-changers-are-helping-to-fill-the-advice-industrys-talent-shortage/265974), [financial crime staffing](https://www.workfusion.com/blog/the-unvirtuous-cycle-of-staffing-challenges-for-financial-crime-compliance-teams/)
