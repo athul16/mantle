@@ -89,8 +89,12 @@ test("candidate pages load without layout shift and back returns to the right st
   await expect(page.getByRole("timer")).toBeVisible();
   expect(await cls(), "workspace CLS").toBeLessThan(CLS_BUDGET);
 
-  // Back from the workspace can't restart the timer: instructions now offer "Back to your test".
+  // Start replaces the practice page in history (a client navigation, so full screen carries over),
+  // so Back lands on the system check. Going on from there can't restart the timer:
+  // the practice page now offers "Back to your test".
   await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("link", { name: "Back to your test" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Start the/ })).toHaveCount(0);
 });
