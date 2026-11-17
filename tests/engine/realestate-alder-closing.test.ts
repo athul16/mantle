@@ -292,7 +292,7 @@ function solveLender(sc: ReturnType<typeof screen>) {
   expect([!!apr, prepay, amount].filter(Boolean).length, body).toBe(1);
   const newWait = prepay || (!!apr && Math.round((Number(apr![2]) - Number(apr![1])) * 1000) > 125);
   const right = [oneOption(cfg, /^Update the settlement statement/), oneOption(cfg, /^Get the lender's revised closing instructions in writing/)];
-  right.push(newWait ? oneOption(cfg, /new 3-business-day wait/) : oneOption(cfg, /no new 3-business-day wait/));
+  right.push(newWait ? oneOption(cfg, /a new 3-business-day wait/) : oneOption(cfg, /no new 3-business-day wait/));
   return { right: right.sort(), newWait, kind: prepay ? "prepay" : amount ? "amount" : newWait ? "apr_big" : "apr_small" };
 }
 const solveBuyer = (sc: ReturnType<typeof screen>) => oneOption(sc.mc("inbox-buyer"), /written amendment signed by the buyer and the seller/);
@@ -793,7 +793,7 @@ describe("realestate-alder-closing: scoring", () => {
         const sc = screen(seed);
         const l = solveLender(sc);
         const cfg = sc.mc("inbox-lender");
-        const waitCall = l.newWait ? oneOption(cfg, /new 3-business-day wait/) : oneOption(cfg, /no new 3-business-day wait/);
+        const waitCall = l.newWait ? oneOption(cfg, /a new 3-business-day wait/) : oneOption(cfg, /no new 3-business-day wait/);
         expect(lost(seed, (a) => (a["inbox-lender"].selected = l.right.filter((x) => x !== waitCall)))).toBeCloseTo(8 / 3, 2);
         const move = oneOption(sc.mc("inbox-buyer"), /^Change the date in the closing file/);
         expect(lost(seed, (a) => (a["inbox-buyer"].selected = [move]))).toBe(7);

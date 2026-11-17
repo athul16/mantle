@@ -10,6 +10,7 @@ import { demoTimedClose } from "./demo-timed-close";
 import { ediscoveryLarchReview } from "./ediscovery-larch-review";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
+import { realestateAlderClosing } from "./realestate-alder-closing";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -22,6 +23,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
+  [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
