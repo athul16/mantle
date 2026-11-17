@@ -1,14 +1,13 @@
 # Paralegal self-review pack, November 2026
 
-Five paralegal simulations are built, merged and waiting for the team's own sign-off before any company can use them. There is no outside reviewer for this pass; the team reviews.
+Six paralegal simulations are built, merged and waiting for the team's own sign-off before any company can use them. There is no outside reviewer for this pass; the team reviews.
 
 1. **Litigation: Morrow v. Tidewater Freight** (`litigation-morrow-tidewater`, 52 minutes)
 2. **eDiscovery: Project Larch review batch** (`ediscovery-larch-review`, 50 minutes)
 3. **Corporate: Halyard Robotics Series A** (`corporate-halyard-robotics`, 50 minutes)
 4. **Real estate: closing on 418 Alder Lane** (`realestate-alder-closing`, 50 minutes)
 5. **Personal injury: Diaz, intake to demand** (`pi-diaz-demand`, 50 minutes)
-
-The sixth, **Immigration: H-1B petition packet** (`immigration-h1b-packet`), is still being built and will be added to this pack after it merges.
+6. **Immigration: H-1B petition packet** (`immigration-h1b-packet`, 50 minutes)
 
 Overview of the vertical: `docs/14-paralegal-simulations.md`. Full scenario docs: `docs/paralegal/<slug>.md`.
 
@@ -351,9 +350,68 @@ All five share these properties, so they aren't repeated per simulation: 100 poi
 
 ---
 
-## 6. Immigration: H-1B petition packet
+## 6. Immigration: H-1B petition packet (50 minutes, 100 points)
 
-Not in this pack yet. It is being built on `feat/sim-immigration-paralegal`; its traps, judgment calls and timing get added here from `docs/paralegal/immigration-h1b-packet.md` after it merges.
+**Setup.** Immigration paralegal at a law firm on an H-1B extension of stay for a worker at a fictional employer. Fictional agency and forms (P-129, WA-9035, A-28, AR-94, N-797) modelled on the real process; every rule is stated, and the attorney gives legal advice. Doc: `docs/paralegal/immigration-h1b-packet.md`.
+
+### Traps
+
+| # | Task | Trap | Expected answer | Rule | Pts | Verdict | Note |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Rapid A | Filing window | 6 months before the start date, same day of the month (not 180 days) | Stated | ½ | | |
+| 2 | Rapid A | Arrival record end | Approved end + 10 days | Stated | ½ | | |
+| 3 | Rapid A | Arrival record, passport expires first | Passport expiry, no 10 days added | Stated | 1 | | |
+| 4 | Rapid A | Grace period | 60 days after the last day of work, or the arrival record end if earlier | Stated | ½ / 1 | | |
+| 5 | Rapid A | Extension filing | 45 days before the arrival record ends (not the approved end) | Firm practice | ½ | | |
+| 6 | Rapid A | Six-year limit and recapture | 6 years plus full days outside; departure and return days don't count | Stated | 1 each | | |
+| 7 | Forms | Identity detail off (swapped letters, day/month swap, transposed passport digits) | Flag: doesn't match the passport | Identity comes from the passport | 4 | | |
+| 8 | Forms | Job title or occupation code | Flag: doesn't match the attestation | Job details match the certified attestation | 3 | | |
+| 9 | Forms | Lower wage or other wage level | Flag: wage doesn't match | Same | 4 | | |
+| 10 | Forms | Petition dates outside the attestation's validity | Flag: outside the validity period | Stated | 3 | | |
+| 11 | Forms | Worksite not on the attestation | Flag: worksite isn't covered | Stated | 4 | | |
+| 12 | Forms | Passport capitals and day-first dates; start a few days after validity begins | Leave unflagged | Look-alikes | −1 if flagged | | |
+| 13 | Forms | Decision | Hold the filing, send the attorney the list, corrections through the attorney | | 2 | | |
+| 14 | Checklist | Document "not in the packet" | Flag: missing | | 4 | | |
+| 15 | Checklist | A-28, P-129 or support letter unsigned | Flag: not signed | | 4 | | |
+| 16 | Checklist | Fee check with wrong training-fee tier or an omitted fee | Flag: wrong fee ($780 + $500 + $750, or $1,500 at 26+ employees) | Fee schedule stated | 4 | | |
+| 17 | Checklist | Foreign-language degree or experience letter | Flag: needs a certified translation | | 3 | | |
+| 18 | Checklist | Attestation pending, or copy of an old expired passport | Flag: not valid on the filing date | | 3 | | |
+| 19 | Checklist | Decision | Hold the packet, send the attorney the list | | 2 | | |
+| 20 | Rapid B | 13 easy and 6 hard term questions (amended petition for a worksite move, public access file, late RFE response) | One right option each | | ½ / 1 | | |
+| 21 | Rapid C | RFE response due on a weekend or holiday | Last business day *before* (must arrive by) | Stated | ½ / 1 | | |
+| 22 | Rapid C | Motion to reopen due on a weekend or holiday | Next business day *after* | Stated | 1 | | |
+| 23 | Rapid C | Posting, premium processing, courier | 10 / 15 business days, courier 2 business days before; holidays don't count | Stated | ½ / 1 | | |
+| 24 | `inbox-rfe` | Build the RFE response | Cover letter, notice on top, one document per requested item; not padding or the whole file | Multi-select, wrong picks cost | 12 | | |
+| 25 | `inbox-backdate` | HR asks for a backdated job letter kept quiet | Refuse, say you can't date it falsely, forward to the attorney now | Never backdate a record | 10 | | |
+| 26 | `inbox-beneficiary` | Beneficiary asks whether to travel while pending | No legal advice; the attorney will reply, pass it on today | UPL | 8 | | |
+
+### Judgment calls
+
+| # | Call | Verdict | Note |
+| --- | --- | --- | --- |
+| 1 | Fictional form names, but the fee amounts mirror the real public schedule (stated in the checklist) | | |
+| 2 | Grace period, 10-day arrival record, filing window and recapture are simplified rules stated on each item: applying a rule, not recalling law | | |
+| 3 | RFE due dates roll back, motion deadlines roll forward on purpose; the team may prefer one direction | | |
+| 4 | 45-day extension filing and 2-business-day courier rule are the fictional firm's own practice | | |
+| 5 | Inbox is multiple choice so everything scores automatically; the backdating step could later be a rubric-scored reply | | |
+| 6 | Packet tabs shuffled per seed so the fee trap isn't in the same place for everyone | | |
+| 7 | Packet passport trap is a copy of a previous passport, so it never contradicts the forms cross-check | | |
+| 8 | Number answers are single digits (extension years 1–3, recaptured days 2–6) because of the leak test | | |
+
+### Timing
+
+| Section | Minutes | Work | Verdict | Note |
+| --- | --- | --- | --- | --- |
+| Rapid A: status and date math | 6 | 15 × 20 s | | |
+| Forms cross-check | 10 | 14 details × 4 documents | | |
+| Rapid B: terms | 6 | 15 × 20 s | | |
+| Packet checklist | 10 | 12 tabs | | |
+| Rapid C: deadlines | 6 | 15 × 20 s | | |
+| Inbox | 12 | RFE 300 s, backdate 210 s, beneficiary 210 s | | |
+
+**Overall verdict (immigration):** ______ &nbsp; Reviewer: ______ &nbsp; Date: ______
+
+---
 
 ## After sign-off
 

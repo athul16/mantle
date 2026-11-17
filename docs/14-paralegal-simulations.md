@@ -2,7 +2,7 @@
 
 The second vertical after accounting: six job simulations for paralegals and legal assistants, one per practice area. Each is a 50-minute timed workday in a fictional matter, scored automatically against a per-seed key. Detailed scenario docs live in `paralegal/`; the team's self-review checklist is `reviews/2026-11-paralegal-review.md`.
 
-**Status: draft, team self-review pending, not published.** Five simulations are merged; the sixth (immigration) is being built. None has been published (`pnpm scenarios:publish` not run), so no company can use them yet.
+**Status: draft, team self-review pending, not published.** All six simulations are merged. None has been published (`pnpm scenarios:publish` not run), so no company can use them yet.
 
 ## Market
 
@@ -48,7 +48,7 @@ Every paralegal simulation follows the same pattern (see `06-assessment-engine.m
 | Corporate: Halyard Robotics Series A | `corporate-halyard-robotics` | 50 | 100 | Merged, draft | `paralegal/corporate-halyard-robotics.md` |
 | Real estate: closing on 418 Alder Lane | `realestate-alder-closing` | 50 | 100 | Merged, draft | `paralegal/realestate-alder-closing.md` |
 | Personal injury: Diaz, intake to demand | `pi-diaz-demand` | 50 | 100 | Merged, draft | `paralegal/pi-diaz-demand.md` |
-| Immigration: H-1B petition packet | `immigration-h1b-packet` | | | In progress | `paralegal/immigration-h1b-packet.md` (after merge) |
+| Immigration: H-1B petition packet | `immigration-h1b-packet` | 50 | 100 | Merged, draft | `paralegal/immigration-h1b-packet.md` |
 
 ### 1. Litigation: Morrow v. Tidewater Freight
 
@@ -125,9 +125,20 @@ Doc: `paralegal/realestate-alder-closing.md`.
 
 Doc: `paralegal/pi-diaz-demand.md`.
 
-### 6. Immigration: H-1B petition packet (in progress)
+### 6. Immigration: H-1B petition packet
 
-Being built on branch `feat/sim-immigration-paralegal`. Planned: status and date math, a forms-consistency check across a petition form, passport and job letter (name, date of birth, wage level, dates), a packet checklist, deadlines, and an inbox (organizing an RFE response; the employer asks to backdate a letter, which the candidate refuses). Fictional form names. Its doc will be `paralegal/immigration-h1b-packet.md`; this section and the review pack get filled in after it merges.
+**Setup.** Immigration paralegal at a law firm working an H-1B extension of stay for a worker at a fictional employer. The agency and forms are fictional but modelled on the real process (Form P-129 petition, WA-9035 wage attestation, A-28 attorney appearance, AR-94 arrival record, N-797 notices); every rule is stated in the material, and the attorney, not the paralegal, gives legal advice.
+
+| # | Section | Minutes | Step types | Points |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round: status and date math (filing window, arrival record, grace period, six-year limit) | 6 | `rapid_round` | 10 |
+| 2 | Forms cross-check: petition, passport, job letter and wage attestation | 10 | `document_review` | 20 |
+| 3 | Rapid round: document and process terms | 6 | `rapid_round` | 10 |
+| 4 | Packet checklist: missing, unsigned, wrong fee, untranslated, not valid | 10 | `document_review` | 20 |
+| 5 | Rapid round: deadlines (RFE, motion to reopen, posting, premium processing, courier) | 6 | `rapid_round` | 10 |
+| 6 | Inbox: RFE response packet, backdating request, beneficiary's travel question | 12 | `multiple_choice` | 12 + 10 + 8 |
+
+Doc: `paralegal/immigration-h1b-packet.md`.
 
 ## Shared legal helpers
 
@@ -158,8 +169,7 @@ Added for the paralegal work (first used by the PI medical chronology) and gener
 
 | Item | Status |
 | --- | --- |
-| Five simulations | Merged, draft: team self-review pending |
-| Immigration simulation | In progress on `feat/sim-immigration-paralegal` |
+| Six simulations | Merged, draft: team self-review pending |
 | Self-review | Checklist in `reviews/2026-11-paralegal-review.md`, not yet done. There is no outside reviewer for now; the team signs off |
 | Publishing | Not run. After sign-off, fixes (and a version bump where needed) land first, then `pnpm scenarios:publish` |
 | Go-to-market | Not started for legal; `09-go-to-market.md` covers accounting only |
