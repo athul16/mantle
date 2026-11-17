@@ -1,6 +1,6 @@
 # Immigration paralegal: H-1B petition packet
 
-Status: **draft: team self-review pending.** Version 1. Not published (`pnpm scenarios:publish` not run).
+Status: **draft: team self-review pending.** Version 1. Published to the cloud library as v1 on 2026-11-17 for the team's own testing; fixes from the review ship as v2.
 
 | | |
 | --- | --- |
