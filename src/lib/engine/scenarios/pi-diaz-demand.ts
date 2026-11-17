@@ -245,10 +245,14 @@ function moneyItem(rng: Rng, v: Values, n: string, kind: MoneyKind, clientFirst:
       break;
     }
     case "mileage": {
-      const trips = rng.int(4, 30);
-      const miles = rng.int(6, 60);
-      const rate = rng.int(18, 72);
-      answer = trips * miles * rate;
+      // At least $100, so the answer's cents form has five digits and can't read like a four-digit invoice number.
+      let trips: number, miles: number, rate: number;
+      do {
+        trips = rng.int(4, 30);
+        miles = rng.int(6, 60);
+        rate = rng.int(18, 72);
+        answer = trips * miles * rate;
+      } while (answer < 10_000);
       q = `Medical mileage: ${trips} round trips of ${miles} miles at ${usd(rate)} a mile. How much does the demand claim?`;
       break;
     }
