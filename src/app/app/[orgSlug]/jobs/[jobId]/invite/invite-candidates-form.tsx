@@ -204,8 +204,7 @@ export function InviteCandidatesForm({
               {skipped ? ` · ${skipped} already invited, will be skipped` : null}
             </p>
             <p id="invite-limit" className="help">
-              Up to {max} candidates per batch. Duplicates and people already invited to this job are skipped. If an email bounces, it&apos;s listed as
-              not delivered so you can resend it.
+              Up to {max} per batch. Duplicates and people already invited are skipped.
             </p>
           </div>
 
@@ -226,7 +225,7 @@ export function InviteCandidatesForm({
               />
             </div>
             <p className="help">
-              Uses the &quot;email&quot; column (and &quot;name&quot; if present); without a header, the first cell with an @ in each row.
+              Uses the &quot;email&quot; and &quot;name&quot; columns, or the first email in each row.
             </p>
             {csv ? (
               <p className="help" aria-live="polite">

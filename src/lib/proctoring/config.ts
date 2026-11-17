@@ -156,7 +156,7 @@ export const DISPLAY_SURFACES = ["monitor", "window", "browser", "application", 
 export type DisplaySurface = (typeof DISPLAY_SURFACES)[number];
 
 /** Version of the monitoring notice, stored with each consent. Change it when the text changes. */
-export const MONITORING_CONSENT_VERSION = "2026-11-15.proctoring-v2";
+export const MONITORING_CONSENT_VERSION = "2026-11-16.plain-notice";
 
 /**
  * What the notice needs: what is captured (after any waiver for this
@@ -164,46 +164,58 @@ export const MONITORING_CONSENT_VERSION = "2026-11-15.proctoring-v2";
  * whom to ask about accommodations (organizations.settings.contact_email).
  */
 export type MonitoringSettings = Proctoring & {
+  /** The candidate is excused from full screen, so the test never enters it (D9). */
+  fullscreenWaived?: boolean;
   mediaRetentionDays?: number;
   resultsRetentionDays?: number;
   contactEmail?: string | null;
 };
 
 /**
- * The monitoring notice as paragraphs: what is captured, why, who sees it and
- * for how long (docs/02 Compliance). The verify page shows the same facts as a
- * table; the system check shows these paragraphs only if consent wasn't
- * recorded at verify (e.g. a session from before the change).
+ * The monitoring notice in parts (docs/02 Compliance): what is recorded, then
+ * full screen, who sees it, human review and how long it is kept. The verify
+ * page shows `recorded` as a list; the system check shows monitoringNotice()
+ * only if consent wasn't recorded at verify. Both come from here so they agree.
  */
-export function monitoringNotice(settings: MonitoringSettings, companyName: string): string[] {
+export function monitoringNoticeParts(settings: MonitoringSettings, companyName: string): { recorded: string[]; details: string[] } {
   const mediaDays = settings.mediaRetentionDays ?? DEFAULT_MEDIA_RETENTION_DAYS;
   const resultsDays = settings.resultsRetentionDays ?? DEFAULT_RESULTS_RETENTION_DAYS;
-  const captured: string[] = [];
-  if (settings.camera) captured.push("a camera photo every 30 to 60 seconds and when you leave the test window");
-  if (settings.screen) captured.push("a screenshot of your entire screen at the same times");
-  if (settings.microphone) captured.push("short audio clips when we hear speech, plus when speech starts and stops");
-  captured.push("when you leave the test window, leave full screen, copy, cut or paste (the length of what you paste, never the text)");
-  const paragraphs = [`While you take this test we record ${joinList(captured)}.`];
-  if (settings.fullscreen) paragraphs.push("Full screen is required: the test runs in full screen, and leaving it is noted.");
+  const recorded: string[] = [];
+  if (settings.camera) recorded.push("a camera photo every 30 to 60 seconds, and more often when you leave the test window");
+  if (settings.screen) recorded.push("a screenshot of your entire screen at the same times");
+  if (settings.microphone) recorded.push("short audio clips when someone speaks, and when speech starts and stops");
+  recorded.push("when you leave the test window or full screen, and when you copy, cut or paste (the length of what you paste, never the text)");
   if (settings.camera && settings.gaze) {
-    paragraphs.push(
-      "On-device check: your device checks whether you are facing the screen and how many faces it sees; only the result is sent, never the image or a face template.",
-    );
+    recorded.push("whether you're facing the screen and how many faces your device sees (only the result is sent, never the image)");
   }
-  const media = settings.microphone ? "photos, screenshots and audio clips" : "photos and screenshots";
-  paragraphs.push(
-    `Why: so ${companyName} can trust that the work is yours. Only ${companyName}'s hiring team can see the ${media}.`,
-    "Unusual moments are marked for a person to check, with the matching photos. No one is rejected automatically.",
-    `How long: the ${media} are kept for ${mediaDays} days after your assessment ends, then deleted. Your answers, results and the hiring team's notes are kept for ${resultsDays} days, then deleted. ${companyName} can delete them sooner on request. We don't use the photos to identify you.`,
-    accommodationLine(companyName, settings.contactEmail),
+  const details: string[] = [];
+  if (settings.fullscreen) details.push("The test runs in full screen. Leaving it covers the task.");
+  else if (!settings.fullscreenWaived) details.push("The test opens in full screen. Leaving it is noted.");
+  const media = settings.microphone ? "Photos, screenshots and audio clips" : "Photos and screenshots";
+  details.push(
+    `Only ${companyName}'s hiring team sees this. A person reviews anything unusual. No one is rejected automatically.`,
+    settings.camera || settings.screen || settings.microphone
+      ? `${media} are deleted after ${mediaDays} days, answers and results after ${resultsDays} days. We don't use photos to identify you.`
+      : `Answers and results are deleted after ${resultsDays} days.`,
   );
-  return paragraphs;
+  return { recorded, details };
+}
+
+/** The monitoring notice as paragraphs (system check). */
+export function monitoringNotice(settings: MonitoringSettings, companyName: string): string[] {
+  const { recorded, details } = monitoringNoticeParts(settings, companyName);
+  return [`We record ${joinList(recorded)}.`, ...details, accommodationLine(companyName, settings.contactEmail)];
 }
 
 /** Whom to ask for extra time or to take the test without a camera, microphone, full screen or screen share (D9). */
 export function accommodationLine(companyName: string, contactEmail?: string | null): string {
   const who = contactEmail ? `${companyName} at ${contactEmail}` : `${companyName}'s hiring team`;
-  return `Need extra time, or can't use a camera, microphone, full screen or share your screen? Contact ${who} before you start; they can adjust this for you.`;
+  return `Need extra time, or can't use a camera, microphone, full screen or screen share? Contact ${who} before you start.`;
+}
+
+/** "a, b and c". */
+export function listText(items: string[]): string {
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items.at(-1)}` : (items[0] ?? "");
 }
 
 function joinList(items: string[]): string {

@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { Icon } from "@/components/icons";
 import { maskEmail } from "@/lib/candidate/code";
-import { CODE_TTL_MINUTES, MAX_CODE_ATTEMPTS, consentLabel } from "@/lib/candidate/config";
+import { CODE_TTL_MINUTES, consentLabel } from "@/lib/candidate/config";
 import { loadPageState, pageForStatus } from "@/lib/candidate/pages";
+import { monitoringNoticeParts } from "@/lib/proctoring/config";
 import { getInviteProctoringSettings } from "@/lib/proctoring/server";
-import { DEFAULT_MEDIA_RETENTION_DAYS, DEFAULT_RESULTS_RETENTION_DAYS } from "@/lib/retention/policy";
 import { LocalTime } from "../../local-time";
 import { BrandAside, ERROR_TEXT, MessageBox, SplitPage } from "../../ui";
 import { VerifyForm } from "./verify-form";
@@ -18,9 +17,9 @@ export const metadata = { title: "Confirm it's you" };
 const RESEND_FORM = "resend-code";
 
 /**
- * Name, emailed code and consent (prototype vVerify()). The "What's recorded,
- * and why" table is the monitoring notice, built from the assessment's real
- * settings; ticking the box is the consent (recorded by /api/candidate/verify).
+ * Name, emailed code and consent (prototype vVerify()). The "What we record"
+ * list is the monitoring notice, built from the assessment's real settings;
+ * ticking the box is the consent (recorded by /api/candidate/verify).
  * Posting the form is what creates (or resumes) the attempt.
  */
 export default async function VerifyPage({ params, searchParams }: PageProps<"/a/[token]/verify">) {
@@ -33,8 +32,6 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
 
   const { invite } = state;
   const settings = await getInviteProctoringSettings(invite);
-  const mediaDays = settings.mediaRetentionDays ?? DEFAULT_MEDIA_RETENTION_DAYS;
-  const resultsDays = settings.resultsRetentionDays ?? DEFAULT_RESULTS_RETENTION_DAYS;
   const company = invite.companyName;
   const error = typeof query.error === "string" ? query.error : undefined;
   const left = typeof query.left === "string" ? Number(query.left) : undefined;
@@ -72,80 +69,26 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
     message = <MessageBox tone="bad">{ERROR_TEXT[error]}</MessageBox>;
   }
 
-  const rows: [string, string, string][] = [];
-  if (settings.camera) rows.push(["Camera snapshots", "Occasional photos, not video", "Confirm the same person does the whole simulation"]);
-  if (settings.screen) rows.push(["Your entire screen", "Only while the simulation is open", "Show that no other tools or people helped"]);
-  if (settings.microphone)
-    rows.push(["Short audio clips", "Only when speech is heard, not a continuous recording", "Check that no one else is helping you"]);
-  if (settings.fullscreen) rows.push(["Full screen", "The task runs full screen; leaving it is noted", "Keep your attention on the task"]);
-  if (settings.camera && settings.gaze)
-    rows.push(["Facing the screen", "Checked on your device; only the result is sent, never the image", "Notice when you look away or others appear"]);
-  rows.push(["Your activity", "Opens, edits, sends, copy and paste — timestamped", "Show how you worked, not just what you submitted"]);
+  const { recorded, details } = monitoringNoticeParts(settings, company);
 
   const notice = (
     <>
-      <div>
-        <h2 style={{ fontSize: 22 }}>What&apos;s recorded, and why</h2>
-        <p className="small ink2" style={{ marginTop: 4 }}>
-          Read this before you agree. You can stop at any time by closing the window.
+      <h2 id="recorded-heading" style={{ fontSize: 18 }}>
+        What we record
+      </h2>
+      <ul aria-labelledby="recorded-heading" className="small ink2" style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+        {recorded.map((r) => (
+          <li key={r}>{r[0].toUpperCase() + r.slice(1)}</li>
+        ))}
+      </ul>
+      {details.map((d) => (
+        <p key={d} className="small ink2">
+          {d}
         </p>
-      </div>
-      <div className="card" style={{ overflowX: "auto" }}>
-        <table className="tbl" style={{ fontSize: 14 }}>
-          <thead>
-            <tr>
-              <th>What</th>
-              <th>Why</th>
-              <th>Who sees it</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([what, sub, why]) => (
-              <tr key={what}>
-                <td className="strong">
-                  {what}
-                  <div className="xs muted" style={{ fontWeight: 400 }}>
-                    {sub}
-                  </div>
-                </td>
-                <td className="ink2">{why}</td>
-                <td className="ink2">{company}&apos;s hiring team</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 12 }}>
-        <div style={{ padding: "14px 16px", borderRadius: 10, background: "var(--subtle)", display: "flex", gap: 10 }}>
-          <Icon name="trash" />
-          <span className="small">
-            <span className="strong">
-              {settings.camera || settings.screen || settings.microphone
-                ? `${settings.microphone ? "Photos, screenshots and audio clips" : "Photos and screenshots"} deleted after ${mediaDays} days.`
-                : null} Answers and results
-              deleted after {resultsDays} days.
-            </span>{" "}
-            {company} can delete them sooner on request.
-            {settings.camera ? " Photos are never used to identify you." : ""}
-          </span>
-        </div>
-        <div style={{ padding: "14px 16px", borderRadius: 10, background: "var(--subtle)", display: "flex", gap: 10 }}>
-          <Icon name="user" />
-          <span className="small">
-            <span className="strong">A person decides.</span> Written replies are scored by a person; nothing rejects you automatically.
-          </span>
-        </div>
-      </div>
+      ))}
       <p className="small ink2" data-testid="accommodation-contact">
-        Need extra time, or can&apos;t use a camera, microphone, full screen or share your screen? Contact{" "}
-        {settings.contactEmail ? (
-          <>
-            {company} at <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
-          </>
-        ) : (
-          `${company}'s hiring team`
-        )}{" "}
-        before you start.
+        Need extra time or other changes? Email{" "}
+        {settings.contactEmail ? <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a> : `${company}'s hiring team`} before you start.
       </p>
     </>
   );
@@ -175,7 +118,7 @@ export default async function VerifyPage({ params, searchParams }: PageProps<"/a
       <VerifyForm
         token={token}
         defaultName={invite.candidateName ?? ""}
-        sentTo={`${maskEmail(invite.email)} · ${MAX_CODE_ATTEMPTS} tries per code`}
+        sentTo={maskEmail(invite.email)}
         resendFormId={RESEND_FORM}
         canResend
         message={message}

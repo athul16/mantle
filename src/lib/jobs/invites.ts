@@ -62,7 +62,7 @@ export function buildInviteEmail(args: {
     ``,
     `Start here: ${args.link}`,
     ``,
-    `The link is personal to you. Please finish by ${deadline} UTC. No account or download is needed; you can open the link now to check your setup and start later. Once you begin, the timer runs until you submit, so set aside uninterrupted time.`,
+    `The link is personal to you. Please finish by ${deadline} UTC. No account or download needed. Once you start, the timer runs until you submit.`,
     ``,
     `If you weren't expecting this email, you can ignore it.`,
   ].join("\n");

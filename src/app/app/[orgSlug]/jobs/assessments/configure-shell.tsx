@@ -49,7 +49,7 @@ export function ConfigureShell({
         >
           <Icon name="lock" />
           <span className="small">
-            These settings lock once the first candidate starts, so every candidate is judged the same way. To change them later, clone the assessment.
+            These settings lock once the first candidate starts. To change them later, clone the assessment.
           </span>
         </div>
       )}

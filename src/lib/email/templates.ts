@@ -93,12 +93,12 @@ export function inviteEmailHtml(args: {
   const body = [
     eyebrow(`${args.jobTitle} · Next step`),
     heading("Show us how you'd handle a real day on the job", 28),
-    lead(`${hi} — thanks for applying. Instead of a quiz, you'll spend ${time} working through a realistic task from the ${escapeHtml(args.jobTitle)} role.`),
+    lead(`${hi}, thanks for applying. You'll spend ${time} on a realistic task from the ${escapeHtml(args.jobTitle)} role.`),
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${C.line};border-radius:10px;border-collapse:separate;margin:0 0 18px"><tr>${factCells}</tr></table>`,
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px"><tr><td style="border-radius:7px;background:${C.brand}">
 <a href="${escapeHtml(args.link)}" style="display:inline-block;padding:13px 28px;font:500 15px ${FONT};color:#FFFFFF;text-decoration:none;border-radius:7px">Start the simulation &rarr;</a>
 </td></tr></table>`,
-    small("No account or download needed. You can open the link now to check your setup and start later.", C.ink3),
+    small("No account or download needed. You can check your setup now and start later.", C.ink3),
     divider,
     small(`This link is personal to you. If you weren't expecting this email, you can ignore it.`, C.ink2, "0"),
   ].join("\n");
@@ -114,9 +114,9 @@ export function codeEmailHtml(args: { orgName: string; code: string; ttlMinutes:
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px"><tr>
 <td align="center" style="padding:22px;border-radius:10px;background:${C.subtle};border:1px solid ${C.line};font:700 40px ${FONT};letter-spacing:.18em;color:${C.ink}">${escapeHtml(spaced)}</td>
 </tr></table>`,
-    lead(`It expires in ${args.ttlMinutes} minutes and works once. If it runs out, ask for a new one on the same page.`),
+    lead(`It expires in ${args.ttlMinutes} minutes and works once.`),
     divider,
-    small("Didn't ask for a code? Someone may have opened your invitation link. You can ignore this email — nothing starts without the code.", C.ink2, "0"),
+    small("Didn't ask for a code? You can ignore this email.", C.ink2, "0"),
   ].join("\n");
   return page(`${args.code} is your code. It expires in ${args.ttlMinutes} minutes.`, card(args.orgName, body));
 }

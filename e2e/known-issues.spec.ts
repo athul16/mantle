@@ -29,7 +29,7 @@ test.describe("colour contrast", () => {
     await candidate.verify(hiring.invite);
     await axeSerious(page, testInfo);
     await page.getByRole("link", { name: "Continue", exact: true }).click();
-    await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
+    await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
     await expect(page.getByRole("timer")).toBeVisible();
     await axeSerious(page, testInfo);
   });

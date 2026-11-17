@@ -27,7 +27,7 @@ export function CreateOrgForm() {
         <div className="row g16">
           <CompanyLogo name={name.trim() || "?"} size={64} />
           <p className="small ink2" style={{ flex: 1 }}>
-            Until logo upload is ready, candidates see your initials on this tile.
+            Until then, candidates see your initials.
           </p>
         </div>
       </div>

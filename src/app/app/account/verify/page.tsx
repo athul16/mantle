@@ -18,10 +18,10 @@ export default function VerifyPage({ searchParams }: PageProps<"/app/account/ver
           <Icon name="phone" className="i-lg" />
         </span>
       }
-      intro="Open the authenticator app you set up for this account and enter the 6-digit code it shows."
+      intro="Enter the 6-digit code from your authenticator app."
       below={
         <p className="xs muted" style={{ textAlign: "center" }}>
-          Lost your phone or authenticator app? Contact support to reset two-factor for your account. Nobody from our team will ever ask you for a code.
+          Lost your authenticator? Contact support. We&apos;ll never ask you for a code.
         </p>
       }
     >

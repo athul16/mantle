@@ -4,38 +4,38 @@ import { useState, type CSSProperties } from "react";
 import { Icon } from "@/components/icons";
 
 /**
- * "Learn the workspace in 4 steps" (prototype vInstructions()): a small,
+ * The practice run (prototype vInstructions()): a small,
  * untimed copy of the workspace with coach marks. Entirely in the browser:
  * nothing typed here is saved, sent or scored.
  */
 
 const COACH: Record<number, { t: string; d: (m: number) => string; pos: CSSProperties }> = {
   1: {
-    t: "Your clock lives here",
-    d: (m) => `It counts down from ${m}:00 once you start and turns amber with 5 minutes left. No pop-ups, no alarms.`,
+    t: "Your clock",
+    d: (m) => `Counts down from ${m}:00 once you start.`,
     pos: { top: 58, left: 12 },
   },
   2: {
     t: "Your inbox",
-    d: () => "Your tasks arrive as messages here — some arrive while you work. You'll get a small notice; nothing takes over your screen.",
+    d: () => "Tasks arrive here as emails, some while you work.",
     pos: { top: 96, left: 214 },
   },
   3: {
     t: "The workbook",
-    d: () => "Grey cells and locked tabs are read-only source data. White cells with a blue underline are yours. Try typing 1,250 in the highlighted cell.",
+    d: () => "Grey cells are read-only. White cells are yours. Try typing 1,250 in B2.",
     pos: { top: 228, right: 24 },
   },
   4: {
     t: "Reply and send",
-    d: () => "Some tasks end with a reply. Try sending “Done” — then start the real thing.",
+    d: () => "Some tasks need a reply. Try sending “Done”.",
     pos: { bottom: 70, right: 24 },
   },
 };
 
 const STEPS: [number, string, string][] = [
-  [1, "Clock", "Always top-left"],
-  [2, "Inbox", "New mail lands here"],
-  [3, "Workbook", "Grey = read-only, white = yours"],
+  [1, "Clock", "Top left"],
+  [2, "Inbox", "Where tasks arrive"],
+  [3, "Workbook", "White cells are yours"],
   [4, "Reply", "Send your answer"],
 ];
 
@@ -58,10 +58,6 @@ export function PracticeTour({ minutes, title }: { minutes: number; title: strin
 
   return (
     <>
-      <div className="row g12 wrap">
-        <span className="badge b-accent">Practice · untimed · not scored</span>
-        <h2 style={{ fontSize: 20 }}>Learn the workspace in 4 steps</h2>
-      </div>
       <div className="pframe">
         <div className="pf-head">
           <span className={`${spot(1)}pf-clock`}>
@@ -71,9 +67,6 @@ export function PracticeTour({ minutes, title }: { minutes: number; title: strin
           <span className="small strong">{title}</span>
           <span className="grow" />
           <span className="xs okc">Saved</span>
-          <span className="btn btn-sm" aria-hidden="true" style={{ pointerEvents: "none" }}>
-            Submit
-          </span>
         </div>
         <div className="pf-body">
           <div className="pf-inbox">
@@ -160,10 +153,10 @@ export function PracticeTour({ minutes, title }: { minutes: number; title: strin
                 {n === 1250 ? (
                   <span className="okc row g4">
                     <Icon name="check" className="i-sm" />
-                    Nice — that&apos;s the one.
+                    That&apos;s it.
                   </span>
                 ) : (
-                  <span className="muted">Waiting for 1,250 in B2…</span>
+                  <span className="muted">Type 1,250 in B2</span>
                 )}
               </span>
             ) : null}

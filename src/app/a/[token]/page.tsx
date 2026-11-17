@@ -169,7 +169,7 @@ export default async function InviteLandingPage({ params, searchParams }: PagePr
         </div>
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, flex: 1 }}>
           <p className="ink2" style={{ fontSize: 15, lineHeight: 1.55 }}>
-            The simulation is a {minutes}-minute workday with a spreadsheet and an inbox — it&apos;s built for a bigger screen.
+            This {minutes}-minute test needs a bigger screen.
           </p>
           <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
             <li className="row g10">

@@ -170,7 +170,7 @@ export function ConfigureAssessmentForm({
                 name="title"
                 required
                 defaultValue={editing ? editing.title : mode.kind === "create" ? mode.defaultTitle : undefined}
-                placeholder="Staff Accountant Intern — Spring 2027"
+                placeholder="Staff Accountant Intern, Spring 2027"
                 aria-label="Assessment name"
                 aria-invalid={errors?.title ? true : undefined}
                 aria-describedby={errors?.title ? "ca-title-err" : undefined}
@@ -221,7 +221,7 @@ export function ConfigureAssessmentForm({
               <FieldError id="ca-pass-err" text={errors?.passScore?.[0]} />
             </div>
           </SettingRow>
-          <SettingRow title="Monitoring" hint="Candidates see exactly this list before they agree" last>
+          <SettingRow title="Monitoring" hint="Candidates see this before they start" last>
             <fieldset
               style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}
               aria-describedby={errors?.monitoring ? "ca-mon-err" : undefined}
@@ -231,7 +231,7 @@ export function ConfigureAssessmentForm({
               <MonitoringChoice
                 value="monitored"
                 label="Monitored"
-                help="Candidates agree to camera photos and/or screen screenshots while they work."
+                help="Camera photos and/or screenshots while they work."
                 checked={monitoring === "monitored"}
                 onChange={setMonitoring}
               />
@@ -248,34 +248,34 @@ export function ConfigureAssessmentForm({
                     <Toggle name="screen" label="Entire-screen sharing" on={screenShare} onChange={setScreenShare} disabled={locked} />
                     <div>
                       <div className="small strong">Entire-screen sharing</div>
-                      <div className="xs muted">The workspace locks if sharing stops, until it&apos;s restored</div>
+                      <div className="xs muted">The task locks if sharing stops</div>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
                     <Toggle name="fullscreen" label="Require full screen" on={fullscreen} onChange={setFullscreen} disabled={locked} />
                     <div>
                       <div className="small strong">Require full screen</div>
-                      <div className="xs muted">The task runs full screen; leaving it covers the task while the timer keeps running</div>
+                      <div className="xs muted">Leaving full screen hides the task. The timer keeps running.</div>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
-                    <Toggle name="microphone" label="Microphone (audio clips when speech is heard)" on={microphone} onChange={setMicrophone} disabled={locked} />
+                    <Toggle name="microphone" label="Microphone" on={microphone} onChange={setMicrophone} disabled={locked} />
                     <div>
-                      <div className="small strong">Microphone (audio clips when speech is heard)</div>
+                      <div className="small strong">Microphone</div>
                       <div className="xs muted">Short clips are saved only when speech is heard</div>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
                     <Toggle
                       name="gaze"
-                      label="Gaze check (on-device: facing the screen, number of faces)"
+                      label="Gaze check"
                       on={gaze}
                       onChange={setGazeChoice}
                       disabled={locked || !camera}
                     />
                     <div>
-                      <div className="small strong">Gaze check (on-device: facing the screen, number of faces)</div>
-                      <div className="xs muted">Needs the camera; only the result is sent, never the image</div>
+                      <div className="small strong">Gaze check</div>
+                      <div className="xs muted">Checks they face the screen. Needs the camera. Images stay on their device.</div>
                     </div>
                   </div>
                 </div>

@@ -58,10 +58,7 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
           ) : (
             <p className="small">{contactEmail ? `Candidates are told to contact ${contactEmail}.` : "No contact email is set."}</p>
           )}
-          <p className="small ink2">
-            Candidates see this address in the monitoring notice and on the verify page, so they know whom to ask for extra time or to take the
-            test without a camera or screen share. Recruiters set those accommodations per invite on the job page.
-          </p>
+          <p className="small ink2">Candidates email this address to ask for extra time or to skip camera and screen sharing.</p>
         </Row>
         <Row id="security-heading" title="Sign-in security" sub="Two-factor authentication" last>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -79,7 +76,7 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
 }
 
 const RETENTION_NOTE =
-  "Camera photos and screen screenshots go first. Results (the candidate, their answers, scores, integrity events, flags, notes and votes) go later. Candidates see both periods in the monitoring notice before they agree. You can also delete one candidate's data from their report at any time.";
+  "Photos and screenshots are deleted first, results later. Candidates see both periods before they start. You can also delete one candidate's data from their report.";
 
 function Row({ id, title, sub, children, last = false }: { id: string; title: string; sub: string; children: ReactNode; last?: boolean }) {
   return (

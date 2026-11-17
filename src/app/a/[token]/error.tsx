@@ -19,12 +19,10 @@ export default function CandidateError({ error, retry }: { error: unknown; retry
   return (
     <StateCard title="Something went wrong" icon="alert" tone="warn">
       <p className="ink2" style={{ marginTop: -14 }}>
-        Your progress is saved — answers are stored as you go. If your test has started, its clock keeps running, so try again as soon as you
-        can.
+        Your answers are saved. If your test has started, the clock is still running, so try again soon.
       </p>
       <p className="small ink2">
-        If it keeps happening, open the link from your invitation email again, or reply to that email to contact the company that invited you.
-        Quote the reference so they can find what happened.
+        Still stuck? Reopen the link from your invitation email, or reply to that email with the reference below.
       </p>
       <div className="row g14 wrap">
         <button type="button" className="btn btn-primary" onClick={() => retry()}>

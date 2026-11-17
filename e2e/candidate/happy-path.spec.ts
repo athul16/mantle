@@ -26,10 +26,10 @@ test("a candidate takes the petty cash demo from link to done", async ({ page, h
   await expect(page.getByRole("img", { name: "Passed" })).toHaveCount(3);
 
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await land(/\/instructions$/, "Before you start");
-  await expect(page.getByText("Practice · untimed · not scored")).toBeVisible();
+  await land(/\/instructions$/, "Practice run");
+  await expect(page.getByText("Not timed · not scored")).toBeVisible();
 
-  const start = page.getByRole("button", { name: "Start the 15-minute simulation" });
+  const start = page.getByRole("button", { name: "Start the 15-minute test" });
   await start.click();
   await expect(page).toHaveURL(/\/workspace$/);
   await expect(page.getByText("Demo: petty cash count")).toBeVisible();

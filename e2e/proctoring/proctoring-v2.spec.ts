@@ -69,8 +69,8 @@ test("full screen and microphone: system check rows, the full-screen cover, and 
 
   const code = await candidate.requestCode(invite);
   // The notice names the audio clips and full screen too.
-  await expect(page.getByRole("table")).toContainText("Short audio clips");
-  await expect(page.getByRole("table")).toContainText("Full screen");
+  await expect(page.getByRole("list", { name: "What we record" })).toContainText("Short audio clips");
+  await expect(page.getByText("The test runs in full screen. Leaving it covers the task.")).toBeVisible();
   await candidate.submitCode(code);
   await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
 
@@ -86,18 +86,15 @@ test("full screen and microphone: system check rows, the full-screen cover, and 
 
   const attempt = must(await db().from("attempts").select("id").eq("invite_id", invite.inviteId).single());
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
-  await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Practice run" })).toBeVisible();
+  await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
-  // Camera, screen and microphone carried over, but the page is not in full screen: the test is covered, the timer runs.
-  const cover = page.getByRole("dialog", { name: "Go full screen to start" });
-  await expect(cover).toBeVisible();
+  // Camera, screen and microphone carried over, and Start went full screen from the click: no cover, the timer runs.
   await expect(page.getByRole("timer")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await expect(page.getByRole("dialog", { name: /full screen/ })).toHaveCount(0);
   await a11y();
-  await cover.getByRole("button", { name: "Go full screen" }).click();
-  await expect(cover).toHaveCount(0);
-  expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
   const status = page.getByRole("status", { name: "Monitoring" });
   await expect(status).toContainText("Camera on");
   await expect(status).toContainText("Screen shared");

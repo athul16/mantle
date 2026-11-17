@@ -20,8 +20,7 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
         <main style={{ maxWidth: "28rem", margin: "0 auto" }}>
           <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-.015em", margin: "0 0 12px" }}>Something went wrong</h1>
           <p style={{ color: "#434B55", margin: "0 0 12px" }}>
-            Please try again. If you were taking an assessment, your progress is saved. If it keeps happening, quote this
-            reference when you get in touch:
+            Please try again. Your progress is saved. If it keeps happening, send us this reference:
           </p>
           <p style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", margin: "0 0 16px" }} data-testid="error-ref">
             {ref}

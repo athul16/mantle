@@ -43,7 +43,7 @@ export function NumericStep({ config, answer, onChange, disabled }: StepComponen
         />
       </div>
       <p id={helpId} className="small muted">
-        Numbers only. You can use the calculator, and change your answer until you submit.
+        Numbers only. You can change it until you submit.
       </p>
     </section>
   );

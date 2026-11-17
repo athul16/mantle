@@ -67,8 +67,8 @@ export async function requestCode(token: string, now = new Date()): Promise<Requ
     text: [
       `Your verification code is ${code}.`,
       "",
-      `Enter it on the page where you clicked Continue to open the ${invite.jobTitle} assessment from ${invite.companyName}.`,
-      `It expires in ${CODE_TTL_MINUTES} minutes and works once. If you didn't ask for it, you can ignore this email: nothing starts without the code.`,
+      `Enter it on the page you just opened. It expires in ${CODE_TTL_MINUTES} minutes and works once.`,
+      `Didn't ask for a code? You can ignore this email.`,
     ].join("\n"),
     html: codeEmailHtml({ orgName: invite.companyName, code, ttlMinutes: CODE_TTL_MINUTES }),
   });

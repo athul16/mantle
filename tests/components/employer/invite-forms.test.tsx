@@ -33,7 +33,7 @@ describe("InviteCandidatesForm", () => {
     render(<InviteCandidatesForm orgId="org-1" jobId="job-1" max={200} />);
     expect(screen.getByRole("tab", { name: "Paste emails" })).toHaveAttribute("aria-selected", "true");
     expect(emailsBox()).toHaveValue("");
-    expect(screen.getByText(/Up to 200 candidates per batch/)).toBeVisible();
+    expect(screen.getByText(/Up to 200 per batch/)).toBeVisible();
     expect(send()).toHaveTextContent("Send invites");
     expect(send()).toBeEnabled();
 
@@ -186,15 +186,15 @@ describe("InviteCandidatesForm", () => {
         jobId="job-1"
         max={50}
         summary={{ assessment: "Bank reconciliation", minutes: 30, deadline: null }}
-        emailPreview={{ subject: "Acme: your work simulation for Audit intern", body: "Hi {first name} — Acme has invited you." }}
+        emailPreview={{ subject: "Acme: your work simulation for Audit intern", body: "Hi {first name}, Acme has invited you." }}
       />,
     );
-    expect(screen.getByText(/Up to 50 candidates per batch/)).toBeVisible();
+    expect(screen.getByText(/Up to 50 per batch/)).toBeVisible();
     expect(screen.getByText("Bank reconciliation")).toBeVisible();
     expect(screen.getByText("30 min")).toBeVisible();
     expect(screen.getByText("0 candidates")).toBeVisible();
     expect(screen.getByText("Acme: your work simulation for Audit intern")).toBeVisible();
-    expect(screen.getByText("Hi {first name} — Acme has invited you.")).toBeVisible();
+    expect(screen.getByText("Hi {first name}, Acme has invited you.")).toBeVisible();
   });
 });
 
@@ -288,7 +288,7 @@ describe("AccommodationsForm", () => {
     expect(screen.getByRole("checkbox", { name: "No camera for this candidate" })).not.toBeChecked();
     // The assessment doesn't share the screen, so there is nothing to waive.
     expect(screen.queryByRole("checkbox", { name: "No screen share for this candidate" })).toBeNull();
-    expect(screen.getByText(/recorded in the audit log/)).toBeVisible();
+    expect(screen.getByText(/You can change it until they start/)).toBeVisible();
   });
 
   it("offers full screen and microphone waivers when the assessment requires them", async () => {
