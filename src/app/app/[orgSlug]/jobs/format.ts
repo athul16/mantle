@@ -14,6 +14,7 @@ export const STEP_LABELS: Record<string, string> = {
   numeric: "Numeric answer",
   rapid_round: "Rapid round",
   multiple_choice: "Multiple choice",
+  ordering: "Ordering",
 };
 
 /** "accounting" → "Accounting". */

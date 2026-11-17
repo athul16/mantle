@@ -50,7 +50,7 @@ describe("demo-mini-close generator", () => {
   });
 });
 
-const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct"]);
+const PUBLIC_ID_FIELDS = new Set(["accounts", "side", "targets", "reasons", "decision", "choice", "correct", "order"]);
 /** Only id-shaped strings are skipped under those fields; a note or sentence there is still checked. */
 const ID_LIKE = /^[A-Za-z0-9_.-]{1,64}$/;
 

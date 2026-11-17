@@ -11,6 +11,7 @@ import { demoTimedClose } from "./demo-timed-close";
 import { ediscoveryLarchReview } from "./ediscovery-larch-review";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
+import { piDiazDemand } from "./pi-diaz-demand";
 import { realestateAlderClosing } from "./realestate-alder-closing";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
@@ -24,6 +25,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
+  [`${piDiazDemand.slug}@v${piDiazDemand.version}`]: piDiazDemand,
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
 };

@@ -10,6 +10,8 @@ import { documentReviewServer, type DocumentReviewConfig, type DocumentReviewKey
 import type { DocumentReviewAnswer } from "@/lib/engine/step-types/document_review/public";
 import { multipleChoiceServer, type MultipleChoiceConfig, type MultipleChoiceKey } from "@/lib/engine/step-types/multiple_choice/server";
 import { rapidRoundServer, type RapidRoundConfig, type RapidRoundKey } from "@/lib/engine/step-types/rapid_round/server";
+import { orderingServer, type OrderingConfig, type OrderingKey } from "@/lib/engine/step-types/ordering/server";
+import { orderingAnswerSchemaFor } from "@/lib/engine/step-types/ordering/public";
 import { fillTemplate } from "@/lib/engine/server/template";
 import type { Step, Variant } from "@/lib/engine/types";
 import type { StoredStepScore } from "./summary";
@@ -174,6 +176,9 @@ export function describeStep(step: Step, variant: Variant | null, answer: unknow
 
     case "rapid_round":
       return { ...base, answerText: null, rows: rapidRoundRows(config as RapidRoundConfig, key as RapidRoundKey | null, variant, answer, score) };
+
+    case "ordering":
+      return { ...base, answerText: null, rows: orderingRows(config as OrderingConfig, key as OrderingKey | null, variant, answer, score) };
 
     default:
       // Step types without a custom view yet (e.g. ones added after this
@@ -439,4 +444,54 @@ function rapidRoundRows(
   const timing = score?.items.find((i) => i.id === "timing");
   if (timing) out.push({ id: "timing", label: timing.label, answer: timing.note ?? "", expected: "—" });
   return out;
+}
+
+/**
+ * One row per position (the candidate's item next to the expected one, no
+ * points), then the scored parts worth points: items in their exact place and
+ * pairs in the right relative order, with counts recomputed from the answer.
+ */
+function orderingRows(
+  c: OrderingConfig,
+  k: OrderingKey | null,
+  variant: Variant | null,
+  answer: unknown,
+  score: StoredStepScore | null,
+): StepRow[] {
+  const fill = (t: string) => {
+    if (!variant) return t;
+    try {
+      return fillTemplate(t, variant.values);
+    } catch {
+      return t; // e.g. {{first_name}}, which isn't a variant value
+    }
+  };
+  const labels = new Map(c.items.map((i) => [i.id, fill(i.label)]));
+  const ids = c.items.map((i) => i.id);
+  const parsed = answer === undefined ? null : safeParse(() => orderingServer.parseAnswer(answer));
+  const given = parsed?.order ?? [];
+  const complete = !!parsed && orderingAnswerSchemaFor(ids).safeParse(parsed).success;
+  const n = ids.length;
+  const pairs = (n * (n - 1)) / 2;
+
+  const rows: Omit<StepRow, "earned" | "max" | "note">[] = ids.map((_, i) => ({
+    id: `pos-${i + 1}`,
+    label: `Position ${i + 1}`,
+    answer: given[i] ? (labels.get(given[i]) ?? given[i]) : NOT_ANSWERED,
+    expected: k?.order[i] ? (labels.get(k.order[i]) ?? k.order[i]) : "—",
+  }));
+
+  // Same counts as the scorer: exact places, and pairs in the key's relative order.
+  let inPlace = 0;
+  let rightPairs = 0;
+  if (complete && k) {
+    const rank = new Map(k.order.map((id, i) => [id, i]));
+    const ranks = given.map((id) => rank.get(id) ?? -1);
+    inPlace = ranks.filter((r, i) => r === i).length;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (ranks[i] < ranks[j]) rightPairs++;
+  }
+  const count = (got: number, of: number) => (!parsed ? NOT_ANSWERED : !complete ? "Not every item once" : !k ? "—" : `${got} of ${of}`);
+  if (c.positionPoints > 0) rows.push({ id: "positions", label: "Items in the right position", answer: count(inPlace, n), expected: `${n} of ${n}` });
+  if (c.pairwisePoints > 0) rows.push({ id: "pairs", label: "Pairs in the right order", answer: count(rightPairs, pairs), expected: `${pairs} of ${pairs}` });
+  return withScore(rows, score);
 }
