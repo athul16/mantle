@@ -344,7 +344,7 @@ const CHOICE_RULES: [string, RegExp, RegExp, "easy" | "hard"][] = [
   ["check", /settlement check arrives/, /^Log it and give it to the attorney for the client trust account/, "easy"],
   ["referral-fee", /offers the firm a fee for each client/, /^Decline and tell the attorney/, "easy"],
   ["intake-first", /What do you collect first at intake/, /^The date of loss, the people and insurers involved/, "easy"],
-  ["same-crash", /was driving the other car in the same crash/, /^Run a conflicts check before talking about the case/, "hard"],
+  ["same-crash", /driving the other car in the same crash/, /^Run a conflicts check before talking about the case/, "hard"],
   ["rent", /asks whether the firm can lend them rent money/, /^Only an attorney can answer/, "hard"],
   ["date-mismatch", /says the crash happened on a different day than the police report/, /^Note both dates and tell the attorney/, "hard"],
   ["omit-records", /asks you to leave an old back injury out/, /^Refuse: records go out complete/, "hard"],
@@ -630,10 +630,17 @@ describe("pi-diaz-demand: scoring", () => {
 
   describe("each trap answered wrongly costs exactly its points", () => {
     const seeds = SEEDS.slice(0, 40);
+    // The perfect answer and its score, once per seed: the trap tests mutate a copy many times.
+    const base = new Map<string, { answers: Answers; points: number }>();
     const lost = (seed: string, mutate: (a: Answers & Record<string, unknown>) => void) => {
-      const a = clone(perfectAnswers(seed));
+      if (!base.has(seed)) {
+        const answers = perfectAnswers(seed);
+        base.set(seed, { answers, points: scoreAttempt(scenario, seed, answers).points });
+      }
+      const { answers, points } = base.get(seed)!;
+      const a = clone(answers);
       mutate(a);
-      return scoreAttempt(scenario, seed, perfectAnswers(seed)).points - scoreAttempt(scenario, seed, a).points;
+      return points - scoreAttempt(scenario, seed, a).points;
     };
     type ReviewId = (typeof REVIEW_STEPS)[number];
     const flagsOf = (a: Answers & Record<string, unknown>, id: ReviewId) => (a[id] as { flags: Flag[] }).flags;

@@ -442,7 +442,7 @@ describe("ordering report rows", () => {
       config: orderingServer.configSchema.parse(config),
       key: orderingServer.keySchema.parse(keyOrder),
       variant,
-      answer: order ? { order } : null,
+      answer: order ? { order } : undefined,
     });
   const describeOrder = (order: string[] | undefined) => describeStep(step, variant, order ? { order } : undefined, order ? scored(order) : null);
 
