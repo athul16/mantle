@@ -62,8 +62,7 @@ export function DeleteCandidateData({
         <span className="badge">Admins only</span>
       </div>
       <p className="small ink2">
-        Permanently deletes this candidate&apos;s invite, answers, scores, notes, integrity flags and snapshots — for example when they ask you to.
-        You&apos;ll type “{CONFIRM}” to confirm.
+        Permanently deletes this candidate&apos;s invite, answers, scores, notes, flags and snapshots. You&apos;ll type “{CONFIRM}” to confirm.
       </p>
       {isAdmin ? (
         <button type="button" className="btn btn-sm btn-danger" style={{ alignSelf: "flex-start" }} onClick={() => setOpen(true)}>
@@ -92,8 +91,7 @@ export function DeleteCandidateData({
                 Delete {candidate}&apos;s data?
               </h2>
               <p className="small ink2">
-                This permanently deletes their invite, answers, scores, notes, integrity flags and snapshots. It can&apos;t be undone. The deletion
-                itself is kept in the audit log.
+                Their invite, answers, scores, notes, flags and snapshots will be deleted. This can&apos;t be undone.
               </p>
               <div>
                 <label className="label" htmlFor="del-confirm">

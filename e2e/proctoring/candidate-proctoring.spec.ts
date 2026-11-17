@@ -62,10 +62,10 @@ test("a candidate consents, passes the camera and screen checks and is monitored
 
   // The verify page shows what is recorded, why and for how long before the one consent box.
   const code = await candidate.requestCode(invite);
-  const notice = page.getByRole("table");
-  await expect(notice).toContainText("Camera snapshots");
-  await expect(notice).toContainText("Your entire screen");
-  await expect(page.getByText(/Photos and screenshots deleted after \d+ days\. Answers and results deleted after \d+ days\./)).toBeVisible();
+  const notice = page.getByRole("list", { name: "What we record" });
+  await expect(notice).toContainText("A camera photo every 30 to 60 seconds");
+  await expect(notice).toContainText("A screenshot of your entire screen");
+  await expect(page.getByText(/Photos and screenshots are deleted after \d+ days, answers and results after \d+ days\./)).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /agree to camera snapshots, screen sharing and activity recording/ })).toBeVisible();
   await a11y();
   await candidate.submitCode(code);
@@ -88,9 +88,9 @@ test("a candidate consents, passes the camera and screen checks and is monitored
   await expect.poll(async () => (await mediaFor(attempt.id)).map((m) => m.source)).toContain("camera");
 
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
-  await expect(page.getByText("If either stops, the workspace is covered until it's back.", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Practice run" })).toBeVisible();
+  await expect(page.getByText("Camera and screen sharing", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
   // The streams from the system check carry over: no second prompt, no cover.
@@ -117,8 +117,8 @@ test("a candidate consents, passes the camera and screen checks and is monitored
   // Stopping the share covers the workspace (the timer keeps running) until it is shared again.
   await endScreenShare(page);
   const cover = page.getByRole("dialog", { name: "Screen sharing stopped" });
-  await expect(cover).toContainText("Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.");
-  await expect(cover).toContainText("The timer keeps running while this message is open; it does not pause.");
+  await expect(cover).toContainText("Screen sharing stopped. Share your entire screen again to continue.");
+  await expect(cover).toContainText("The timer is still running.");
   await a11y();
   await cover.getByRole("button", { name: "Share entire screen" }).click();
   await expect(cover).toHaveCount(0);
@@ -144,7 +144,7 @@ test("after a reload the workspace asks for the screen again before showing the 
   await expect(page.getByRole("listitem").filter({ hasText: "Start photo" })).toContainText("Taken");
   await page.getByRole("button", { name: "Share entire screen" }).click();
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
+  await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
   await page.reload();

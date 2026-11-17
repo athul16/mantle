@@ -32,7 +32,7 @@ export default async function CheckPage({ params }: PageProps<"/a/[token]/check"
       }
       mainStyle={{ maxWidth: 1080 }}
     >
-      <SystemCheck token={token} proctoring={proctoring} consented={consented} companyName={invite.companyName} />
+      <SystemCheck token={token} proctoring={proctoring} consented={consented} companyName={invite.companyName} autoFullscreen={!proctoring.fullscreenWaived} />
     </SplitPage>
   );
 }

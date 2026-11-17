@@ -119,9 +119,22 @@ describe("Full screen required", () => {
 
     act(() => setFullscreen(false));
     expect(screen.getByRole("dialog", { name: "Return to full screen" })).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("The timer keeps running while this message is open; it does not pause.");
+    expect(gate()).toHaveTextContent("The timer is still running.");
     await user.click(screen.getByRole("button", { name: "Go full screen" }));
     await waitFor(() => expect(gate()).not.toBeInTheDocument());
+  });
+
+  it("says Return to full screen when the page arrived already in full screen (Start entered it) and then left", async () => {
+    installFullscreen(true);
+    setFullscreen(true);
+    render(
+      <Proctoring settings={{ ...OFF, fullscreen: true }}>
+        <Work />
+      </Proctoring>,
+    );
+    await waitFor(() => expect(gate()).not.toBeInTheDocument());
+    act(() => setFullscreen(false));
+    expect(screen.getByRole("dialog", { name: "Return to full screen" })).toBeInTheDocument();
   });
 
   it("doesn't block where the browser has no Fullscreen API, and says so", () => {
@@ -131,7 +144,7 @@ describe("Full screen required", () => {
       </Proctoring>,
     );
     expect(gate()).not.toBeInTheDocument();
-    expect(screen.getByRole("note")).toHaveTextContent("This browser can't run the test in full screen");
+    expect(screen.getByRole("note")).toHaveTextContent("This browser doesn't support full screen");
   });
 
   it("keeps the camera cover and the full-screen cover together", async () => {
@@ -175,7 +188,7 @@ describe("Microphone", () => {
     await waitFor(() => expect(audioMonitors).toHaveLength(1));
     act(() => mic.end());
     expect(screen.getByRole("dialog", { name: "Your microphone is off" })).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("The timer keeps running");
+    expect(gate()).toHaveTextContent("The timer is still running");
     expect(audioMonitors[0].stop).toHaveBeenCalled();
 
     mic = audioTrack();

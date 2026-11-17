@@ -76,7 +76,7 @@ export function CreateJobForm({
             className={`input${errors?.title ? " invalid" : ""}`}
             required
             autoFocus
-            placeholder="Staff Accountant Intern — Summer 2027"
+            placeholder="Staff Accountant Intern, Summer 2027"
             aria-invalid={errors?.title ? true : undefined}
             aria-describedby={errors?.title ? "cj-role-help cj-role-err" : "cj-role-help"}
           />

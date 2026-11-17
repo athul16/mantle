@@ -95,9 +95,11 @@ test("the candidate's Continue, Verify, Start and Submit each show a pending sta
   await expect(page).toHaveURL(/\/check$/);
 
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  const start = page.getByRole("button", { name: /^Start the \d+-minute simulation$/ });
-  await expectCandidatePending(page, start, "Starting…");
-  await start.click();
+  // Start uses fetch (so full screen carries over), not a form post: hold that request instead.
+  const held = await hold(page, (req) => req.method() === "POST" && new URL(req.url()).pathname === "/api/candidate/start");
+  await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
+  await expect(page.getByRole("button", { name: "Starting…" })).toBeDisabled();
+  await held.release();
   await expect(page).toHaveURL(/\/workspace$/);
 
   await page.getByRole("link", { name: "Submit", exact: true }).click();

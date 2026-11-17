@@ -67,7 +67,7 @@ describe("ConfigureAssessmentForm: from the library", () => {
     expect(monitored).not.toBeChecked();
     expect(notMonitored).not.toBeChecked();
     expect(monitored).toBeRequired();
-    expect(monitored).toHaveAccessibleDescription(/camera photos and\/or screen screenshots/);
+    expect(monitored).toHaveAccessibleDescription(/Camera photos and\/or screenshots/);
     expect(notMonitored).toHaveAccessibleDescription(/No camera or screen capture/);
     expect(screen.queryByRole("switch", { name: "Camera snapshots" })).not.toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Entire-screen sharing" })).not.toBeInTheDocument();
@@ -89,15 +89,15 @@ describe("ConfigureAssessmentForm: from the library", () => {
     render(<ConfigureAssessmentForm {...base} mode={create} />);
     expect(screen.queryByRole("switch", { name: "Require full screen" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "Monitored" }));
-    const gaze = "Gaze check (on-device: facing the screen, number of faces)";
+    const gaze = "Gaze check";
     expect(toggle("Require full screen")).toHaveAttribute("aria-checked", "false");
-    expect(toggle("Microphone (audio clips when speech is heard)")).toHaveAttribute("aria-checked", "false");
+    expect(toggle("Microphone")).toHaveAttribute("aria-checked", "false");
     expect(toggle(gaze)).toBeDisabled();
     await user.click(toggle("Camera snapshots"));
     expect(toggle(gaze)).toBeEnabled();
     await user.click(toggle(gaze));
     await user.click(toggle("Require full screen"));
-    await user.click(toggle("Microphone (audio clips when speech is heard)"));
+    await user.click(toggle("Microphone"));
     await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
     await waitFor(() => expect(createAssessment).toHaveBeenCalled());
     expect(formDataOf(createAssessment)).toMatchObject({ monitoring: "monitored", camera: "on", fullscreen: "on", microphone: "on", gaze: "on" });
@@ -109,10 +109,10 @@ describe("ConfigureAssessmentForm: from the library", () => {
     render(<ConfigureAssessmentForm {...base} mode={create} />);
     await user.click(screen.getByRole("radio", { name: "Monitored" }));
     await user.click(toggle("Camera snapshots"));
-    await user.click(toggle("Gaze check (on-device: facing the screen, number of faces)"));
+    await user.click(toggle("Gaze check"));
     await user.click(toggle("Camera snapshots"));
-    expect(toggle("Gaze check (on-device: facing the screen, number of faces)")).toHaveAttribute("aria-checked", "false");
-    await user.click(toggle("Microphone (audio clips when speech is heard)"));
+    expect(toggle("Gaze check")).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle("Microphone"));
     await user.click(screen.getByRole("button", { name: "Save and attach to a job" }));
     await waitFor(() => expect(createAssessment).toHaveBeenCalled());
     expect(formDataOf(createAssessment)).not.toHaveProperty("gaze");
@@ -122,7 +122,7 @@ describe("ConfigureAssessmentForm: from the library", () => {
   it("a microphone-only assessment opens as Monitored with its switches set", () => {
     render(<ConfigureAssessmentForm {...base} mode={edit({ ...assessment, proctoring: { camera: false, screen: false, fullscreen: true, microphone: true, gaze: false } })} />);
     expect(screen.getByRole("radio", { name: "Monitored" })).toBeChecked();
-    expect(toggle("Microphone (audio clips when speech is heard)")).toHaveAttribute("aria-checked", "true");
+    expect(toggle("Microphone")).toHaveAttribute("aria-checked", "true");
     expect(toggle("Require full screen")).toHaveAttribute("aria-checked", "true");
   });
 
@@ -276,8 +276,8 @@ describe("ConfigureAssessmentForm: an existing assessment", () => {
     expect(timeLimit()).toBeDisabled();
     expect(toggle("Camera snapshots")).toBeDisabled();
     expect(toggle("Require full screen")).toBeDisabled();
-    expect(toggle("Microphone (audio clips when speech is heard)")).toBeDisabled();
-    expect(toggle("Gaze check (on-device: facing the screen, number of faces)")).toBeDisabled();
+    expect(toggle("Microphone")).toBeDisabled();
+    expect(toggle("Gaze check")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clone" })).toHaveClass("btn-primary");
     expect(screen.getByRole("link", { name: "Back" })).toBeVisible();

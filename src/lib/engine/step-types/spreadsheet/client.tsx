@@ -67,7 +67,7 @@ export function SpreadsheetStep({
       <div className="fxbar" aria-hidden="true">
         <span className="ref">{focus?.ref ?? ""}</span>
         <span className="fx">fx</span>
-        <span className="val">{focus ? focusText || <span className="muted">Empty — type a value.</span> : <span className="muted">Select a white cell to type in it.</span>}</span>
+        <span className="val">{focus ? focusText || <span className="muted">Empty. Type a value.</span> : <span className="muted">Select a white cell to type in it.</span>}</span>
       </div>
       <div className="gridwrap">
         <table ref={gridRef} className="sheet">

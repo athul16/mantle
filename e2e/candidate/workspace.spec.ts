@@ -148,8 +148,8 @@ test("when time runs out the answers are submitted as a timeout", async ({ page,
   await expireAttempt(invite.inviteId);
   // The browser countdown reaches zero, asks the server, and the server settles the attempt.
   await page.clock.fastForward("16:00");
-  await land(/\/done$/, "Time's up — your work is in.");
-  await expect(page.getByText("The clock reached 0:00, so we submitted everything that was saved. Nothing was lost.")).toBeVisible();
+  await land(/\/done$/, "Time's up. Your work is in.");
+  await expect(page.getByText("We submitted everything you saved.")).toBeVisible();
 
   const attempt = await attemptFor(invite.inviteId);
   expect(attempt?.status).toBe("scored");
@@ -165,7 +165,7 @@ test.describe("expired attempt", () => {
     await candidate.startTest(hiring.invite);
     await expireAttempt(hiring.invite.inviteId);
     await page.reload();
-    await land(/\/done$/, "Time's up — your work is in.");
+    await land(/\/done$/, "Time's up. Your work is in.");
   });
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { enterFullscreen, fullscreenSupported } from "@/lib/candidate/fullscreen";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { Icon } from "@/components/icons";
 import { SNAPSHOT_INTERVAL_MS, isMonitored, type Proctoring as Settings, type SnapshotSource } from "../config";
@@ -32,29 +33,24 @@ import { useBrowserSignals, type Signal } from "./use-browser-signals";
 type DeviceState = { on: boolean; message?: string; starting?: boolean };
 
 const STOPPED = {
-  camera: "Your camera turned off. Turn it back on to continue. The timer keeps running.",
-  screen: "Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.",
-  microphone: "Your microphone turned off. Turn it back on to continue. The timer keeps running.",
+  camera: "Your camera turned off. Turn it back on to continue.",
+  screen: "Screen sharing stopped. Share your entire screen again to continue.",
+  microphone: "Your microphone turned off. Turn it back on to continue.",
 };
 
 /** Uploaded speech clips per workspace visit. */
 const MAX_AUDIO_CLIPS = 300;
 
 const GAZE_NOTE = "Your device couldn't run the facing-the-screen check; your camera is still on.";
-const FULLSCREEN_NOTE = "This browser can't run the test in full screen, so it runs in the window. Nothing is recorded about this.";
+const FULLSCREEN_NOTE = "This browser doesn't support full screen, so the test runs in the window.";
 
 const noSubscribe = () => () => {};
-const fullscreenSupported = () =>
-  typeof document !== "undefined" && document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === "function";
 const subscribeFullscreen = (onChange: () => void) => {
   document.addEventListener("fullscreenchange", onChange);
   return () => document.removeEventListener("fullscreenchange", onChange);
 };
 const isFullscreen = () => !!document.fullscreenElement;
 
-function requestFullscreen() {
-  void document.documentElement.requestFullscreen?.().catch(() => {});
-}
 
 /**
  * `inlineIndicators`: the page shows <ProctoringIndicators /> itself (the
@@ -76,6 +72,9 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   const fullscreen = useSyncExternalStore(subscribeFullscreen, isFullscreen, () => false);
   const canFullscreen = useSyncExternalStore(noSubscribe, fullscreenSupported, () => true);
   const [enteredFullscreen, setEnteredFullscreen] = useState(false);
+  // Start goes full screen before the workspace mounts, so no fullscreen_entered
+  // signal arrives here; being in full screen at all counts as having entered it.
+  if (fullscreen && !enteredFullscreen) setEnteredFullscreen(true);
   const [gazeNote, setGazeNote] = useState(false);
   const [notesDismissed, setNotesDismissed] = useState(false);
 
@@ -322,7 +321,6 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   );
   const need = needs.length > 1 ? `${needs.slice(0, -1).join(", ")} and ${needs.at(-1)}` : needs[0];
   const intro = fullscreenOnly ? "This simulation runs in full screen." : `This simulation needs ${need}${fullscreenRequired ? ", in full screen" : ""}.`;
-  const after = fullscreenOnly ? "The hiring team sees when you left full screen." : "The hiring team sees how long monitoring was off.";
   const icon = fullscreenOnly ? "maximize" : screenLost ? "monitor" : "shield";
   const bad = fullscreenOnly || screenLost || micLostNow;
 
@@ -366,7 +364,7 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
                 {heading}
               </h2>
               <p className="ink2">
-                {intro} Your work is saved. The timer keeps running while this message is open; it does not pause. {after}
+                {intro} Your work is saved. The timer is still running.
               </p>
             </div>
             {[camera.message, screen.message, mic.message].filter(Boolean).map((m) => (
@@ -396,15 +394,12 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
               ) : null}
               {fullscreenRequired && !fullscreen ? (
                 // Called straight from the click: browsers only allow full screen from a user gesture.
-                <button type="button" className="btn btn-dark btn-lg" onClick={requestFullscreen}>
+                <button type="button" className="btn btn-dark btn-lg" onClick={enterFullscreen}>
                   <Icon name="maximize" />
                   Go full screen
                 </button>
               ) : null}
             </div>
-            <p className="xs muted">
-              Monitoring confirms the work is your own. Each time it stops is noted in your activity log.
-            </p>
           </div>
         </div>
       )}
@@ -473,7 +468,7 @@ export function FullscreenButton() {
   if (!p || !p.settings.screen || !p.active || p.fullscreen) return null;
   if (typeof document === "undefined" || !document.fullscreenEnabled) return null;
   return (
-    <button type="button" className="btn btn-sm" onClick={requestFullscreen}>
+    <button type="button" className="btn btn-sm" onClick={enterFullscreen}>
       <Icon name="maximize" />
       Go full screen
     </button>

@@ -38,8 +38,8 @@ describe("candidate error page", () => {
     const retry = vi.fn();
     const { container } = render(<CandidateError error={serverError("4242424242")} retry={retry} reset={() => {}} />);
     expect(screen.getByRole("heading")).toHaveTextContent(/something went wrong/i);
-    expect(container).toHaveTextContent(/progress is saved/i);
-    expect(container).toHaveTextContent(/company that invited you/i);
+    expect(container).toHaveTextContent(/answers are saved/i);
+    expect(container).toHaveTextContent(/reply to that email/i);
     expect(container).toHaveTextContent("4242424242");
     expectNoLeak(container.textContent ?? "");
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));

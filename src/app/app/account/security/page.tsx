@@ -12,7 +12,7 @@ import { RemoveFactorButton } from "./remove-factor-button";
 export const metadata = { title: "Two-factor authentication · Mantle" };
 
 const SAFETY =
-  "Keep your authenticator app safe: lock your phone, turn on the app's own backup, and never share a code or the setup key with anyone. Our team will never ask for them. If you lose access to your authenticator, you won't be able to sign in until support resets it, so adding a second app on another device is a good idea.";
+  "Never share a code or your setup key. We'll never ask for them. If you lose your authenticator, you can't sign in until support resets it, so consider adding a second device.";
 
 export default function SecurityPage({ searchParams }: PageProps<"/app/account/security">) {
   return (
@@ -96,10 +96,7 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
             </>
           ) : (
             <>
-              <p className="small ink2">
-                When you sign in, you enter your password and then a 6-digit code from an authenticator app on your phone (for example 1Password, Google
-                Authenticator or Microsoft Authenticator).
-              </p>
+              <p className="small ink2">After your password, you enter a 6-digit code from an authenticator app like 1Password or Google Authenticator.</p>
               <span className="badge" style={{ alignSelf: "flex-start" }}>
                 <Icon name="circle" />
                 Two-factor authentication is off
@@ -109,7 +106,7 @@ async function Security({ searchParams }: { searchParams: PageProps<"/app/accoun
           <EnrollPanel next={next} label={factors.length ? "Add another authenticator app" : "Set up an authenticator app"} primary={!factors.length} />
           <p className="xs muted">
             {required
-              ? "Your role requires it: admins and recruiters must have it turned on, and viewers too when their company shows them candidate snapshots."
+              ? "Required for your role."
               : "It's optional for you, and recommended."}
           </p>
         </Card>

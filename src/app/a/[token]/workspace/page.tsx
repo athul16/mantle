@@ -34,6 +34,7 @@ export default async function WorkspacePage({ params, searchParams }: PageProps<
       companyName={session.invite.companyName}
       startedAt={attempt.started_at}
       initialTaskId={typeof task === "string" ? task : undefined}
+      autoFullscreen={!proctoring.fullscreenWaived}
     />
   );
 }

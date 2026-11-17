@@ -1,102 +1,113 @@
-import Link from "next/link";
 import { CompanyLogo } from "@/components/brand";
-import { Icon } from "@/components/icons";
 import { getIntro } from "@/lib/candidate/attempt";
 import { requireSessionPage } from "@/lib/candidate/pages";
-import { isMonitored } from "@/lib/proctoring/config";
+import { listText } from "@/lib/proctoring/config";
 import { getProctoringSettings } from "@/lib/proctoring/server";
-import { SubmitButton } from "../submit-button";
 import { PracticeTour } from "./practice-tour";
-import { StartMonitoredButton } from "./start-button";
+import { ResumeLink, StartButton } from "./start-button";
 
 // Candidate pages read the link token, the session cookie and the database on
 // every request, so they wait on the server rather than show a prefetched shell.
 export const instant = false;
 
-export const metadata = { title: "Before you start" };
+export const metadata = { title: "Practice run" };
 
-/** Briefing and practice (prototype vInstructions(), variant B). */
+/**
+ * Practice and the short brief (prototype vInstructions()). The practice
+ * workspace is clearly marked as not the test; Start sits bottom right in a
+ * footer bar so it reads as the way out of practice and into the real thing.
+ */
 export default async function InstructionsPage({ params }: PageProps<"/a/[token]/instructions">) {
   const { token } = await params;
   const { session, attempt } = await requireSessionPage(token, ["not_started", "in_progress"]);
   const [{ intro, stepCount }, proctoring] = await Promise.all([getIntro(session), getProctoringSettings(session)]);
-  const monitored = isMonitored(proctoring);
   const minutes = session.invite.timeLimitMinutes;
-  const watched = [proctoring.camera ? "Camera" : null, proctoring.screen ? "screen" : null].filter(Boolean).join(" or ");
-
   const { extraTimePercent, waiveCamera, waiveScreen, waiveFullscreen, waiveMicrophone } = session.invite.accommodations;
   const waivedList = [
     waiveCamera ? "camera" : null,
     waiveScreen ? "screen share" : null,
-    waiveFullscreen ? "full screen" : null,
+    waiveFullscreen || proctoring.fullscreenWaived ? "full screen" : null,
     waiveMicrophone ? "microphone" : null,
   ].filter((w): w is string => w !== null);
-  const waived = waivedList.length > 1 ? `${waivedList.slice(0, -1).join(", ")} and ${waivedList.at(-1)}` : (waivedList[0] ?? "");
+  const waived = listText(waivedList);
+  const keepOn = [proctoring.camera ? "camera" : null, proctoring.screen ? "screen sharing" : null, proctoring.microphone ? "microphone" : null].filter(
+    (w): w is string => w !== null,
+  );
 
   const facts: [string, string][] = [
-    ["Time", `${minutes} min${extraTimePercent ? ` (includes ${extraTimePercent}% extra time)` : ""}, starts when you press Start`],
-    ["Tasks", `${stepCount}, delivered through the inbox — some may arrive while you work`],
-    ["Allowed", "A calculator, scratch paper"],
-    ["Not allowed", "Other tabs or apps, phone, AI tools, other people"],
-    ["Saving", "Automatic. Lost connection? Reopen your link."],
+    ["Time", `${minutes} minutes${extraTimePercent ? ` (includes ${extraTimePercent}% extra)` : ""}`],
+    ["Tasks", `${stepCount}, sent to your inbox`],
+    ["Allowed", "Calculator, scratch paper"],
+    ["Not allowed", "Other tabs, AI tools, your phone, other people"],
   ];
-  if (waived) facts.push(["Excused", `${session.invite.companyName} has excused you from the ${waived} for this assessment.`]);
-  if (proctoring.camera || proctoring.screen) {
-    facts.push([watched, `If ${proctoring.camera && proctoring.screen ? "either" : "it"} stops, the workspace is covered until it's back. The clock keeps running.`]);
-  }
-  if (proctoring.fullscreen) facts.push(["Full screen", "Stay in full screen; leaving covers the task and the timer keeps running"]);
-  if (proctoring.microphone) facts.push(["Microphone", "Your microphone is on; short clips are saved when speech is heard"]);
-  if (proctoring.camera && proctoring.gaze) facts.push(["Gaze", "Face the screen; your device checks where you're looking"]);
-  facts.push(["At 0:00", "Whatever is saved is submitted"]);
+  const autoFullscreen = !proctoring.fullscreenWaived;
+  if (autoFullscreen) facts.push(["Full screen", "The test opens in full screen"]);
+  const keepOnText = listText(keepOn);
+  if (keepOnText) facts.push(["Keep on", keepOnText[0].toUpperCase() + keepOnText.slice(1)]);
+  if (waived) facts.push(["Excused", `No ${waived} needed`]);
+  facts.push(["Saving", "Automatic. Lost connection? Reopen your link."]);
+  facts.push(["Time's up", "Your work is submitted"]);
 
   return (
-    <div className="split" style={{ background: "var(--bg)" }}>
-      <aside className="iaside">
-        <div className="row g10">
-          <CompanyLogo name={session.invite.companyName} size={32} />
-          <span className="strong">{session.invite.companyName}</span>
-          <span className="grow" />
-          <span className="xs muted">Step 3 of 4</span>
-        </div>
-        <div className="col g8">
-          <h1 style={{ fontSize: 24, lineHeight: 1.2 }}>Before you start</h1>
-          <p className="ink2" style={{ whiteSpace: "pre-line" }}>
-            {intro}
-          </p>
-        </div>
-        <dl className="dl">
-          {facts.map(([k, v]) => (
-            <div key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+      <header className="row g10" style={{ padding: "16px 32px", background: "#fff", borderBottom: "1px solid var(--line)" }}>
+        <CompanyLogo name={session.invite.companyName} size={28} />
+        <span className="strong">{session.invite.companyName}</span>
         <span className="grow" />
-        <div className="col g10">
-          {attempt.status === "in_progress" ? (
-            <Link href={`/a/${token}/workspace`} className="btn btn-dark btn-lg">
-              Back to your test
-            </Link>
-          ) : monitored ? (
-            <StartMonitoredButton token={token} minutes={minutes} />
-          ) : (
-            <form action="/api/candidate/start" method="post" className="col">
-              <input type="hidden" name="token" value={token} />
-              <SubmitButton className="btn btn-dark btn-lg" pendingText="Starting…">
-                <Icon name="play" />
-                Start the {minutes}-minute simulation
-              </SubmitButton>
-            </form>
-          )}
-          <span className="xs muted" style={{ textAlign: "center" }}>
-            You can&apos;t pause once the clock starts.
-          </span>
-        </div>
-      </aside>
-      <main className="imain">
-        <PracticeTour minutes={minutes} title={`${session.invite.jobTitle} simulation`} />
-      </main>
+        <span className="xs muted">Step 3 of 4</span>
+      </header>
+
+      <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 32, padding: "32px 32px 120px", alignItems: "flex-start" }}>
+        <main style={{ flex: "999 1 560px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="col g6">
+            <div className="row g10 wrap">
+              <h1 style={{ fontSize: 24, lineHeight: 1.2 }}>Practice run</h1>
+              <span className="badge b-accent">Not timed · not scored</span>
+            </div>
+            <p className="ink2">Try the workspace here. This isn&apos;t the test.</p>
+          </div>
+          <PracticeTour minutes={minutes} title="Practice workspace" />
+        </main>
+
+        <aside className="card" style={{ flex: "1 1 300px", maxWidth: 380, padding: "22px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 18 }}>Before you start</h2>
+          {intro ? (
+            <p className="small ink2" style={{ whiteSpace: "pre-line" }}>
+              {intro}
+            </p>
+          ) : null}
+          <dl className="dl">
+            {facts.map(([k, v]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </aside>
+      </div>
+
+      <footer
+        className="row g16 wrap"
+        style={{
+          position: "sticky",
+          bottom: 0,
+          justifyContent: "flex-end",
+          padding: "14px 32px",
+          background: "#fff",
+          borderTop: "1px solid var(--line)",
+          boxShadow: "0 -4px 12px rgba(0,0,0,.04)",
+        }}
+      >
+        {attempt.status === "in_progress" ? (
+          <ResumeLink token={token} fullscreen={autoFullscreen} />
+        ) : (
+          <>
+            <span className="small ink2">The timer starts when you click. You can&apos;t pause it.</span>
+            <StartButton token={token} minutes={minutes} fullscreen={autoFullscreen} />
+          </>
+        )}
+      </footer>
     </div>
   );
 }

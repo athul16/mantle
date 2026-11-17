@@ -83,7 +83,7 @@ describe("Proctoring on", () => {
       </Proctoring>,
     );
     expect(gate()).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("The timer keeps running while this message is open; it does not pause.");
+    expect(gate()).toHaveTextContent("The timer is still running.");
     // The covered workspace can't be reached by keyboard or screen reader.
     expect(screen.getByTestId("proctored-content")).toHaveAttribute("inert");
     await waitFor(() => expect(media.getUserMedia).toHaveBeenCalled());
@@ -128,7 +128,7 @@ describe("Proctoring on", () => {
     await activate();
     act(() => shared.end());
     expect(screen.getByRole("dialog", { name: "Screen sharing stopped" })).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("Screen sharing stopped. Share your entire screen again to continue. The timer keeps running.");
+    expect(gate()).toHaveTextContent("Screen sharing stopped. Share your entire screen again to continue.");
     await act(() => vi.advanceTimersByTimeAsync(SIGNAL_FLUSH_MS));
     expect(signalKinds()).toContain("screen_share_stopped");
 
@@ -142,7 +142,7 @@ describe("Proctoring on", () => {
     await activate();
     act(() => camera.end());
     expect(screen.getByRole("dialog", { name: "We can't see your camera" })).toBeInTheDocument();
-    expect(gate()).toHaveTextContent("Your camera turned off. Turn it back on to continue. The timer keeps running.");
+    expect(gate()).toHaveTextContent("Your camera turned off. Turn it back on to continue.");
     expect(screen.getByRole("button", { name: "Turn on camera" })).toBeVisible();
   });
 

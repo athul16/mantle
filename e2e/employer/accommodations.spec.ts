@@ -32,13 +32,13 @@ test("extra time set by a recruiter extends the candidate's server deadline", as
   const candidatePage = await context.newPage();
   const candidate = candidateHelpers(candidatePage);
   const code = await candidate.requestCode(invite);
-  await expect(candidatePage.getByTestId("accommodation-contact")).toContainText(`Contact ${company.name} at ${contact} before you start`);
+  await expect(candidatePage.getByTestId("accommodation-contact")).toContainText(`Email ${contact} before you start`);
   await expect(candidatePage.getByRole("link", { name: contact })).toHaveAttribute("href", `mailto:${contact}`);
   await candidate.submitCode(code);
   await expect(candidatePage).toHaveURL(/\/check$/);
   await candidatePage.getByRole("link", { name: "Continue", exact: true }).click();
-  await expect(candidatePage.getByText("23 min (includes 50% extra time), starts when you press Start")).toBeVisible();
-  await candidatePage.getByRole("button", { name: "Start the 23-minute simulation" }).click();
+  await expect(candidatePage.getByText("23 minutes (includes 50% extra)")).toBeVisible();
+  await candidatePage.getByRole("button", { name: "Start the 23-minute test" }).click();
   await expect(candidatePage).toHaveURL(/\/workspace$/);
   await expect(candidatePage.getByRole("timer")).toBeVisible();
   expect(await candidate.secondsLeft()).toBeGreaterThan(22 * 60);

@@ -39,8 +39,8 @@ export function candidateHelpers(page: Page) {
   async function startTest(invite: InviteRef) {
     await verify(invite);
     await page.getByRole("link", { name: "Continue", exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
-    await page.getByRole("button", { name: /^Start the \d+-minute simulation$/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Practice run" })).toBeVisible();
+    await page.getByRole("button", { name: /^Start the \d+-minute test$/ }).click();
     await expect(page).toHaveURL(/\/workspace$/);
     await expect(page.getByRole("timer")).toBeVisible();
   }

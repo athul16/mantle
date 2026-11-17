@@ -98,22 +98,25 @@ describe("signal kinds and capture constants", () => {
 
 describe("monitoring notice", () => {
   it("has a new consent version for the v2 wording", () => {
-    expect(MONITORING_CONSENT_VERSION).toBe("2026-11-15.proctoring-v2");
+    expect(MONITORING_CONSENT_VERSION).toBe("2026-11-16.plain-notice");
+  });
+
+  it("says the test opens in full screen unless the candidate is excused", () => {
+    expect(monitoringNotice({ ...OFF }, "Acme").join("\n")).toContain("The test opens in full screen. Leaving it is noted.");
+    expect(monitoringNotice({ ...OFF, fullscreenWaived: true }, "Acme").join("\n")).not.toMatch(/full screen\. Leaving/);
   });
 
   it("describes full screen, microphone and gaze only when they are on", () => {
     const off = monitoringNotice({ ...OFF, camera: true }, "Acme").join("\n");
-    expect(off).not.toMatch(/full screen is required/i);
+    expect(off).not.toMatch(/runs in full screen/i);
     expect(off).not.toMatch(/audio/);
     expect(off).not.toMatch(/facing the screen/);
-    expect(off).toContain("We don't use the photos to identify you.");
+    expect(off).toContain("We don't use photos to identify you.");
 
     const on = monitoringNotice({ camera: true, screen: true, fullscreen: true, microphone: true, gaze: true }, "Acme").join("\n");
-    expect(on).toMatch(/full screen is required/i);
-    expect(on).toContain("short audio clips when we hear speech, plus when speech starts and stops");
-    expect(on).toContain(
-      "your device checks whether you are facing the screen and how many faces it sees; only the result is sent, never the image or a face template",
-    );
-    expect(on).toContain("We don't use the photos to identify you.");
+    expect(on).toMatch(/runs in full screen/i);
+    expect(on).toContain("short audio clips when someone speaks, and when speech starts and stops");
+    expect(on).toContain("whether you're facing the screen and how many faces your device sees (only the result is sent, never the image)");
+    expect(on).toContain("We don't use photos to identify you.");
   });
 });
