@@ -124,6 +124,19 @@ describe("Full screen required", () => {
     await waitFor(() => expect(gate()).not.toBeInTheDocument());
   });
 
+  it("says Return to full screen when the page arrived already in full screen (Start entered it) and then left", async () => {
+    installFullscreen(true);
+    setFullscreen(true);
+    render(
+      <Proctoring settings={{ ...OFF, fullscreen: true }}>
+        <Work />
+      </Proctoring>,
+    );
+    await waitFor(() => expect(gate()).not.toBeInTheDocument());
+    act(() => setFullscreen(false));
+    expect(screen.getByRole("dialog", { name: "Return to full screen" })).toBeInTheDocument();
+  });
+
   it("doesn't block where the browser has no Fullscreen API, and says so", () => {
     render(
       <Proctoring settings={{ ...OFF, fullscreen: true }}>

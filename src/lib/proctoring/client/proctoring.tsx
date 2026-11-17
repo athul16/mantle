@@ -72,6 +72,9 @@ export function Proctoring({ settings, children, inlineIndicators = false }: { s
   const fullscreen = useSyncExternalStore(subscribeFullscreen, isFullscreen, () => false);
   const canFullscreen = useSyncExternalStore(noSubscribe, fullscreenSupported, () => true);
   const [enteredFullscreen, setEnteredFullscreen] = useState(false);
+  // Start goes full screen before the workspace mounts, so no fullscreen_entered
+  // signal arrives here; being in full screen at all counts as having entered it.
+  if (fullscreen && !enteredFullscreen) setEnteredFullscreen(true);
   const [gazeNote, setGazeNote] = useState(false);
   const [notesDismissed, setNotesDismissed] = useState(false);
 
