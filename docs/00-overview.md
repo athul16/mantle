@@ -59,4 +59,5 @@ Open and decided questions with research: `decisions/`. Build status: `10-progre
 | `11-testing.md` | How the app is tested, where each kind of test goes |
 | `12-pilot-runbook.md` | Running a pilot |
 | `13-design-system.md` | Mantle look and feel: the prototype, tokens, components, screen map |
+| `14-paralegal-simulations.md` | Paralegal vertical: market, the six simulations, shared legal helpers, content rules, status |
 | `decisions/` | Decision briefs: background, options, recommendation, what was decided |
