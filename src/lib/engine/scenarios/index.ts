@@ -3,6 +3,7 @@ import "server-only";
 import type { ServerScenario } from "../server/scenario";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
+import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
 import { demoEntriesReview } from "./demo-entries-review";
 import { demoMiniClose } from "./demo-mini-close";
 import { demoPettyCash } from "./demo-petty-cash";
@@ -11,6 +12,7 @@ import { ediscoveryLarchReview } from "./ediscovery-larch-review";
 import { harborLaneBankRec } from "./harbor-lane-bank-rec";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 import { piDiazDemand } from "./pi-diaz-demand";
+import { realestateAlderClosing } from "./realestate-alder-closing";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -24,6 +26,8 @@ const scenarios: Record<string, ServerScenario> = {
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
   [`${piDiazDemand.slug}@v${piDiazDemand.version}`]: piDiazDemand,
+  [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
+  [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
