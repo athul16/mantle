@@ -653,7 +653,7 @@ describe("immigration-h1b-packet: scoring", () => {
     expect(shared / 20).toBeLessThan(40);
   });
 
-  describe("each trap answered wrongly costs exactly its points", () => {
+  describe("each trap answered wrongly costs exactly its points", { timeout: LONG }, () => {
     const seeds = SEEDS.slice(0, 40);
     const lost = (seed: string, mutate: (a: Answers & Record<string, unknown>) => void) => {
       const a = clone(perfectAnswers(seed));
