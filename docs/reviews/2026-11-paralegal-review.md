@@ -16,7 +16,7 @@ Overview of the vertical: `docs/14-paralegal-simulations.md`. Full scenario docs
 - **Every seed is a different variant.** Names, numbers, dates and which row carries which trap change; the rules, traps and expected treatment don't. Approving a rule here approves it for every variant. To see one variant, run the scenario with any seed in the local app.
 - **Each simulation has three tables:** the planted traps (expected answer and the rule behind it), the judgment calls the authors flagged, and timing. Write **approve**, **change** or **reject** in the Verdict column and what to change in the Note column. Where the expected answer is defensible but not the only one, say whether the alternative should also get credit.
 - **What to check.** Is the expected answer what a competent paralegal does? Is the rule stated in the material, or is it fair to expect from memory? Is anything a paralegal shouldn't decide (privilege, conflicts, case value, ratification) correctly escalated rather than decided? Is the time enough for the work?
-- **Nothing is published until sign-off.** Anything marked change or reject is fixed (with a version bump if needed) before `pnpm scenarios:publish` is run.
+- **v1 is already published for testing** (2026-11-17), so the team can take each one on the live site while reviewing. Published rows are frozen: anything marked change or reject is fixed in a new version, which is published after sign-off.
 
 All five share these properties, so they aren't repeated per simulation: 100 points scored automatically (no written replies); three rapid rounds of 15 items × 20 s with items 3, 6, 9, 12 and 15 the harder kinds; inbox steps are multiple choice; fictional people, firms, courts and states; false flags in review tasks cost 1 point each (floored at 0); the right row with the wrong reason earns half.
 
@@ -417,4 +417,4 @@ All five share these properties, so they aren't repeated per simulation: 100 poi
 
 1. Fix everything marked change (bump the scenario version if the key or scoring changes) and rerun the scenario tests.
 2. Update the status line in each `docs/paralegal/<slug>.md` and in `docs/14-paralegal-simulations.md`.
-3. Run `pnpm scenarios:publish` for the approved simulations.
+3. Publish the new versions of anything that changed (v1 is already in the library).

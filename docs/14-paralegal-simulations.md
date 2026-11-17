@@ -2,7 +2,7 @@
 
 The second vertical after accounting: six job simulations for paralegals and legal assistants, one per practice area. Each is a 50-minute timed workday in a fictional matter, scored automatically against a per-seed key. Detailed scenario docs live in `paralegal/`; the team's self-review checklist is `reviews/2026-11-paralegal-review.md`.
 
-**Status: draft, team self-review pending, not published.** All six simulations are merged. None has been published (`pnpm scenarios:publish` not run), so no company can use them yet.
+**Status: draft, team self-review pending, published as v1 for testing.** All six simulations are merged and were published to the cloud library as v1 on 2026-11-17 (only these six, not the accounting scenarios), so they can be picked in Configure assessment and taken end to end on the live site. Every company account sees the library, so they are live in that sense; fixes from the self-review ship as v2.
 
 ## Market
 
@@ -171,5 +171,5 @@ Added for the paralegal work (first used by the PI medical chronology) and gener
 | --- | --- |
 | Six simulations | Merged, draft: team self-review pending |
 | Self-review | Checklist in `reviews/2026-11-paralegal-review.md`, not yet done. There is no outside reviewer for now; the team signs off |
-| Publishing | Not run. After sign-off, fixes (and a version bump where needed) land first, then `pnpm scenarios:publish` |
+| Publishing | v1 of all six published 2026-11-17 for testing. Review fixes bump the version (published rows are frozen) and the new version is published after sign-off |
 | Go-to-market | Not started for legal; `09-go-to-market.md` covers accounting only |

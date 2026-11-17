@@ -1,6 +1,6 @@
 # eDiscovery document reviewer: `ediscovery-larch-review` v1
 
-**Status: draft: team self-review pending.** Not published (`pnpm scenarios:publish` has not been run for it).
+**Status: draft: team self-review pending.** Published to the cloud library as v1 on 2026-11-17 for the team's own testing; fixes from the review ship as v2.
 
 Code: `src/lib/engine/scenarios/ediscovery-larch-review.ts`. Tests: `tests/engine/ediscovery-larch-review.test.ts` (solve every task from the rendered material over 200 seeds and compare with the server key).
 
