@@ -3,6 +3,7 @@ import "server-only";
 import type { ServerScenario } from "../server/scenario";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
+import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
 import { demoEntriesReview } from "./demo-entries-review";
 import { demoMiniClose } from "./demo-mini-close";
 import { demoPettyCash } from "./demo-petty-cash";
@@ -23,6 +24,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
+  [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
 };
 
