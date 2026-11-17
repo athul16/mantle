@@ -511,8 +511,13 @@ describe("immigration-h1b-packet: setup", () => {
     expect(new Set(forms.map((f) => at(f, "job"))).size).toBe(2);
     expect(new Set(forms.map((f) => at(f, "wage"))).size).toBe(2);
     expect(new Set(forms.map((f) => at(f, "dates"))).size).toBe(2);
-    const packets = screens.map((s) => readPacket(s.doc("packet-checklist")));
-    const pAt = (p: ReturnType<typeof readPacket>, issue: PacketIssue) => [...p.issues].find(([, i]) => i === issue)![0];
+    const packets = screens.map((s) => ({ doc: s.doc("packet-checklist"), ...readPacket(s.doc("packet-checklist")) }));
+    // Tabs are shuffled per seed, so count which checklist item carries each trap, and where the fee tab sits.
+    const pAt = (p: (typeof packets)[number], issue: PacketIssue) => {
+      const id = [...p.issues].find(([, i]) => i === issue)![0];
+      return p.doc.document.rows.find((r) => r.id === id)!.cells[col(p.doc, /^Item/)];
+    };
+    expect(new Set(packets.map((p) => [...p.issues].find(([, i]) => i === "fee")![0])).size).toBeGreaterThan(6);
     expect(new Set(packets.map((p) => pAt(p, "missing"))).size).toBe(4);
     expect(new Set(packets.map((p) => pAt(p, "unsigned"))).size).toBe(3);
     expect(new Set(packets.map((p) => pAt(p, "translation"))).size).toBe(2);
