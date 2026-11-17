@@ -1237,7 +1237,7 @@ function buildOnce(rng: Rng) {
   const [cond1, cond2] = flagged("unmet");
 
   // ---- Section C: inbox ----
-  const valDate = weekdayBetween(rng, "2026-09-01", "2026-10-15");
+  const valDate = weekdayBetween(rng, addDays(closing, -25), addDays(closing, -5));
   Object.assign(v, { val_date: formatDate(valDate), early: formatDate(addDays(valDate, -rng.int(5, 30))) });
   const fd = placeOptions(rng, `Don't backdate: tell ${pCeo.first} the consent takes effect when the last director signs, and pass the request to ${pPartner.full}`, [
     "Date it as asked: the board agreed to the grant informally back then",
