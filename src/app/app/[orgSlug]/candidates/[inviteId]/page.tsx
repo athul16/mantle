@@ -153,7 +153,7 @@ function waitingMessage(report: CandidateReport, name: string): [string, string]
     case "started":
       return [`${name} is taking the assessment now`, "Their report appears here as soon as they submit."];
     case "expired":
-      return [`${name}'s invite expired`, "They didn't start before the invite closed. Resend the link from the candidates list to give them another chance."];
+      return [`${name}'s invite expired`, "They didn't start in time. Resend the link from the candidates list."];
     case "revoked":
       return [`${name}'s invite was revoked`, "Invite them again from the candidates list."];
     default:
@@ -244,8 +244,7 @@ function Identity({ report, name, score, accommodations }: { report: CandidateRe
       </dl>
       {hasAccommodations(accommodations) ? (
         <p className="small" style={{ padding: "10px 12px", borderRadius: 8, background: "var(--accent-soft)" }} data-testid="report-accommodations">
-          <span className="strong">Accommodations:</span> {describeAccommodations(accommodations, report.assessment?.timeLimitMinutes).join(", ")}. Set by the
-          hiring team before the candidate started; logged in the audit log.
+          <span className="strong">Accommodations:</span> {describeAccommodations(accommodations, report.assessment?.timeLimitMinutes).join(", ")}.
         </p>
       ) : null}
     </div>

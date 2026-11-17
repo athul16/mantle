@@ -118,8 +118,7 @@ export function OrderingStep({ config, answer, onChange, disabled }: StepCompone
   return (
     <section className="card" style={{ maxWidth: 720, padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
       <p id={helpId} className="small muted">
-        Put the items in order, first at the top. Drag a row by its handle, or focus the handle and use the arrow keys, or use the Up and
-        Down buttons. Your order is saved as you go.
+        Put the items in order, first at the top. Drag the handles or use Up and Down.
       </p>
       <ol role="list" aria-label="Your order" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
         {order.map((itemId, index) => {

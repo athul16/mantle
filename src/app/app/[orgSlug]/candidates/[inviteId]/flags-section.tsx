@@ -196,7 +196,7 @@ export function FlagsSection({
             ))}
           </ul>
         ) : null}
-        <span className="xs muted">Suspicious = a combination of signals that together suggest outside help; Review = something unusual a person should look at.</span>
+        <span className="xs muted">Suspicious: signals that together suggest outside help. Review: something unusual worth a look.</span>
       </div>
       <dl style={{ margin: 0, padding: "6px 18px", fontSize: 13 }}>
         {rows.map(([label, value], i) => (
@@ -258,11 +258,11 @@ export function FlagsSection({
           <Icon name="info" className="i-sm" />
           <span>
             Flags are for a person to judge. Nothing here rejects anyone.
-            {monitored ? " Snapshots are visible to admins and recruiters only." : " Camera and screen monitoring were off for this assessment; only browser activity was checked."}
+            {monitored ? " Snapshots are visible to admins and recruiters only." : " Camera and screen monitoring were off. Only browser activity was checked."}
           </span>
         </span>
         {flags.length === 0 ? <span>No integrity flags.</span> : null}
-        {anyMedia && canSeeMedia ? <span>Snapshot links expire after 10 minutes; reload the page for fresh ones.</span> : null}
+        {anyMedia && canSeeMedia ? <span>Snapshot links expire after 10 minutes. Reload for fresh ones.</span> : null}
       </div>
     </section>
   );
@@ -324,7 +324,7 @@ function FlagEvidence({ flag, startedAt, canSeeMedia }: { flag: ReportFlag; star
   return (
     <>
       {flag.rule === "downtime" ? (
-        <p className="small ink2">The task was covered during each gap and the timer kept running. Judge whether the lost time affected the result.</p>
+        <p className="small ink2">The timer kept running during each gap. Judge whether the lost time affected the result.</p>
       ) : null}
       {canSeeMedia && audio.length ? (
         <ul aria-label="Audio clips" style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>

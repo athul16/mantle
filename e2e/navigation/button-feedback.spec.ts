@@ -95,7 +95,7 @@ test("the candidate's Continue, Verify, Start and Submit each show a pending sta
   await expect(page).toHaveURL(/\/check$/);
 
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  const start = page.getByRole("button", { name: /^Start the \d+-minute simulation$/ });
+  const start = page.getByRole("button", { name: /^Start the \d+-minute test$/ });
   await expectCandidatePending(page, start, "Starting…");
   await start.click();
   await expect(page).toHaveURL(/\/workspace$/);

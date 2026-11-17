@@ -10,6 +10,7 @@ import { stepBrief } from "@/lib/engine/client/registry";
 import type { PublicMessage, PublicStep } from "@/lib/engine/types";
 import { FullscreenButton, Proctoring, ProctoringIndicators } from "@/lib/proctoring/client/proctoring";
 import type { Proctoring as ProctoringSettings } from "@/lib/proctoring/config";
+import { useFullscreenOnInteract } from "@/lib/candidate/fullscreen";
 import { Calculator } from "./calculator";
 import { formatRemaining, hasAnswer, isWorkbookStep, senderParts, shortLabel } from "./labels";
 import { ClockTime, TimerBadge } from "./parts";
@@ -76,6 +77,7 @@ export function Workspace({
   companyName,
   startedAt,
   initialTaskId,
+  autoFullscreen = true,
 }: {
   token: string;
   initial: View;
@@ -84,8 +86,11 @@ export function Workspace({
   companyName?: string;
   startedAt?: string | null;
   initialTaskId?: string;
+  /** Put the test back in full screen on the next click (off when excused from full screen). */
+  autoFullscreen?: boolean;
 }) {
   const router = useRouter();
+  useFullscreenOnInteract(autoFullscreen);
   const [messages, setMessages] = useState(initial.messages);
   const [steps, setSteps] = useState(initial.steps);
   const [answers, setAnswers] = useState<Record<string, unknown>>(initial.answers);
@@ -477,7 +482,7 @@ export function Workspace({
                     type="button"
                     className={on ? "on" : undefined}
                     aria-current={on ? "step" : undefined}
-                    title={`${s.title}${hasAnswer(answers[s.id]) ? " — started" : ""}`}
+                    title={`${s.title}${hasAnswer(answers[s.id]) ? " (started)" : ""}`}
                     onClick={() => setTaskId(s.id)}
                   >
                     <span className="n">{i + 1}</span>
@@ -578,8 +583,7 @@ export function Workspace({
           <div className="wsbanner" role="alert" style={{ background: "var(--bad-bg)", color: "var(--bad)", borderColor: "var(--bad-line)" }}>
             <Icon name="alert" />
             <span className="txt">
-              <strong>Your last change didn&apos;t save.</strong> Check your connection — we&apos;ll keep retrying, and nothing
-              you&apos;ve typed is lost on this page.
+              <strong>Your last change didn&apos;t save.</strong> Check your connection. We&apos;ll keep retrying.
             </span>
             <span className="grow" />
             <button type="button" className="btn btn-sm" onClick={retrySaves}>

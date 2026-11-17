@@ -76,6 +76,7 @@ export async function getInviteProctoringSettings(
   const { mediaDays, resultsDays } = readRetention(org.data.settings);
   return {
     ...applyWaivers(readProctoring(assessment.data.proctoring), accommodations),
+    fullscreenWaived: accommodations.waiveFullscreen === true,
     mediaRetentionDays: mediaDays,
     resultsRetentionDays: resultsDays,
     contactEmail: invite.contactEmail,

@@ -92,7 +92,7 @@ describe("FlagsSection", () => {
     const items = within(screen.getByRole("list", { name: "Evidence" })).getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Screen share stopped for 45 s (back on) · 5:00 to 5:45 into the test");
     expect(items[1]).toHaveTextContent("Camera off for 1 min 20 s (never back; counted until the time ran out) · 58:40 to 1:00:00 into the test");
-    expect(screen.getByText(/the timer kept running\. Judge whether the lost time affected the result/)).toBeVisible();
+    expect(screen.getByText(/timer kept running during each gap\. Judge whether the lost time affected the result/)).toBeVisible();
   });
 
   it("says flags are for review and never reject anyone", () => {
@@ -186,7 +186,7 @@ describe("FlagsSection", () => {
     expect(within(section).getByTestId("integrity-badge")).toHaveTextContent("Clear");
     unmount();
     renderSection({ flags: [], camera: false, screen: false });
-    expect(screen.getByText(/Camera and screen monitoring were off for this assessment; only browser activity was checked\./)).toBeVisible();
+    expect(screen.getByText(/Camera and screen monitoring were off\. Only browser activity was checked\./)).toBeVisible();
   });
 });
 
@@ -222,7 +222,7 @@ describe("FlagsSection: proctoring v2", () => {
     const card = screen.getByRole("region", { name: "Integrity" });
     expect(within(card).getByTestId("integrity-label")).toHaveTextContent("Suspicious");
     expect(card).toHaveTextContent("Copied text, then left the test window");
-    expect(card).toHaveTextContent("Suspicious = a combination of signals that together suggest outside help; Review = something unusual a person should look at.");
+    expect(card).toHaveTextContent("Suspicious: signals that together suggest outside help. Review: something unusual worth a look.");
   });
 
   it("labels a single minor flag as review and a clean attempt as clear", () => {

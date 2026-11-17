@@ -38,7 +38,7 @@ export default async function InvitePage({ params }: PageProps<"/app/[orgSlug]/j
   });
   // Line 1 is the greeting ("Hi,"); line 2 says who invited them and for how long.
   const lines = sample.text.split("\n").filter((l) => l.trim());
-  const body = `Hi {first name} — ${lines[1] ?? ""}`.trim();
+  const body = `Hi {first name}, ${lines[1] ?? ""}`.trim();
 
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>

@@ -73,11 +73,11 @@ function Done({
         )}
         <div className="col g8">
           <h1 style={{ fontSize: 30 }}>
-            {timedOut ? "Time's up — your work is in." : firstName ? `Submitted. Thanks, ${firstName}.` : "Submitted. Thanks."}
+            {timedOut ? "Time's up. Your work is in." : firstName ? `Submitted. Thanks, ${firstName}.` : "Submitted. Thanks."}
           </h1>
           <p className="ink2" style={{ fontSize: 16 }}>
             {timedOut
-              ? "The clock reached 0:00, so we submitted everything that was saved. Nothing was lost."
+              ? "We submitted everything you saved."
               : `Your work went to ${company}. You can close this window.`}
           </p>
           {mediaOff ? (

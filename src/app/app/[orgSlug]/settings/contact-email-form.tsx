@@ -17,7 +17,7 @@ export function ContactEmailForm({ orgId, email }: { orgId: string; email: strin
           type="email"
           autoComplete="email"
           defaultValue={email ?? ""}
-          help="Leave blank to remove it. Use a shared inbox your recruiters watch, for example careers@yourfirm.com."
+          help="Leave blank to remove it. A shared inbox works best, like careers@yourfirm.com."
           error={state?.fieldErrors?.contactEmail?.[0]}
         />
       </div>

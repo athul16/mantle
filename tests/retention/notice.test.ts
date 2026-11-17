@@ -6,20 +6,20 @@ const OFF = { camera: false, screen: false, fullscreen: false, microphone: false
 describe("monitoring notice retention line", () => {
   it("states the org's media and results periods", () => {
     const text = monitoringNotice({ ...OFF, camera: true, mediaRetentionDays: 60, resultsRetentionDays: 200 }, "Acme").join("\n");
-    expect(text).toContain("photos and screenshots are kept for 60 days after your assessment ends");
-    expect(text).toContain("answers, results and the hiring team's notes are kept for 200 days");
+    expect(text).toContain("Photos and screenshots are deleted after 60 days");
+    expect(text).toContain("answers and results after 200 days");
     expect(text).not.toMatch(/kept with your application and deleted when/);
   });
 
   it("names audio clips in the media period when the microphone is on", () => {
     const text = monitoringNotice({ ...OFF, microphone: true, mediaRetentionDays: 60 }, "Acme").join("\n");
-    expect(text).toMatch(/audio clips are kept for 60 days after your assessment ends/);
+    expect(text).toMatch(/audio clips are deleted after 60 days/);
   });
 
   it("falls back to the default periods when none are given", () => {
     const text = monitoringNotice({ ...OFF, camera: true, screen: true }, "Acme").join("\n");
-    expect(text).toContain("kept for 90 days");
-    expect(text).toContain("kept for 365 days");
+    expect(text).toContain("after 90 days");
+    expect(text).toContain("after 365 days");
   });
 
   it("has a new consent version for the two-period wording", () => {

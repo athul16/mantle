@@ -56,7 +56,7 @@ test("candidate pages", async ({ page, data, candidate }) => {
 
   await candidate.submitCode(code);
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Start the 15-minute simulation" }).click();
+  await page.getByRole("button", { name: "Start the 15-minute test" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Expected cash in the box" })).toBeVisible();
   // The timer and the email's arrival time (a wall-clock time) change between runs.
   await expect(page).toHaveScreenshot("workspace.png", { mask: [page.getByRole("timer"), page.locator("time")] });

@@ -215,7 +215,7 @@ export function RapidRoundStep({ config, disabled, onChange, onCommit }: StepCom
           <p className="small ink2">
             {config.done
               ? `All ${config.itemCount} items are done. Finish the section to move on.`
-              : `${config.itemCount} quick items, ${config.secondsPerItem} seconds each. Each item moves on when you submit it or its time runs out.`}
+              : `${config.itemCount} quick items, ${config.secondsPerItem} seconds each. Each one moves on when you submit or time runs out.`}
           </p>
         </>
       )}

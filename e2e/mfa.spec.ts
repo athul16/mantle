@@ -18,7 +18,7 @@ test.describe("admin two-factor", () => {
     await land(/\/app\/account\/security\?next=/, "Turn on two-factor authentication");
     await page.goto(`/app/${co.slug}/jobs`);
     await expect(page).toHaveURL(new RegExp(`/app/account/security\\?next=${encodeURIComponent(`/app/${co.slug}/jobs`)}`));
-    await expect(page.getByText(/keep .*authenticator/i).first()).toBeVisible();
+    await expect(page.getByText(/never share a code/i).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Set up an authenticator app" }).click();
     await expect(page.getByRole("img", { name: /QR code/i })).toBeVisible();

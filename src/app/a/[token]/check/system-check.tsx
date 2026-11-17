@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { enterFullscreen } from "@/lib/candidate/fullscreen";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Icon } from "@/components/icons";
 import { isMonitored, monitoringNotice, type MonitoringSettings, type Proctoring } from "@/lib/proctoring/config";
@@ -82,11 +83,14 @@ export function SystemCheck({
   proctoring = OFF,
   consented = false,
   companyName = "the company",
+  autoFullscreen = true,
 }: {
   token: string;
   proctoring?: MonitoringSettings;
   consented?: boolean;
   companyName?: string;
+  /** Go full screen on Continue (off when the candidate is excused from full screen). */
+  autoFullscreen?: boolean;
 }) {
   const result = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const screenSupported = useSyncExternalStore(noSubscribe, canShareScreen, () => true);
@@ -308,7 +312,7 @@ export function SystemCheck({
   const running = rows.some((r) => r.state === "pending");
   const left = rows.filter((r) => r.state !== "pass" && !r.optional).length;
   const passed = left === 0 && (!monitored || agreed);
-  const sub = result === null || running ? "Running checks…" : left === 0 ? "All set. You can continue." : left === 1 ? "Almost there — one item left." : `${left} items left.`;
+  const sub = result === null || running ? "Running checks…" : left === 0 ? "All set. You can continue." : left === 1 ? "One item left." : `${left} items left.`;
 
   return (
     <>
@@ -408,7 +412,7 @@ export function SystemCheck({
 
       <div className="row g16 wrap">
         {passed ? (
-          <Link href={`/a/${token}/instructions`} className="btn btn-dark btn-lg">
+          <Link href={`/a/${token}/instructions`} className="btn btn-dark btn-lg" onClick={autoFullscreen ? enterFullscreen : undefined}>
             Continue
             <Icon name="arrowR" />
           </Link>
@@ -600,7 +604,7 @@ function ScreenShare({ state, unsupported, disabled, onShare }: { state: Device;
       <div style={{ flex: "1 1 280px" }}>
         <h2 style={{ fontSize: 16 }}>Share your entire screen</h2>
         <p className="small ink2">
-          When your browser asks, choose <strong>Entire screen</strong> — a window or tab won&apos;t work.
+          When your browser asks, choose <strong>Entire screen</strong>, not a window or tab.
         </p>
         {note ? (
           <p className="small badc" style={{ marginTop: 4 }} role="alert">

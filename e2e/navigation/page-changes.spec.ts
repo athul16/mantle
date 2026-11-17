@@ -77,15 +77,15 @@ test("candidate pages load without layout shift and back returns to the right st
   await candidate.verify(invite);
   expect(await cls(), "system check CLS").toBeLessThan(CLS_BUDGET);
   await page.getByRole("link", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Practice run" })).toBeVisible();
   expect(await cls(), "instructions CLS").toBeLessThan(CLS_BUDGET);
 
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "Check your setup" })).toBeVisible();
   await page.goForward();
-  await expect(page.getByRole("heading", { level: 1, name: "Before you start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Practice run" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Start the 15-minute simulation" }).click();
+  await page.getByRole("button", { name: "Start the 15-minute test" }).click();
   await expect(page.getByRole("timer")).toBeVisible();
   expect(await cls(), "workspace CLS").toBeLessThan(CLS_BUDGET);
 

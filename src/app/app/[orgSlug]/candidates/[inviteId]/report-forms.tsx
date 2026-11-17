@@ -107,7 +107,7 @@ export function RubricReviewForm({
             <tr>
               <td colSpan={3} style={{ borderBottom: 0, background: "var(--subtle)" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <span className="small ink2">Your scores replace the provisional ones. Who reviewed and when is kept with the score.</span>
+                  <span className="small ink2">Your scores replace the provisional ones.</span>
                   <span style={{ flex: 1 }} />
                   <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
                     {pending ? "Saving…" : reviewed ? "Update review" : "Save review"}

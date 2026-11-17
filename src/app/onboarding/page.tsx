@@ -31,14 +31,14 @@ export default function OnboardingPage() {
       <main className="card raised" style={{ width: "100%", maxWidth: 560, padding: 32, display: "flex", flexDirection: "column", gap: 22 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <h1 style={{ fontSize: 24 }}>Set up your company</h1>
-          <p className="ink2">Candidates see your name and logo on every screen — we stay in the background.</p>
+          <p className="ink2">Candidates see your name and logo on every screen.</p>
         </div>
         <Suspense>
           <ExistingOrgs />
         </Suspense>
         <CreateOrgForm />
       </main>
-      <p className="small muted">You&apos;ll be the admin. Invite teammates as Admins, Recruiters or Viewers from Team whenever you&apos;re ready.</p>
+      <p className="small muted">You&apos;ll be the admin. Invite teammates from Team any time.</p>
     </div>
   );
 }

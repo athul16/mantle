@@ -137,7 +137,7 @@ export function AccommodationsForm({
           Waive microphone
         </label>
       ) : null}
-      <p className="xs muted">Applies only to this candidate and can change until they start. Each change is recorded in the audit log.</p>
+      <p className="xs muted">Only for this candidate. You can change it until they start.</p>
       <FormMessage error={state?.error} message={state?.message} />
       <div>
         <Button type="submit" variant="secondary" size="sm" disabled={pending}>

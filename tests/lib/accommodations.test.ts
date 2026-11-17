@@ -102,7 +102,7 @@ describe("monitoring notice contact line", () => {
   });
 
   it("names the camera, microphone, full screen and screen share", () => {
-    expect(accommodationLine("Acme", null)).toContain("can't use a camera, microphone, full screen or share your screen");
+    expect(accommodationLine("Acme", null)).toContain("can't use a camera, microphone, full screen or screen share");
   });
 
   it("falls back to the hiring team without one", () => {

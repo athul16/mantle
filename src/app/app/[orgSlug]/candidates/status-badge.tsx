@@ -25,7 +25,7 @@ export function StatusBadge({ status, needsReview = false, replyToScore = false 
   return (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
       {badge}
-      <span className="badge b-accent" title="A task waits for a recruiter or admin to score it; the score is provisional">
+      <span className="badge b-accent" title="A task needs scoring. The score is provisional.">
         <Icon name="reply" />
         {replyToScore ? "Reply to score" : "Needs review"}
       </span>

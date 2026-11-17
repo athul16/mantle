@@ -470,9 +470,9 @@ function InviteDrawer({ row, ctx, onClose }: { row: CandidateRow; ctx?: TableCon
         ) : null}
         <p className="xs muted">
           {row.status === "revoked"
-            ? "This link no longer works; the candidate sees “Invitation withdrawn”."
-            : "Resend sends a new link and the current one stops working. Revoke stops the link; the candidate sees “Invitation withdrawn”. Both only work before the candidate starts."}
-          {ctx?.canManage && ctx.deadlinePassed && row.status !== "revoked" ? " The job's invite deadline has passed, so no new links can be sent." : ""}
+            ? "This link no longer works."
+            : "Resend sends a new link and cancels the old one. Revoke cancels the link. Both only work before the candidate starts."}
+          {ctx?.canManage && ctx.deadlinePassed && row.status !== "revoked" ? " The invite deadline has passed." : ""}
         </p>
       </section>
       <section style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--line)" }}>
