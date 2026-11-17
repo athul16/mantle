@@ -60,4 +60,6 @@ Open and decided questions with research: `decisions/`. Build status: `10-progre
 | `12-pilot-runbook.md` | Running a pilot |
 | `13-design-system.md` | Mantle look and feel: the prototype, tokens, components, screen map |
 | `14-paralegal-simulations.md` | Paralegal vertical: market, the six simulations, shared legal helpers, content rules, status |
+| `14-next-industries.md` | Industries to pitch after accounting, pharma and paralegal: competitors, saturation, order |
+| `15-simulation-prompts.md` | Authoring prompts for agents: shared brief plus one prompt per new industry |
 | `decisions/` | Decision briefs: background, options, recommendation, what was decided |
