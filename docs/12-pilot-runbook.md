@@ -55,7 +55,7 @@ pnpm scenarios:publish
 
 It reads `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` from `.env.local`, which points at the cloud project. Each line prints `slug@vN -> <id>`. Re-run after any scenario change that bumps a version.
 
-Before publishing the accounting simulations (Harbor Lane, Calder & Finch audit, Ridgeway AP), get the accountant's sign-off on [reviews/2026-11-accountant-review.md](reviews/2026-11-accountant-review.md).
+The accounting simulations (Harbor Lane, Calder & Finch audit, Ridgeway AP) and the six paralegal simulations are already published as v1 for testing. Changes from the team's sign-off on [reviews/2026-11-accountant-review.md](reviews/2026-11-accountant-review.md) and [reviews/2026-11-paralegal-review.md](reviews/2026-11-paralegal-review.md) ship as new versions; publish those by slug, since `pnpm scenarios:publish` publishes everything in code.
 
 ## 5. Pilot company and team
 

@@ -15,7 +15,7 @@ _Last updated: 2026-11-16 (main at `206f8cc`: proctoring v2, timed sections, rap
 | 5 | Engine: step type interface + `inbox_reply` + `spreadsheet` | ✅ Done | Step-type interface, seeded variants, server-only scoring; `numeric`, `inbox_reply` (rubric, needs review, AI scorer seam), `spreadsheet` (in-house grid, partial credit); `demo-petty-cash` and `demo-mini-close` scenarios; `/dev/engine` scenario picker; 104 unit tests |
 | 6 | Results table + candidate report | ✅ Done | Per-job results table (sort, filter, search, needs-review badge); candidate report with answers next to the expected answer, per-task points, rubric review for `inbox_reply` (`review_rubric_step` function), timeline, notes with hire / no hire vote; viewers read-only on scores (PR #19) |
 | 7 | Proctoring: browser signals, camera snapshots, screen share, flags | ✅ Done | Real camera and screen checks; browser signals (blur, full-screen exits, copy/paste); webcam and screen snapshots to a private per-org bucket; rules turn signals into flags with evidence; flags section on the report where admins and recruiters confirm or clear with a note (PR #23) |
-| 8 | `journal_entry` + `document_review`; Example 1 (or Example 4) end to end | ✅ Done | `journal_entry` and `document_review` with `demo-entries-review` (PR #18); Example 4 as `harbor-lane-bank-rec` v1: Harbor Lane Coffee bank rec, journal entries and a reply to Dana, 30 minutes, 100 points (PR #22). Not published to the cloud yet; waits on the team's content review |
+| 8 | `journal_entry` + `document_review`; Example 1 (or Example 4) end to end | ✅ Done | `journal_entry` and `document_review` with `demo-entries-review` (PR #18); Example 4 as `harbor-lane-bank-rec` v1: Harbor Lane Coffee bank rec, journal entries and a reply to Dana, 30 minutes, 100 points (PR #22). Published v1 for testing 2026-11-17; content review pending |
 
 8 of 8 skeleton steps. Stages A to D are built in code: send a link, take a proctored test, review and judge the result, with a real accounting simulation. Stage E (pilot-ready) is next.
 
@@ -63,7 +63,7 @@ What runs today, from the code on main and the cloud project (2026-11-16, main a
 | `audit-calder-bluestem` v1 | Calder & Finch year-end audit of Bluestem Manufacturing: vouching, inbox, summary of misstatements with a pass/propose `multiple_choice` call, adjusting entries, three rapid rounds (tick and tie, FOB cutoff, sample selection); 100 points, 52 minutes, 6 sections (PRs #40, #43, #47) |
 | `demo-petty-cash`, `demo-mini-close`, `demo-entries-review`, `demo-timed-close` | Demos of the step types and the sections engine |
 
-Status: built and engine-tested (answer keys tie across many seeds, every trap scores as intended); none of the three accounting simulations has been played end to end in a browser yet. Content review is a self-review by the team using `docs/reviews/2026-11-accountant-review.md` as the checklist (no outside accountant), still pending. Only `demo-petty-cash` v1 is published in the cloud library. `pnpm scenarios:publish` has no draft gate: it publishes every scenario in code, so running it today would publish all seven. Tax, advisory and forensic simulations (Prompts 3 to 5) are handed off to a separate collaborator.
+Status: built and engine-tested (answer keys tie across many seeds, every trap scores as intended); none of the three accounting simulations has been played end to end in a browser yet. Content review is a self-review by the team using `docs/reviews/2026-11-accountant-review.md` as the checklist (no outside accountant), still pending. The three accounting simulations, the six paralegal ones and `demo-petty-cash` are published in the cloud library as v1 for testing (2026-11-17); the other three demos are not. `pnpm scenarios:publish` has no draft gate: it publishes every scenario in code, so running it would also publish the remaining demos. Tax, advisory and forensic simulations (Prompts 3 to 5) are handed off to a separate collaborator.
 
 **Company report.** Answers next to the expected answer (rapid round items with prompt, values, expected values and response time), rubric review, a Timing card (answers within 2 s of returning to the window, a large rapid round vs other tasks gap; evidence only, the label doesn't change), flags with snapshots, filmstrips and audio, notes and vote, timeline (PRs #39, #45).
 
@@ -104,7 +104,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 3. **Candidate side** (done): invite link → 6-digit email code → consent → system check → instructions → timed workspace (inbox left, task right) → review → submit. Server-owned timer, autosave, resume after refresh.
 4. **Engine** (done for MVP step types): turns a scenario into tasks with each candidate's own numbers, then scores them. `numeric`, `inbox_reply` (rubric; AI scorer in shadow only), `spreadsheet`, `journal_entry`, `document_review`, `rapid_round` and `multiple_choice` are built, plus timed sections and one-at-a-time screens.
 5. **Integrity** (built, v2): browser signals, copy counter, webcam and screen snapshots, away capture, optional full screen, microphone and on-device gaze, flags with evidence that a recruiter confirms or clears, severity-based label with reasons. Nothing auto-rejects.
-6. **Content** (drafts in code): `harbor-lane-bank-rec`, `corporate-ap-ridgeway` and `audit-calder-bluestem` (Examples 4 to 6 in `07-accounting-simulations.md`). They still need a browser playthrough, the team's content self-review and publishing. Tax, advisory and forensic simulations are handed off to a separate collaborator.
+6. **Content** (drafts in code): `harbor-lane-bank-rec`, `corporate-ap-ridgeway` and `audit-calder-bluestem` (Examples 4 to 6 in `07-accounting-simulations.md`). Published as v1 for testing (2026-11-17); they still need a browser playthrough and the team's content self-review, and fixes ship as v2. Tax, advisory and forensic simulations are handed off to a separate collaborator.
 
 ## Stages to the MVP
 
@@ -133,10 +133,11 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 - [x] Accountant review pack written (`docs/reviews/2026-11-accountant-review.md`, PR #46); it is the team's self-review checklist, no outside accountant.
 - [ ] Play `corporate-ap-ridgeway` and `audit-calder-bluestem` end to end in a browser (sections, rapid rounds, report), and `harbor-lane-bank-rec` too.
 - [ ] Content self-review of the three simulations against `docs/reviews/2026-11-accountant-review.md`, deciding the calls it flags: one supplies treatment across Ridgeway (JE flash expenses on use, the match posts straight to Store Supplies Expense); the unreceived invoice and credit memo treatment on the vendor statement rec; strict no-tolerance match policy; Harbor Lane's labelled rec rows hinting at the answers and all-or-nothing cells; the audit's whole-accrual misstatement, clearly trivial rule and section lengths; the rapid round point weights. The pack still says "changing in PR" for the two answers PR #47 switched.
+- [x] Three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) published to the cloud library as v1 for testing (2026-11-17, by slug).
 - [x] Six paralegal simulations published to the cloud library as v1 for testing (2026-11-17, a one-off publish of just those six slugs).
-- [ ] Draft gate for publishing: `pnpm scenarios:publish` publishes every scenario in code (13 today); add a draft flag or allowlist before running it, or it would also publish the unreviewed accounting simulations.
+- [ ] Draft gate for publishing: `pnpm scenarios:publish` publishes every scenario in code (13 today); add a draft flag or allowlist before running it, or it would also publish the three unpublished demos (`demo-mini-close`, `demo-entries-review`, `demo-timed-close`).
 - [ ] Paralegal content self-review of the six simulations against `docs/reviews/2026-11-paralegal-review.md` (traps, judgment calls, timing), then a play-through of each on the live site (assign it to a job, invite yourself); fixes ship as v2.
-- [ ] Publish the reviewed simulations (`pnpm scenarios:publish`) after the self-review and the draft gate.
+- [ ] Publish v2 of any simulation the self-review changes (v1 rows are frozen).
 - [ ] D3 free legal checks (compare notice with competitors, pilot firm HR review, UNC law clinics / Launch Chapel Hill); paid lawyer before charging, leaving NC, or turning on AI scoring.
 - [ ] D14: ask pilot firms what they would pay (first round free).
 
@@ -144,6 +145,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
 | 2026-11-17 | PR #58: progress log for PRs #49–#57 and the immigration simulation in the paralegal doc and review pack. Docs only |
 | 2026-11-17 | PR #57: `immigration-h1b-packet` v1 (`docs/paralegal/immigration-h1b-packet.md`, draft: team self-review pending): H-1B extension packet, 50 min, 100 points; status and date math, forms cross-check (petition, passport, job letter, wage attestation), packet checklist, terms, deadlines and an inbox (RFE response, backdating request, beneficiary's travel question). Fictional forms and agency. Test-first. All six paralegal simulations are now merged |

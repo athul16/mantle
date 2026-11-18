@@ -14,7 +14,7 @@ Three accounting simulations are waiting for an accountant's sign-off before any
 
 **What "draft: needs accountant review" means.** The simulations are built and tested (the numbers tie for hundreds of seeds, every trap scores as intended), but nobody with an accounting qualification has checked that the expected answers, the accounts used and the judgment calls are right. That check is this review. `docs/07-accounting-simulations.md` marks each one as a draft.
 
-**Nothing goes to companies until you sign off.** Simulations reach the company library only when they are published. Publishing is `pnpm scenarios:publish`, which Athul runs after sign-off. If you mark anything "change" or "reject", it is fixed (and the version bumped if needed) before publishing.
+**v1 is already published for testing** (2026-11-17), so the team can take each simulation on the live site while reviewing. Published rows are frozen: anything marked "change" or "reject" is fixed in a new version, which is published after sign-off.
 
 **How to review.** Each simulation below has the setup, the timeline, every trap with its expected answer and the rule behind it, the judgment calls the authors flagged, the scoring, and a sign-off table at the end. In the sign-off tables, write **approve**, **change** or **reject** in the middle column and anything you want changed in the note column. Where the expected answer is defensible but not the only acceptable one, say whether the alternative should also get credit.
 
@@ -452,7 +452,7 @@ Each trap answered wrongly costs exactly its own points: paying the duplicate, t
 ## After sign-off
 
 1. Every "change" is made in the scenario code and in `docs/07-accounting-simulations.md`.
-2. Athul runs `pnpm scenarios:publish` (see `docs/12-pilot-runbook.md`, step 4).
+2. Athul publishes the new versions of anything that changed (see `docs/12-pilot-runbook.md`, step 4).
 3. `docs/10-progress.md` records the review and the publish.
 
 Reviewer name: ____________________ Date: ____________ Signature: ____________________
