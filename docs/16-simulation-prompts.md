@@ -1,6 +1,6 @@
-# 15 · Simulation authoring prompts (first wave)
+# 16 · Simulation authoring prompts (first wave)
 
-Prompts for subagents that build one simulation each, in lead order from `14-next-industries.md`. Give a subagent the **build contract** followed by **one role prompt**. One subagent, one simulation, one branch, one PR.
+Prompts for subagents that build one simulation each, in lead order from `15-next-industries.md`. Give a subagent the **build contract** followed by **one role prompt**. One subagent, one simulation, one branch, one PR.
 
 | Order | Role | Slug | `roleFamily` |
 | --- | --- | --- | --- |
@@ -13,7 +13,7 @@ Prompts for subagents that build one simulation each, in lead order from `14-nex
 
 All six share one shape: 50 minutes, 100 points, six timed sections (6 + 10 + 6 + 10 + 6 + 12 minutes), three rapid rounds, two long tasks, and a final desk section shown one screen at a time that holds the values calls. Everything is scored automatically, which matters for high-volume rounds: no attempt waits on a reviewer.
 
-Second-wave prompts (shortage markets) are in `16-simulation-prompts-shortage-markets.md`; they use this file's build contract.
+Second-wave prompts (shortage markets) are in `17-simulation-prompts-shortage-markets.md`; they use this file's build contract.
 
 ---
 

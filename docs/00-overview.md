@@ -60,7 +60,7 @@ Open and decided questions with research: `decisions/`. Build status: `10-progre
 | `12-pilot-runbook.md` | Running a pilot |
 | `13-design-system.md` | Mantle look and feel: the prototype, tokens, components, screen map |
 | `14-paralegal-simulations.md` | Paralegal vertical: market, the six simulations, shared legal helpers, content rules, status |
-| `14-next-industries.md` | Roles to pitch after accounting, pharma and paralegal, ranked by hiring volume and applicant overload; competitors |
-| `15-simulation-prompts.md` | Subagent build contract plus one prompt per first-wave role, in lead order |
-| `16-simulation-prompts-shortage-markets.md` | Second-wave prompts for shortage markets (insurance underwriting, construction, wealth, trade, credit, AML) |
+| `15-next-industries.md` | Roles to pitch after accounting, pharma and paralegal, ranked by hiring volume and applicant overload; competitors |
+| `16-simulation-prompts.md` | Subagent build contract plus one prompt per first-wave role, in lead order |
+| `17-simulation-prompts-shortage-markets.md` | Second-wave prompts for shortage markets (insurance underwriting, construction, wealth, trade, credit, AML) |
 | `decisions/` | Decision briefs: background, options, recommendation, what was decided |

@@ -1,8 +1,8 @@
-# 14 · Next industries to pitch
+# 15 · Next industries to pitch
 
-Which roles to take the simulations to after accounting, pharma and paralegal (those three are planned and not covered here). Tech roles are out of scope. Research as of Nov 2026 from vendor sites, trade press, BLS and industry surveys. Many figures come from recruiters, vendors or test-prep sites; treat them as direction, not proof.
+Which roles to take the simulations to after accounting, paralegal and pharma (accounting and paralegal are built, pharma is planned; none is covered here). Tech roles are out of scope. Research as of Nov 2026 from vendor sites, trade press, BLS and industry surveys. Many figures come from recruiters, vendors or test-prep sites; treat them as direction, not proof.
 
-Authoring prompts: `15-simulation-prompts.md` (first wave, this ranking) and `16-simulation-prompts-shortage-markets.md` (second wave).
+Authoring prompts: `16-simulation-prompts.md` (first wave, this ranking) and `17-simulation-prompts-shortage-markets.md` (second wave).
 
 ## How the picks are ranked
 
@@ -53,7 +53,7 @@ US openings per year, 2024 to 2034 (BLS): management analysts 98,100; market res
 
 ## Second wave: shortage markets
 
-Still good markets, but the opposite problem (few applicants), so they move behind the first wave. Prompts: `16-simulation-prompts-shortage-markets.md`.
+Still good markets, but the opposite problem (few applicants), so they move behind the first wave. Prompts: `17-simulation-prompts-shortage-markets.md`.
 
 | Role | Signal | Simulations found |
 | --- | --- | --- |
