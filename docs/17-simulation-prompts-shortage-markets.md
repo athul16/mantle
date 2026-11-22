@@ -667,4 +667,4 @@ sims for fraud operations and sanctions specialists.
 
 - One agent per prompt, each on its own branch (`feat/sim-<slug>`). Two agents must not share helper files: only the first simulation in a vertical creates `scenarios/<vertical>/`.
 - Every simulation lands as "draft: practitioner review pending". Nothing is published until a practitioner in that field has reviewed it, as with the accountant review pack.
-- `pnpm scenarios:publish` still has no draft gate (`10-progress.md`); don't run it while drafts are in code.
+- `pnpm scenarios:publish` only publishes the allowlist in `src/lib/scenarios/publishable.ts` (PR #62). Never add a new simulation to it in its own PR; it goes on after review.

@@ -858,5 +858,5 @@ typical carrier's.
 
 - Start in table order. One subagent per prompt on `feat/sim-<slug>`; subagents must not share helper files, so only the first simulation in a role family creates `scenarios/<roleFamily>/`.
 - Every simulation lands as "draft: practitioner review pending" and is not published until someone who does the job has reviewed it, as with the accountant review pack.
-- `pnpm scenarios:publish` has no draft gate (`10-progress.md`); don't run it while drafts are in code.
+- `pnpm scenarios:publish` only publishes the allowlist in `src/lib/scenarios/publishable.ts` (PR #62). Never add a new simulation to it in its own PR; it goes on after review.
 - For high-volume rounds, check completion rates in the first pilot: sections `s-rapid-a` and `s-work-1` (16 minutes, 30 points) are built to work as a shorter first-stage cut if 50 minutes proves too long for a pool of hundreds.
