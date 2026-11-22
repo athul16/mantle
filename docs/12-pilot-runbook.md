@@ -47,7 +47,7 @@ Check: `APP/api/health` returns `{"ok":true,"db":true,"storage":true,"email":tru
 
 ## 4. Publish the scenarios
 
-Scenarios are code; publishing copies them into the platform library in the cloud database. Safe to re-run (published versions are left alone).
+Scenarios are code; publishing copies them into the platform library in the cloud database. Only versions on the allowlist in `src/lib/scenarios/publishable.ts` are published; every other scenario in code is a draft and prints `skipped (draft)`. Safe to re-run (published versions are left alone).
 
 ```bash
 pnpm scenarios:publish
@@ -55,7 +55,7 @@ pnpm scenarios:publish
 
 It reads `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` from `.env.local`, which points at the cloud project. Each line prints `slug@vN -> <id>`. Re-run after any scenario change that bumps a version.
 
-The accounting simulations (Harbor Lane, Calder & Finch audit, Ridgeway AP) and the six paralegal simulations are already published as v1 for testing. Changes from the team's sign-off on [reviews/2026-11-accountant-review.md](reviews/2026-11-accountant-review.md) and [reviews/2026-11-paralegal-review.md](reviews/2026-11-paralegal-review.md) ship as new versions; publish those by slug, since `pnpm scenarios:publish` publishes everything in code.
+The accounting simulations (Harbor Lane, Calder & Finch audit, Ridgeway AP) and the six paralegal simulations are already published as v1 for testing. Changes from the team's sign-off on [reviews/2026-11-accountant-review.md](reviews/2026-11-accountant-review.md) and [reviews/2026-11-paralegal-review.md](reviews/2026-11-paralegal-review.md) ship as new versions: add the new `slug@vN` to the allowlist, then run `pnpm scenarios:publish`.
 
 ## 5. Pilot company and team
 
