@@ -1,6 +1,6 @@
-# 16 · Simulation prompts: shortage markets (second wave)
+# 17 · Simulation prompts: shortage markets (second wave)
 
-Second-wave prompts, for the industries where employers struggle to find skilled people (`14-next-industries.md`, "Second wave"). The first wave, ordered by applicant volume, and the full build contract are in `15-simulation-prompts.md`; use that file's shared brief instead of the shorter one here.
+Second-wave prompts, for the industries where employers struggle to find skilled people (`15-next-industries.md`, "Second wave"). The first wave, ordered by applicant volume, and the full build contract are in `16-simulation-prompts.md`; use that file's shared brief instead of the shorter one here.
 
 Prompts for agents that build one simulation each. Give an agent the **shared brief** followed by **one industry prompt**. One agent, one simulation, one branch, one PR.
 
@@ -12,7 +12,7 @@ Every prompt follows the shape of the paralegal simulations already in code (`do
 | 2 | Construction: project engineer | `construction-tamarack-mob` | `construction` |
 | 3 | Wealth management: client service associate | `wealth-juniper-household` | `wealth` |
 | 4 | Trade compliance: entry and classification analyst | `customs-fenwick-entry` | `trade` |
-| 5 | Commercial banking: credit analyst | `credit-stonebridge-renewal` | `banking` |
+| 5 | ~~Commercial banking: credit analyst~~ (dropped, same as first-wave `banking-stonebridge-renewal`) | | |
 | 6 | Financial crime: AML / KYC analyst | `aml-marlowe-alerts` | `compliance` |
 
 ---
@@ -562,90 +562,9 @@ duties by origin should appear at all given how often they changed in 2026.
 
 ---
 
-## Prompt 5 · Commercial banking: credit analyst
+## Prompt 5 · Commercial banking: credit analyst (dropped)
 
-```text
-SIMULATION: `credit-stonebridge-renewal`, role family `banking`.
-
-ROLE AND SETTING
-The candidate is a commercial credit analyst at Stonebridge Community Bank
-(fictional). Today: underwrite the annual renewal and a line increase for an
-operating company (seed from a pool: HVAC contractor, craft food
-manufacturer, regional distributor, dental group). Cast: the relationship
-manager who wants it at Friday's loan committee, the chief credit officer,
-the borrower's controller, a loan operations specialist.
-
-MATERIALS TO BUILD (all seeded)
-- Credit policy excerpt: minimum debt service coverage, maximum leverage,
-  maximum loan-to-value by collateral type, how old financial statements and
-  appraisals may be, borrowing base advance rates and ineligibles (receivables
-  over 90 days, concentration over a percent, affiliate and foreign accounts),
-  the risk rating grid.
-- Three years of income statements and balance sheets, the interim period, an
-  accounts receivable aging, the existing loan agreement's covenants, the
-  guarantor's personal financial statement, a lien search summary, the draft
-  credit memo.
-- Reuse the accounting helpers where they fit; keep statements tying on every
-  seed (assets = liabilities + equity, net income flows to equity).
-
-SECTIONS
-1. Rapid round A, ratio flash (6 min, 10 pts). From a statement snippet:
-   current ratio, debt to tangible net worth, days sales outstanding,
-   loan-to-value. Hard items: debt service coverage with the current portion
-   of long-term debt, funded debt to EBITDA with an add-back, a ratio that
-   needs average balances.
-2. Financial spreading (10 min, 20 pts, spreadsheet). Enter EBITDA for each
-   year, adjusted EBITDA, cash available for debt service, total debt
-   service, coverage ratio, leverage. Traps: a one-time gain on an asset sale
-   inside other income; owner distributions that reduce cash available; a
-   depreciation figure buried in cost of goods sold; new debt service from
-   the requested increase; an interim period that must be annualised only
-   where the policy says so. Mid-task the controller sends a revised interim
-   statement.
-3. Rapid round B, structure and covenants (6 min, 10 pts). With the loan
-   agreement on screen: is this covenant met, which covenant is tested when,
-   what a cross-default does, secured vs guaranteed, first vs second lien.
-   Hard items test a covenant exactly at its threshold or with a seeded cure
-   period.
-4. Loan package review (10 min, 20 pts, document_review). The draft credit
-   memo against the file. Findings: financial statements older than policy
-   allows; appraisal older than policy; guarantor's statement unsigned; a
-   covenant breach the memo calls "in compliance"; the lien search shows a
-   prior lien on the equipment; borrower's legal name in the memo differs
-   from the organisational documents. Clean look-alikes: a covenant met with
-   little room, a released lien. Decision: send to committee, return to the
-   relationship manager, or send with a documented policy exception.
-5. Rapid round C, borrowing base (6 min, 10 pts). Eligible receivables and
-   availability from a small aging and the policy. Hard items apply a
-   concentration cap or exclude an affiliate account.
-6. Desk and inbox, one screen at a time (12 min, 30 pts).
-   - Borrowing base certificate check (short spreadsheet, 10).
-   - Risk rating (multiple_choice, 10 in two or three steps): rating from the
-     grid and the single biggest risk to put first in the memo.
-   - Values calls (10).
-
-VALUES CALLS
-- integrity: the relationship manager asks to leave the covenant breach out
-  of the memo "so it doesn't derail Friday".
-- candor: the candidate's own spread, already sent to the chief credit
-  officer, has an error that flatters coverage.
-- stays in lane: the borrower's controller asks whether the increase is
-  approved so they can order equipment.
-- client care: another customer's owner, friendly with the borrower, asks how
-  the borrower is doing.
-- quality over speed: loan operations offers to book the renewal before the
-  insurance certificate arrives.
-
-RULES TO VERIFY AND CITE
-Standard definitions of the ratios (cite the commercial lending reference
-you used); lien priority basics under UCC Article 9; that customer financial
-information is confidential under federal privacy law. Thresholds, ages and
-advance rates are Stonebridge policy: seed them and say so.
-
-JUDGMENT CALLS TO FLAG
-Global cash flow with the guarantor (include or leave for a senior-analyst
-sim); tax-return-based spreading as a sibling sim for small-business lending.
-```
+Dropped: it was the same simulation as first-wave Prompt 4, `banking-stonebridge-renewal` in `16-simulation-prompts.md` (same bank, borrower pool and cast). Build that one only.
 
 ---
 
