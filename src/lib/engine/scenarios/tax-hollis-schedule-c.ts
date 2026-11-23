@@ -760,7 +760,7 @@ export const taxHollisScheduleC = defineScenario({
       {
         id: "schedule-c",
         type: SPREADSHEET,
-        title: "Schedule C input: {{client}}",
+        title: "Schedule C input for {{client}}",
         config: {
           prompt: [
             "Fill in the Schedule C input screen from the client's organizer, with everything we know as of today.",
@@ -773,7 +773,7 @@ export const taxHollisScheduleC = defineScenario({
       {
         id: "elena-summary",
         type: INBOX_REPLY,
-        title: "Note to Elena: {{client_first}}'s Schedule C",
+        title: "Note to Elena on {{client_first}}'s Schedule C",
         config: {
           prompt: "Reply to Elena: net profit, open items, and documents we still need. Keep it short.",
           to: "Elena Vasquez, Tax Manager",
