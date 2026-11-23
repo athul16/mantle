@@ -481,6 +481,140 @@ A perfect attempt shows 85 automatic points until a reviewer marks the two repli
 - The rapid rounds weight the harder kinds (accruals and deferrals; duplicates, over-limit and the near miss; short-pays and unapplied cash) at 1 point and the rest at ½. A uniform ⅔ point would not add up to exactly 10.
 - Sections close their screens, so the inbox shows the held invoice's match record in the vendor-reply prompt and the four queue invoices in the run-total email. The run total still depends on the candidate's own match decisions.
 
+## Example 9: Forensic intern, vendor and expense review at Marlow Forensic (49 min, 100 points)
+
+**Status: draft: needs accountant review.** Built as `forensic-marlow-expenses` v1 in `src/lib/engine/scenarios/forensic-marlow-expenses.ts`, tests in `tests/engine/forensic-marlow-expenses.test.ts` and `e2e/simulations/forensic-marlow-expenses.spec.ts`. Handoff Prompt 5. Six timed sections (`06-assessment-engine.md`, "Timed sections and rapid rounds"), three of them rapid rounds.
+
+**Experimental track.** Few firms hire forensic interns, so this simulation is experimental: it tests the habits a forensic team wants (spot the red flag, keep quiet about scope, report facts not conclusions) more than a job most interns will be hired into.
+
+**Setup:** "You're an intern at Marlow Forensic. The board of {nonprofit}, a nonprofit, hired us after a tip about expense and vendor fraud. Sam, our lead investigator, will send you work as we go." The nonprofit, its staff, the vendors, the board member and every amount, address, tax ID, invoice number and date are seeded per candidate, and so is which vendor holds which indicator and which rapid item comes when. All names are invented; none is a real organization or person. Sam is fixed (message `from` lines aren't templated).
+
+The approval limit is seeded ($2,500, $5,000, $7,500 or $10,000) and stated wherever it matters. One employee (the "suspect", e.g. an operations manager) has a home address that matches a vendor's: that vendor is "the flagged vendor" throughout.
+
+### Sections (49 minutes)
+
+Sections run back to back; a finished section can't be reopened. The overall timer never pauses. `timeLimitMinutes` is 49: the six sections as specified add up to 49, not 45.
+
+| # | Section | Minutes | Steps | Points |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round A: red flag or normal | 6 | `rapid-redflag` (15 × 20 s) | 10 |
+| 2 | Vendor master review, one screen at a time | 12 | `vendors-1` … `vendors-4` (2.5 min each), then `vendor-list` (2 min) | 25 |
+| 3 | Rapid round B: duplicate hunt | 6 | `rapid-duplicate` (15 × 20 s) | 10 |
+| 4 | Inbox, one screen at a time | 10 | `suspect-reply`, `flagged-total`, `board-reply` (200 s each) | 15 |
+| 5 | Rapid round C: quick analytics | 5 | `rapid-analytics` (12 × 25 s) | 10 |
+| 6 | Findings | 10 | `findings-sheet`, `findings-memo` | 30 |
+
+### Messages
+
+| Arrives | From | Delivers |
+| --- | --- | --- |
+| Section 2 + 0 | Sam: the vendor master review brief (the four shell-vendor signs; keep the scope to yourself) | Vendor review |
+| Section 4 + 0 | A staff member at the client (the suspect, by name): "What are you looking at? I can pull the paperwork for you." | Reply to the suspect |
+| Section 4 + 0 | Sam: "What's the total we paid {flagged vendor}? Number only." with the Q1 payment extract for the four vendors on the follow-up list | Flagged total |
+| Section 4 + 0 | A board member: "Can you just confirm it's fraud so we can let {suspect} go?" | Reply to the board member |
+| Section 6 + 0 | Sam: fill in the findings summary from the extract | Findings sheet |
+| Section 6 + 1 | Sam: findings memo he can share with the board, under 150 words: what the records show, amounts, next steps | Findings memo |
+
+### Rapid round A: red flag or normal (10 points)
+
+15 items × 20 s. Each shows one expense line (date with weekday, paid to, description, amount, approved by) or one vendor record (address, bank account, recent invoice numbers, an employee's home address from payroll, and another vendor's bank account). Two fields: **Red flag / Normal** and **why** (Nothing unusual; Round amount just under the approval limit; Weekend date; Address matches an employee's; Same bank account as another vendor; Sequential invoice numbers from one vendor). Each item has at most one problem.
+
+| Tier | Cases per candidate | Expected |
+| --- | --- | --- |
+| ½ point | 2 × weekday expense, round amount $25 to $150 under the limit | Red flag, just under the limit |
+| ½ point | 2 × expense dated on a Saturday or Sunday | Red flag, weekend |
+| ½ point | 2 × vendor whose last three invoices are consecutive numbers | Red flag, sequential |
+| ½ point | 2 × ordinary weekday expense, cents, at most 60% of the limit | Normal |
+| ½ point | 2 × ordinary vendor record | Normal |
+| 1 point | 2 × vendor address identical to the employee's address shown | Red flag, employee address |
+| 1 point | 2 × vendor bank account identical to the other vendor's | Red flag, same bank account |
+| 1 point | 1 × near miss: a round monthly lease payment far under the limit, or a vendor on the employee's street at a different number | Normal |
+
+Hard items sit in slots 3, 6, 9, 12, 15; order within each tier shuffled per seed.
+
+### Part 1 · Vendor master review (25 points)
+
+Four `document_review` screens, three vendors each (12 vendors). Columns: vendor, address, tax ID (EIN), created in the vendor master, first payment. Below each table, payroll's list of six employees' home addresses (the same list on every screen). The candidate flags a vendor row and picks the sign. Reasons: PO box address; No tax ID on file; Address matches an employee's; Created and paid the same day; Other.
+
+Planted, one per screen, shuffled across the screens and rows:
+
+| Indicator | What the row shows | Expected reason |
+| --- | --- | --- |
+| Matches employee (the flagged vendor) | Street address identical to the suspect's home address | Address matches an employee's |
+| PO box | "PO Box nnnn, town" | PO box address |
+| No tax ID | "Not on file" | No tax ID on file |
+| Same day | Created and first paid on the same date | Created and paid the same day |
+
+Each suspicious vendor shows exactly one indicator. The eight clean vendors have a street address that matches no employee, an EIN, and at least two weeks between set-up and first payment. Each screen: the right flag and reason 5 (half for the right vendor with another reason); each clean vendor flagged costs 1 (the false-flag penalty, capped at the screen's earned points).
+
+Then `vendor-list` (`multiple_choice`, multi-select, 5, 2 minutes): "Which vendors go on the follow-up list?" with all 12 vendor names in screen order. Each right pick earns 1.25; each wrong pick costs 0.625 (5 ÷ 8 clean vendors); floored at 0.
+
+### Rapid round B: duplicate hunt (10 points)
+
+15 items × 20 s. A table of six paid invoices in payment order (row, vendor, invoice number, invoice date, amount). Exactly one pair is the same invoice paid twice; the candidate picks the row of the second payment (Row 1 to Row 6). The twin differs from the first payment only by:
+
+- **Number format** (half the items): the same digits written another way (`INV-4417`, `4417`, `INV4417`, `INV-04417`, `#4417`), same vendor, date and amount; or
+- **One day** (the other half): the same invoice number, vendor and amount, dated a day earlier or later.
+
+Invoice number formats vary across all rows, so a format alone gives nothing away. The five 1-point items also carry a recurring-charge decoy: the same vendor and amount a month apart under different invoice numbers (not a duplicate).
+
+### Part 2 · Inbox (15 points)
+
+- **(a) The suspect asks what we're looking at** (`inbox_reply`, 5): doesn't disclose the scope, vendors or that anyone is under review, and doesn't take up the offer to pull files (2); routes questions to Sam (2); courteous and neutral (1).
+- **(b) Flagged total** (`numeric`, 5): the sum of every payment to the flagged vendor in Sam's extract. No partial credit. Adding another vendor's payment or missing one is wrong.
+- **(c) Board member wants a fraud call** (`inbox_reply`, 5): explains we report findings, not conclusions; whether it's fraud is for the board and its counsel (2); doesn't confirm or name anyone, points to Sam's briefing and suggests no action before it (2); calm and respectful (1).
+
+### Rapid round C: quick analytics (10 points)
+
+12 items × 25 s: four of each kind, the four "total" items (1 point each) in slots 3, 6, 9, 12 and the other eight (0.75 each) shuffled.
+
+- **Which month breaks the pattern:** six months (July to December 2025) of one expense category; five within ±8% of a baseline, one 1.9× to 2.8× it. Pick the month.
+- **Split payments:** seven payments to four vendors; one vendor has two payments within two days, each under the limit, adding up to more than it. Decoys: two payments from one vendor three weeks or more apart, and two same-day payments that stay under the limit together. Pick the vendor.
+- **Total paid to one vendor:** six payments to three vendors; type the total paid to the named one (exact to the cent).
+
+### Part 3 · Findings (30 points)
+
+`findings-sheet` (`spreadsheet`, 15): the Q1 payment extract for the four vendors on the follow-up list (date with weekday, vendor, invoice, amount; about 13 lines; the same lines as Sam's email), then a summary with one row per vendor: payments (count, 0.5), total paid (2), red-flag payments (1: payments dated on a weekend or for a round amount within $200 under the limit; no payment is both), and the total paid to all four (1). The flagged vendor has five payments with sequential invoice numbers, three or four of them red-flag payments; the others have two or three payments and zero to two red flags.
+
+`findings-memo` (`inbox_reply`, 15) to Sam, under about 150 words: facts and amounts (the flagged vendor, its payments and total, the address match and the other indicators) 5; neutral, no accusation or conclusion about intent or guilt 4; next steps: preserve records (vendor master, AP files, email), interviews (led by Sam), and bank records for the flagged vendor's account 4; short and organized 2.
+
+### Scoring (100 points)
+
+| Area | What earns points | Points |
+| --- | --- | --- |
+| Rapid A: red flag or normal | Call and reason, half the item each; 10 × ½ + 5 × 1 | 10 |
+| Vendor review | Per screen: flag and sign 5 (half for another sign), −1 per clean vendor flagged; × 4 | 20 |
+| Follow-up list | Multi-select: +1.25 per right vendor, −0.625 per wrong one | 5 |
+| Rapid B: duplicate hunt | The second payment's row; 10 × ½ + 5 × 1 | 10 |
+| Reply to the suspect | Rubric (reviewer) | 5 |
+| Flagged total | Sum of the flagged vendor's payments | 5 |
+| Reply to the board member | Rubric (reviewer) | 5 |
+| Rapid C: quick analytics | 8 × 0.75 (month, split) + 4 × 1 (total) | 10 |
+| Findings summary | Per vendor: payments 0.5, total 2, red flags 1; grand total 1 | 15 |
+| Findings memo | Rubric (reviewer) | 15 |
+| **Total** | | **100** |
+
+A perfect attempt shows 75 automatic points until a reviewer marks the three replies. Each trap answered wrongly costs exactly its own points (tested): missing a shell vendor costs that screen's 5, the right vendor with the wrong sign 2.5, flagging a clean vendor 1; a wrong flagged total 5; each missing vendor on the follow-up list 1.25 and each clean one added 0.625.
+
+### Accepted for v1 (forced by the current step types)
+
+- `document_review` allows one flag per item with one reason, so each suspicious vendor carries exactly one indicator, and each screen holds exactly one (findings are fixed per step). Which indicator, which screen and which row move per seed.
+- Section 2 is four 2.5-minute screens plus a 2-minute follow-up list (`multiple_choice`), not four 3-minute screens: 25 points don't split evenly over four screens, and the list ties the review together.
+- The findings sheet's "red flags" are counted per vendor (payments on a weekend or just under the limit), because spreadsheet cells take numbers only. The written findings (address match, sequential invoices) go in the memo.
+- Inbox screens are 200 s each so the three fill the 10-minute section.
+- Message senders other than Sam are generic ("Client staff member", "Client board member"); the seeded names are in the message bodies.
+- Three replies need a reviewer, so a perfect attempt shows 75 automatic points until they are marked.
+
+### For the accountant reviewing this draft
+
+- The red-flag rules: "round amount within $25 to $150 under the limit" in rapid A and "within $200" in the findings sheet; a weekend date alone counts as a red flag; a round lease payment far under the limit is normal.
+- A vendor on the same street as an employee, at a different number, is treated as normal (rapid A near miss).
+- Whether "created and paid the same day" should also cover a one- or two-day gap; clean vendors here have at least two weeks.
+- The follow-up list: the four flagged vendors only.
+- The board member reply: we never say "fraud"; the board and its counsel decide.
+- The memo's next steps (preserve records, interviews, bank records) and the 150-word limit.
+- Duplicate hunt: the candidate picks the second payment, not the first.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.
