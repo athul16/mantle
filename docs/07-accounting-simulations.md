@@ -687,6 +687,151 @@ A perfect attempt shows 79 automatic points until a reviewer marks the three rep
 - Message senders are fixed (`from` lines aren't templated): Elena by name, the client as "Client portal message"; the client's seeded name is inside each message.
 - Time: 52 minutes, not 50, to keep 6-minute rapid rounds and the 12/10/12 work sections.
 
+## Example 8: Advisory / SOX intern, procure-to-pay controls at Kestrel Advisory (52 min, 100 points)
+
+**Status: draft: needs accountant review.** Built as `advisory-kestrel-p2p` v1 in `src/lib/engine/scenarios/advisory-kestrel-p2p.ts`, tests in `tests/engine/advisory-kestrel-p2p.test.ts` and `e2e/simulations/advisory-kestrel-p2p.spec.ts`. Six timed sections, three rapid rounds (30 points) around the work task, inbox and final write-up (70 points). Not published yet.
+
+**Setup:** "You're a risk advisory intern at Kestrel Advisory. This week you're on the SOX testing team for a client, Arbor Health Supply, a medical supplies distributor. Your manager is Jordan Ellis. Today you're testing Arbor's procure-to-pay (P2P) controls. The work comes in six timed parts, 52 minutes in all; a finished part can't be reopened."
+
+Seeded per candidate: every amount, PO number, vendor, person (requesters, directors, managers, the control owner, the controller, ERP users), date and user ID; **which sample screen holds the verbal-approval PO, how many other exceptions there are (0, 1 or 2), what kind they are and where they sit**; which ERP user is the leaver who is still active; the order the walkthrough steps are shown in; and every rapid item (its names, amounts and dates, and which item comes when).
+
+### Control matrix (read-only)
+
+Jordan's first email (at the start, stays in the inbox) gives Arbor's P2P control matrix as a short table, one control per line:
+
+| Ref | Control | Owner | Key |
+| --- | --- | --- | --- |
+| P2P-01 | Changes to vendor bank details are approved by a second person before the next payment | AP manager | No |
+| P2P-02 | POs over $10,000 are approved by a director in the ERP on or before the order date | Purchasing manager | Yes |
+| P2P-03 | The ERP matches PO, goods receipt and invoice before an invoice can be paid | AP manager | Yes |
+| P2P-04 | The controller approves each payment run before it is released | Controller | Yes |
+| P2P-05 | Each month's bank rec is reviewed and signed off by someone other than the preparer by the review due date | Controller | No |
+| ITGC-03 | ERP access is removed within 1 business day of termination | IT manager | Yes |
+
+### Sections
+
+| # | Section | Minutes | Steps | Points |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round A: control pass or fail | 6 | `rapid-controls` (15 × 24 s) | 10 |
+| 2 | Test of operating effectiveness, one screen at a time | 12 | `test-1` … `test-4` (2¾ min each, 2 POs per screen), then `conclusion` (1 min) | 25 |
+| 3 | Rapid round B: access conflicts | 6 | `rapid-sod` (15 × 24 s) | 10 |
+| 4 | Inbox, one screen at a time | 10 | `verbal` (3 min), `exception-count` (1½ min), `exception-value` (1½ min), `user-list` (4 min) | 15 |
+| 5 | Rapid round C: design or operating? | 6 | `rapid-findings` (15 × 24 s) | 10 |
+| 6 | Walkthrough and write-up | 12 | `walkthrough`, `writeup` | 30 |
+
+Total 52 minutes (`timeLimitMinutes` 52; `validateSections` passes). One-at-a-time screens add up to their section exactly.
+
+### Messages
+
+| Arrives | From | Delivers |
+| --- | --- | --- |
+| Start | Jordan: welcome, the control matrix, the plan for the day | (none) |
+| Section 2 + 0 | Jordan: the sample of 8 POs over $10,000 from Q3, how to test each one (director, in the ERP, on or before the order date; a same-day approval passes), and Kestrel's testing guidance: **0 or 1 exception: effective; 2 or more: deficiency** | Test of operating effectiveness |
+| Section 4 + 0 | Purchasing (the control owner): "PO X was approved verbally by the director before we ordered. Can you pass it?" | Verbal approval |
+| Section 4 + 0 | Jordan: "How many exceptions out of the 8, and their total value?" with the 8 POs (number, vendor, amount) for reference | Exception count and value |
+| Section 4 + 0 | IT service desk: the ERP active user list Jordan asked for; Jordan's note: check it against HR's leavers list | User list |
+| Section 6 + 0 | Jordan: walkthrough notes are in a mess, put the steps in order with the key controls where they sit | Walkthrough |
+| Section 6 + 1 | Jordan: write up the access finding for the client: condition, criteria, risk, recommendation, under 150 words (with the facts from IT's list) | Write-up |
+
+### Rapid rounds (30 points)
+
+Each round is 15 items × 24 seconds (see the timing note below). Items 3, 6, 9, 12 and 15 hold the harder kinds and are worth 1 point; the other ten are worth ½, so each round is exactly 10. The order within each tier is shuffled per seed. Option ids are the same for every candidate.
+
+**A · Control pass or fail** (`rapid-controls`). One piece of evidence with the control it supports. Fields: **Effective / Deficiency**, and the reason (**No issue, Approver is the requester, Approved after payment, Over the approval limit, Sign-off missing or late**), half the item each. Exactly one thing can be wrong with any item.
+
+| Evidence | Control shown | Rows |
+| --- | --- | --- |
+| PO approval screenshot | Approved in the ERP by someone other than the requester, within their approval limit, before payment | PO, amount, requested by, approved by (with limit), approved on, paid on |
+| Vendor change log | Bank detail changes approved by a second person before the next payment | Vendor, change, entered by, approved by, approved on, first payment after the change |
+| Bank rec sign-off | Reviewed and signed off by someone other than the preparer by the due date | Account, month, prepared by, reviewed by, review due, reviewed on |
+
+| Tier | Cases per candidate | Expected |
+| --- | --- | --- |
+| ½ | PO approved by the requester; vendor change approved by the person who entered it; rec reviewed by its preparer | Deficiency, approver is the requester |
+| ½ | 2 × rec with no reviewer sign-off | Deficiency, sign-off missing or late |
+| ½ | 2 × PO well over the approver's limit | Deficiency, over the approval limit |
+| ½ | 3 × clean (one of each evidence type) | Effective, no issue |
+| 1 | PO approved after it was paid; vendor change approved after the first payment to the new account | Deficiency, approved after payment |
+| 1 | Rec signed off 2 to 12 days after the due date | Deficiency, sign-off missing or late |
+| 1 | PO within $1,500 under the approver's limit; rec signed off on the due date | Effective, no issue |
+
+**B · Access conflict** (`rapid-sod`). A user, their department and four ERP roles (role and what it allows). Field: the conflict (**Create vendor + approve payment, Post JE + approve JE, Receive goods + approve invoice, No conflict**). The six sensitive roles are the three pairs; the other roles are view-only, requisitions, timesheets or reports. A user never holds two pairs.
+
+| Tier | Cases per candidate | Expected |
+| --- | --- | --- |
+| ½ | 2 × each pair, with two harmless roles | That pair |
+| ½ | 2 × four harmless roles | No conflict |
+| ½ | 2 × one sensitive role and three harmless ones | No conflict |
+| 1 | 1 × each pair, plus one sensitive role from another pair | That pair |
+| 1 | 2 × one sensitive role from each of the three pairs | No conflict |
+
+**C · Design or operating?** (`rapid-findings`). One finding in a sentence, with seeded names, numbers and dates. Field: **Design deficiency / Operating deficiency / Not a deficiency**. Easy pool of 12 (4 of each), 10 drawn per candidate; hard pool of 6 (2 of each), 5 drawn.
+
+| Answer | Easy (½) | Hard (1) |
+| --- | --- | --- |
+| Design | ERP routes only POs over $X (25,000 to 50,000) to a director, though the control says $10,000; no control over vendor bank changes; one AP user can create vendors and approve payments and nothing monitors it; rec review only checks for a signature | The user access review runs off a list IT keeps in a spreadsheet, and nobody checks it's complete; the three-way match lets invoices up to 20% over the PO through without review |
+| Operating | n of 25 POs approved after the order date; a rec signed off n days late; a leaver's account active n days after they left (policy: 1 business day); a payment run released without the controller's approval | A rec signed, but a reconciling item over 90 days old not followed up as the procedure requires; a vendor bank change approved by the person who entered it |
+| Not a deficiency | A PO under $10,000 approved by a manager; 25 of 25 POs passed; a rec signed off n days early; a leaver's account disabled the day they left | The CFO approved the payment run while the controller was on leave, as the delegation of authority allows; a director approved a PO the same morning it was placed |
+
+### Part 1 · Test of operating effectiveness (25 points)
+
+Four `document_review` screens, two POs each (sample items 1 to 8). Columns: sample number, PO, vendor, amount, requested by, order date, approved by, approver's title, approved on. Every PO is over $10,000. The candidate flags the PO that fails, with a reason (**No approval on record, Approver isn't a director, Approved after the order date, PO is under $10,000, Other**), or ticks **"Both POs pass"** (`confirmClean`). Each screen holds at most one exception:
+
+| Kind | What the screen shows | Planted |
+| --- | --- | --- |
+| No approval (the verbal one) | Approved by "None recorded", approved on "None" | Always, on a seeded screen |
+| Not a director | Approved before the order date by a manager (Purchasing Manager, Warehouse Manager, Senior Buyer) | 0 to 2 of these two kinds, on other screens |
+| After the order | A director approved it 1 to 8 days after the order date | |
+
+Passing POs are approved by a director 0 to 5 days before the order date; a same-day approval passes (the guidance says "on or before"). Then a one-minute `multiple_choice` screen (`conclusion`) asks for the conclusion: **Effective** with 0 or 1 exception, **Deficiency** with 2 or more. Seeded so about 40% of candidates have exactly one exception (effective) and 60% two or three (deficiency).
+
+Scoring: per screen 5 (the right PO and reason, half for the right PO with another reason; or "Both POs pass" on a clean screen); a flag on a passing PO costs 2 (never below 0); conclusion 5.
+
+### Part 2 · Inbox (15 points)
+
+- **(a) Verbal approval** (`multiple_choice`, 5). The purchasing manager asks to pass the PO with no approval on record because the director approved it by phone before the order. Right: **"No. I'll record it as an exception. If there's written approval dated on or before the order date, send it and I'll look at it."** Wrong: pass it on the director's word; pass it once the director approves it in the ERP today; take it out of the sample and test another PO.
+- **(b) Exception count and value** (`numeric` × 2, 2 each). Jordan lists the 8 POs (number, vendor, amount). Count = the candidate's exceptions, including the verbal one; value = total of those POs' amounts. No partial credit. Answering one fewer (passing the verbal PO) loses both.
+- **(c) User list** (`document_review`, 6). IT's list of 8 active ERP users (user ID, name, department, roles, status, last login) and HR's leavers since July 1 (two names with dates). One leaver is still active and logged in after they left; the other is not on the list; an active user shares that second leaver's last name (false-flag trap). Flag the leaver's row, reason **"Left the company but still active"** (4); false flags cost 1. Decision (2): **ask IT to disable the account now and send its activity since the leaving date, with the ticket showing when it was disabled**. Wrong: ask HR to confirm the date first; leave it for the next quarterly access review; ask IT to take the name off the list and resend it.
+
+### Part 3 · Walkthrough and write-up (30 points)
+
+- **Walkthrough** (`ordering`, 15: position 5, pairs 10). Ten items, shown in a seeded order: requisition raised; requisition turned into a PO; **key control: a director approves POs over $10,000 (P2P-02)**; PO sent to the vendor; goods received in the ERP; AP enters the vendor invoice; **key control: the ERP matches PO, receipt and invoice (P2P-03)**; AP builds the payment run; **key control: the controller approves the payment run (P2P-04)**; the bank releases the payments.
+- **Write-up to Jordan** (`inbox_reply`, 15), under 150 words, on the leaver still active in the ERP. Rubric: condition (who, left when, still active with which roles, logged in after leaving) 4; criteria (ITGC-03: access removed within 1 business day) 3; risk (unauthorized invoice or payment approvals, nobody would notice; P2P controls rely on access) 3; recommendation (disable now, review activity since the leaving date, fix the HR-to-IT leaver process) 3; clear and under 150 words 2.
+
+### Scoring (100 points)
+
+| Area | What earns points | Points |
+| --- | --- | --- |
+| Rapid A: control pass or fail | Result and reason, half each; 10 × ½ + 5 × 1 | 10 |
+| Sample screens | 4 × 5 (flag and reason, or "Both POs pass") | 20 |
+| Conclusion | Effective / deficiency against the threshold | 5 |
+| Rapid B: access conflicts | The conflict | 10 |
+| Verbal approval | Multiple choice | 5 |
+| Exception count / value | Numeric | 2 / 2 |
+| User list | Flag 4, decision 2 | 6 |
+| Rapid C: design or operating | The classification | 10 |
+| Walkthrough | Position 5, pairs 10 | 15 |
+| Write-up to Jordan | Rubric (reviewer) | 15 |
+| **Total** | | **100** |
+
+A perfect attempt shows 85 automatic points until a reviewer marks the write-up. Each trap answered wrongly costs exactly its own points (tested): passing the verbal PO ("Both POs pass" on its screen) costs 5; missing a manager approval or a late approval costs 5; flagging the same-day approval on a clean screen costs 5, on a screen with an exception 2; the wrong conclusion 5; passing the verbal approval (any wrong option) 5; leaving the verbal PO out of the count and value 4; missing the leaver 4 (and a wrong request 2); flagging the user who shares a leaver's last name 1. Knock-on effects are scored where they land.
+
+### Judgment calls for the accountant review
+
+- **Rapid timing.** The handoff asks for 15 items × 25 s in a 6-minute section, which is 6¼ minutes. Kept the 6-minute sections and made items 24 s (15 × 24 s = 6 minutes exactly), rather than stretching three sections to 6½ minutes and the test to 53½.
+- **Exception threshold.** Kestrel's guidance for this sample of 8 allows 1 exception ("0 or 1: effective; 2 or more: deficiency"). The verbal PO is always an exception, so a zero-tolerance rule would make every candidate's answer "deficiency". Many firms use zero tolerance for small samples, or expand the sample after one exception; the threshold is the accountant's call.
+- **"Before order" means on or before the order date.** A same-day approval passes (it's the near miss in the sample and in rapid C).
+- **One exception per sample screen at most**, because `document_review` findings are fixed in the config (as in Example 5). The count still varies per seed (1 to 3) because screens can be clean.
+- **The conclusion is its own one-minute screen** after the four pairs (screens are 2¾ minutes, not 3), as in Example 5, so it's a clean `multiple_choice`.
+- **Verbal approval is answered by picking a reply** (`multiple_choice`) rather than writing one, so the trap is scored exactly. Asking for written approval from before the order date is part of the right answer: that would be valid evidence.
+- **The exception value** is asked as well as the count (Jordan's email), so the inbox has two numbers; it also gives the leak tests a derived amount to check.
+- **The write-up is on the access finding** (a leaver still active, ITGC-03), not on the PO sample, because the sample's conclusion is effective for some candidates. The write-up email gives the facts again since the user list screen has closed.
+- **The control matrix** is a list in Jordan's first email (there's no read-only table outside a scored step). The control under test is repeated in each sample screen's brief.
+- **Rapid A**: "approved after payment" for a vendor bank change means approved after the first payment to the new account. A rec preparer who reviews their own rec counts as "approver is the requester".
+- **Rapid B**: the three pairs are the only conflicts; other common ones (create PO + receive goods, approve PO + approve invoice) are left out so the key is unambiguous. A user with one role from each pair has no conflict.
+- **Rapid C**: a self-approved vendor bank change is operating (the procedure requires a second person and wasn't followed); an ERP that lets one user create vendors and approve payments with no monitoring is design. Reasonable people may class the self-approval as design if the system allows it.
+- Message senders are fixed role names (`from` lines aren't templated); everything inside the messages is seeded.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.
