@@ -3,6 +3,7 @@ import "server-only";
 import type { ServerScenario } from "../server/scenario";
 import { advisoryKestrelP2p } from "./advisory-kestrel-p2p";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
+import { forensicMarlowExpenses } from "./forensic-marlow-expenses";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
 import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
 import { demoEntriesReview } from "./demo-entries-review";
@@ -26,6 +27,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${harborLaneBankRec.slug}@v${harborLaneBankRec.version}`]: harborLaneBankRec,
   [`${auditCalderBluestem.slug}@v${auditCalderBluestem.version}`]: auditCalderBluestem,
   [`${corporateApRidgeway.slug}@v${corporateApRidgeway.version}`]: corporateApRidgeway,
+  [`${forensicMarlowExpenses.slug}@v${forensicMarlowExpenses.version}`]: forensicMarlowExpenses,
   [`${ediscoveryLarchReview.slug}@v${ediscoveryLarchReview.version}`]: ediscoveryLarchReview,
   [`${litigationMorrowTidewater.slug}@v${litigationMorrowTidewater.version}`]: litigationMorrowTidewater,
   [`${piDiazDemand.slug}@v${piDiazDemand.version}`]: piDiazDemand,
