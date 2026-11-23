@@ -481,6 +481,212 @@ A perfect attempt shows 85 automatic points until a reviewer marks the two repli
 - The rapid rounds weight the harder kinds (accruals and deferrals; duplicates, over-limit and the near miss; short-pays and unapplied cash) at 1 point and the rest at ½. A uniform ⅔ point would not add up to exactly 10.
 - Sections close their screens, so the inbox shows the held invoice's match record in the vendor-reply prompt and the four queue invoices in the run-total email. The run total still depends on the candidate's own match decisions.
 
+## Example 7: Tax intern, Schedule C at Hollis Tax & Accounting (52 min, 100 points)
+
+**Status: draft: needs accountant review.** Built as `tax-hollis-schedule-c` v1 in `src/lib/engine/scenarios/tax-hollis-schedule-c.ts`, tests in `tests/engine/tax-hollis-schedule-c.test.ts` and `e2e/simulations/tax-hollis-schedule-c.spec.ts`. Six timed sections (`06-assessment-engine.md`, "Timed sections and rapid rounds"): three rapid rounds (30 points) between the organize, inbox and Schedule C work (70 points).
+
+**Setup:** "You're a tax intern at Hollis Tax & Accounting in the middle of busy season. Your manager is Elena Vasquez. Today you're on one client's return: a graphic designer who works for themselves and files Schedule C."
+
+Seeded per candidate: the client's name, every payer, employer, bank, fund and lender name, every amount, mileage, square footage and date, which document sits on which organize screen and in which position, which payer's 1099-NEC is missing, and every rapid item (its amounts and names, and which item comes when). Elena's name and the firm are fixed.
+
+### Tax year and rules (for the accountant reviewer to confirm)
+
+The tax year is fixed in the scenario config: **2025** (`TAX_YEAR`, with the rates below in `RATES`). Every rule and rate the key uses:
+
+| Rule | Value used | Where |
+| --- | --- | --- |
+| Standard mileage rate, business use, 2025 | 70 cents a mile | Rapid C, Schedule C line 9 |
+| Standard mileage rate replaces actual car costs | Gas, repairs and car insurance are not added; business parking and tolls are | Rapid C, Schedule C (gas left off) |
+| Simplified home office method | $5 a square foot, up to 300 square feet ($1,500 cap) | Rapid C, inbox (b), Schedule C line 30 |
+| Net earnings from self-employment | 92.35% of Schedule C net profit (Schedule SE line 4a) | Rapid C |
+| Self-employment tax | 12.4% social security + 2.9% Medicare = 15.3% of net earnings; every amount stays under the 2025 social security wage base ($176,100) | Rapid C |
+| Deduction for half of SE tax | 50% of SE tax (Schedule 1) | Rapid C |
+| Business meals | 50% deductible (client meals, meals on business travel) | Rapid B, Rapid C, Schedule C line 24b |
+| Entertainment | Not deductible (tickets to a game with a client) | Rapid B |
+| Club dues | Not deductible (country club, even when clients are met there) | Rapid B |
+| Fines and penalties | Not deductible (parking ticket, IRS late-filing penalty) | Rapid B, Schedule C |
+| Personal and family costs | Not deductible (groceries, family streaming, a family trip where work email was checked) | Rapid B, organize, inbox (a), Schedule C |
+| Federal income tax | Not deductible on Schedule C | Rapid B |
+| De minimis safe harbor | Hollis elects it for every client: equipment of $2,500 or less per item is expensed in full; over $2,500 is capitalized | Rapid B, organize, Schedule C |
+| Section 179 | Elected on the laptop: its full cost goes on Schedule C line 13 | Schedule C |
+| Self-employed health insurance | Not a Schedule C expense (it belongs on Schedule 1) | Schedule C |
+| 1099-NEC threshold | Business payers issue a 1099-NEC for $600 or more of services in 2025; the income is reportable with or without one | Organize, inbox (c), Schedule C |
+| Prior-year safe harbor for estimates | 110% of last year's tax when last year's AGI was over $150,000, in four equal payments | Rapid C |
+| Points on a home purchase | Form 1098 box 6 points go on Schedule A line 8a with box 1 interest | Rapid A |
+| Form-to-line map (2025 forms) | W-2 box 1 → 1040 line 1a; W-2 box 2 → 1040 line 25a; 1099-NEC box 1 → Schedule C line 1; 1099-INT boxes 1 and 3 → 1040 line 2b; 1099-INT box 8 → 1040 line 2a; 1099-DIV box 1a → 1040 line 3b; 1099-DIV box 1b → 1040 line 3a; 1099-DIV box 2a → Schedule D line 13; Form 1098 box 1 → Schedule A line 8a | Rapid A |
+
+**Rounding and tolerance.** Like the IRS forms, every number answer is in whole dollars: cents are added first and only the result is rounded, 50 cents and up to the next dollar. Rapid number items and Elena's net profit question accept the key ±$1 (so truncating instead of rounding still counts). On the Schedule C sheet line 1, line 30 and each expense line accept ±$1; the three totals (lines 28, 29 and 31) accept ±$3, so a candidate who rounds once at the end rather than line by line isn't penalised. A miss by more than that earns 0 for the cell.
+
+### Sections
+
+Sections run back to back; a finished section can't be reopened. The overall timer never pauses. Total 52 minutes (`timeLimitMinutes` 52; `validateSections` passes).
+
+| # | Section | Minutes | Steps | Points |
+| --- | --- | --- | --- | --- |
+| 1 | Rapid round A: form to field | 6 | `rapid-forms` (15 × 20 s) | 10 |
+| 2 | Organize the documents, one screen at a time | 12 | `sort-1`, `sort-2`, `sort-3`, `deposits` (3 min each) | 25 |
+| 3 | Rapid round B: deductible? | 6 | `rapid-deduct` (15 × 20 s) | 10 |
+| 4 | Inbox, one screen at a time | 10 | `vacation-reply` (3 min), `net-profit` (3 min), `late-reply` (4 min) | 15 |
+| 5 | Rapid round C: quick calcs | 6 | `rapid-calcs` (15 × 20 s) | 10 |
+| 6 | Schedule C | 12 | `schedule-c`, `elena-summary` | 30 |
+
+The inbox screens are 3, 3 and 4 minutes so they fill the 10-minute section (the last reply has the most to say).
+
+### Messages
+
+| Arrives | From | Delivers |
+| --- | --- | --- |
+| Section 1 + 0 | Elena: warm-up while she pulls the file | Rapid A |
+| Section 2 + 0 | Elena: the client's folder is in; sort three batches of three, then check deposits against the 1099s; Hollis elects the $2,500 de minimis safe harbor | Organize |
+| Section 3 + 0 | Elena: quick deductibility checks | Rapid B |
+| Section 4 + 0 | Client: "Can I deduct our family trip? I checked work email every day." | Vacation reply |
+| Section 4 + 0 | Elena: her draft numbers (gross receipts before the late 1099, total expenses, home office square feet). "Net Schedule C profit? Number only." | Net profit |
+| Section 4 + 0 | Client: found a 1099-NEC they'd forgotten (the payer missing from the deposits screen), with its amount. "Does it change anything?" | Late 1099 reply |
+| Section 5 + 0 | Elena: quick calcs | Rapid C |
+| Section 6 + 0 | Elena: build the Schedule C input sheet from the organizer, with everything we know as of today; standard mileage, simplified home office, Section 179 on the laptop | Schedule C |
+| Section 6 + 1 | Elena: "Send me a short note: net profit, open items, documents we still need." | Note to Elena |
+
+All inbox messages arrive when the inbox opens (a screen can be moved on early and shouldn't open before its brief). Elena's net profit question says it is on her draft numbers, so the key for (b) is before the late 1099; the late 1099 changes the Schedule C sheet in section 6.
+
+### Rapid rounds (30 points)
+
+Each round is 15 items × 20 seconds, one field per item. Items 3, 6, 9, 12 and 15 hold the harder kinds and are worth 1 point; the other ten are worth ½, so each round is exactly 10. The order within each tier is shuffled per seed. The step type adds a 0-point response-time line.
+
+**A · Form to field** (`rapid-forms`). A tax form laid out by box (W-2, 1099-NEC, 1099-INT, 1099-DIV or 1098, 2025) with seeded payer, recipient and amounts.
+
+| Tier | Item | Expected |
+| --- | --- | --- |
+| ½ point (pick the line; 10 kinds, one each) | W-2 box 1; W-2 box 2; 1099-NEC box 1; 1099-INT box 1; 1099-INT box 3; 1099-INT box 8; 1099-DIV box 1a; 1099-DIV box 1b; 1099-DIV box 2a; 1098 box 1 | The line in the form-to-line map above, from one list of nine lines (the same list on every item) |
+| 1 point (type the amount, whole dollars, ±$1) | W-2 with a 401(k) deferral: line 1a | Box 1 (not box 3) |
+| | 1099-INT: taxable interest for line 2b | Box 1 + box 3 (box 8 is tax-exempt) |
+| | 1099-DIV: line 3b | Box 1a (1b is part of it) |
+| | Two 1099-NECs to the same person: Schedule C line 1 | The two box 1 amounts added |
+| | Form 1098: Schedule A line 8a | Box 1 + box 6 points |
+
+**B · Deductible?** (`rapid-deduct`). One expense from the client's 2025 records with a seeded amount. One field: Fully deductible / 50% deductible / Not deductible / Capitalize and depreciate (or Section 179). The round's intro states Hollis's de minimis policy. The rule table (each rule has its own test):
+
+| Tier | Rule id | Expense | Expected |
+| --- | --- | --- | --- |
+| ½ | `software` | Annual design software subscription | Fully deductible |
+| ½ | `insurance` | Business liability insurance for the year | Fully deductible |
+| ½ | `stock` | Stock photo license for a client's brochure | Fully deductible |
+| ½ | `ads` | Promoted posts to find new clients | Fully deductible |
+| ½ | `supplies` | Printer ink and paper for client proofs | Fully deductible |
+| ½ | `hosting` | Hosting and domain for the portfolio website | Fully deductible |
+| ½ | `client-meal` | Lunch with a client about a project | 50% deductible |
+| ½ | `travel-meal` | Dinner on an overnight trip for a client shoot | 50% deductible |
+| ½ | `parking-ticket` | Parking ticket outside a client's office | Not deductible |
+| ½ | `groceries` | Groceries for the family | Not deductible |
+| ½ | `income-tax` | Federal estimated income tax payment | Not deductible |
+| ½ | `streaming` | Family streaming subscription | Not deductible |
+| 1 | `laptop` | A laptop for design work, $2,600 to $3,900, one item | Capitalize and depreciate (or Section 179) |
+| 1 | `monitor` | A monitor for design work, $300 to $2,400, one item | Fully deductible (de minimis safe harbor) |
+| 1 | `tickets` | Tickets to take a client to a basketball game | Not deductible (entertainment) |
+| 1 | `club` | Country club dues; clients are met there | Not deductible |
+| 1 | `penalty` | IRS penalty for filing last year's return late | Not deductible |
+
+Ten of the twelve ½-point rules and all five 1-point rules appear per candidate.
+
+**C · Quick calcs** (`rapid-calcs`). One number field, whole dollars, ±$1. The intro gives the 2025 rates (70 cents a mile; $5 a square foot up to 300 square feet; SE tax is 15.3% of 92.35% of net profit) and the rounding rule.
+
+| Tier | Kind (two each at ½, one each at 1) | Expected |
+| --- | --- | --- |
+| ½ | Home office, 90 to 300 sq ft | sq ft × $5 |
+| ½ | Business miles | miles × $0.70, rounded |
+| ½ | Net earnings from self-employment | net profit × 92.35%, rounded |
+| ½ | Client meals | half, rounded |
+| ½ | Tax due spread over four estimates | tax ÷ 4, rounded |
+| 1 | Home office over 300 sq ft | $1,500 (the cap) |
+| 1 | Self-employment tax | base = profit × 92.35%, rounded; then round(base × 12.4%) + round(base × 2.9%), as Schedule SE lines 10 and 11 |
+| 1 | Half of SE tax | SE tax ÷ 2, rounded |
+| 1 | Prior-year safe harbor, last year's AGI over $150,000 | last year's tax × 110% ÷ 4, rounded |
+| 1 | Miles plus business parking and tolls | miles × $0.70 + parking + tolls, rounded once |
+
+### Part 1 · Organize the documents (25 points)
+
+Three `document_review` screens (`sort-1` … `sort-3`), each a table of three documents from the client's folder (document, from, date, details, amount). The candidate flags every document and picks what it is: **Income**, **Deductible business expense**, **Business asset (capitalize)**, **Personal: not deductible**, or **Need more info from the client**. Each document is a 2-point finding: the right category earns 2, a flag with another category 1 (the step type's half credit for the right item), no flag 0. Nine documents per candidate, shuffled across the three screens:
+
+| Category | Documents (per candidate) |
+| --- | --- |
+| Income | The two 1099-NECs in the folder (payers A and B) |
+| Deductible business expense | 3 of: design software annual plan; business liability insurance; portfolio hosting and domain; stock photo license for a client job; lunch with a client (50% deductible, still a business expense) |
+| Business asset | A laptop for design work over $2,500 (one item) |
+| Personal | 2 of: family groceries; kids' summer camp; family streaming plan; gym membership |
+| Need more info | 1 of: a Venmo payment to a first name with a vague memo (a contractor? W-9 and 1099-NEC); a phone bill used for business and personal calls (business share?); an online order with no item details |
+
+The fourth screen (`deposits`, `document_review`, 7) shows the two 1099-NECs in the folder and the client's 2025 business deposits by payer: payer A and payer B (each agreeing to its 1099), payer C (no 1099-NEC in the folder: **the missing one**, $1,800 to $7,500), and a row of small clients each under $600 for the year. Flag payer C's row with **1099-NEC expected but not in the folder** (4; half for another reason). Flagging any other row or field is a false flag (−1). Decision (3): **Ask the client for the missing 1099-NEC, and report the income either way**. Wrong: leave it off until the form arrives; leave it off because the IRS won't know.
+
+### Part 2 · Inbox (15 points)
+
+- **(a) Family vacation** (`inbox_reply`, 5): says no, clearly (2); plain-language why: the trip's main purpose was a family vacation, and checking email or one call doesn't make it a business trip (2); friendly and short, no jargon (1).
+- **(b) Net profit** (`numeric`, 4, whole dollars, ±$1): Elena's draft gross receipts − her draft total expenses − home office square feet × $5. Her draft gross receipts are the organizer's income before the late 1099 (payers A and B plus small clients); her total expenses equal Schedule C line 28. No partial credit.
+- **(c) Late 1099** (`inbox_reply`, 6): thanks the client, says it will be added and that it matches the payer C deposits (1); what changes: gross receipts and net profit go up by the 1099 amount, and so do self-employment tax and income tax (3); calm and plain, says the return will be updated before filing or offers to check estimated payments (2).
+
+### Part 3 · Schedule C input sheet (30 points)
+
+`spreadsheet` (20). The top is the client's organizer (prepared by the client); the bottom is a Schedule C input screen laid out like tax software (line number, line name, amount; whole dollars), not a copy of any vendor's screen.
+
+| Organizer item | Goes to | Treatment |
+| --- | --- | --- |
+| 1099-NEC payer A, 1099-NEC payer B, payments from small clients (no 1099s) | Line 1 | added |
+| The late 1099-NEC (payer C), only in the client's email | Line 1 | **added** |
+| Promoted posts; print ad in the local business directory | Line 8 Advertising | added, rounded once |
+| Business miles (log kept) | Line 9 Car and truck | miles × $0.70 |
+| Gas for the car | Left off | the standard mileage rate covers it |
+| Laptop for design work | Line 13 Depreciation and section 179 | full cost (Section 179) |
+| Business liability insurance | Line 15 Insurance | |
+| Health insurance premiums (self only) | Left off | Schedule 1, not Schedule C |
+| Last year's tax prep fee for the Schedule C | Line 17 Legal and professional | |
+| Printer ink and paper; sketchbooks, markers and mounting board | Line 22 Supplies | added, rounded once |
+| Client meals (full amount) | Line 24b Deductible meals | 50% |
+| Design software subscriptions; professional association dues | Line 27a Other expenses | added, rounded once |
+| Parking ticket outside a client's office | Left off | a fine |
+| Family trip (the one from inbox (a)) | Left off | personal |
+| Home office, seeded sq ft (90 to 300) | Line 30 | sq ft × $5 |
+
+Lines 28 (total expenses = the eight expense lines), 29 (line 1 − line 28) and 31 (line 29 − line 30) complete the sheet. Points: line 1 3; lines 8, 9, 13, 15, 17, 22, 24b and 27a 1.5 each (12); line 28 1; line 29 1; line 30 1; line 31 2 (20 in all).
+
+`inbox_reply` to Elena (10): net profit including the late 1099 (3); what was left off and why: the family trip, gas, the parking ticket, the health insurance (to Schedule 1) (3); documents still needed: the "need more info" item from the organize screens (2); short and organized (2).
+
+### Scoring (100 points)
+
+| Area | What earns points | Points |
+| --- | --- | --- |
+| Rapid A: form to field | 10 items × ½ + 5 × 1 | 10 |
+| Organize | 9 documents × 2 | 18 |
+| Deposits vs 1099s | Missing 1099-NEC flagged 4 (−1 per false flag), decision 3 | 7 |
+| Rapid B: deductible? | 10 × ½ + 5 × 1 | 10 |
+| Vacation reply | Rubric (reviewer) | 5 |
+| Net profit | Elena's draft numbers, ±$1 | 4 |
+| Late 1099 reply | Rubric (reviewer) | 6 |
+| Rapid C: quick calcs | 10 × ½ + 5 × 1 | 10 |
+| Schedule C sheet | Line 1 3, eight expense lines 1.5 each, lines 28/29/30 1 each, line 31 2 | 20 |
+| Note to Elena | Rubric (reviewer) | 10 |
+| **Total** | | **100** |
+
+A perfect attempt shows 79 automatic points until a reviewer marks the three replies. Each trap answered wrongly costs exactly (tested):
+
+- A Schedule C sheet that ignores the late 1099: line 1, line 29 and line 31 are each short by the 1099 amount: **−6** (3 + 1 + 2). Line 28 is unaffected.
+- Gas added to line 9, the meals at 100%, the health insurance on line 15, the parking ticket or the family trip on line 27a: that line (1.5), line 28 (1), line 29 (1) and line 31 (2): **−5.5** each.
+- Missing 1099-NEC not flagged: −4; flagged with another reason: −2; the small-clients row flagged as well: −1; leaving the income off until the form arrives: −3.
+- An organize document flagged with the wrong category: −1; not flagged: −2.
+- Elena's net profit with the home office left out or the late 1099 added: −4.
+- A rapid item wrong or timed out: its ½ or 1.
+
+### Judgment calls for the accountant review
+
+- Every rule and rate in the table above, for tax year 2025, and the whole-dollar rounding with ±$1 (±$3 on the Schedule C totals).
+- Organize uses `document_review`, so a document flagged with the wrong category still earns half (the step type's rule for the right item with another reason). No flag earns 0.
+- The client lunch is sorted as a deductible business expense (the 50% limit is applied on the Schedule C sheet and in Rapid B), not as a category of its own.
+- The deposits screen expects the income reported whether or not the 1099-NEC arrives; the small-clients row (each under $600) is the false-flag trap.
+- Elena's (b) question is on her draft numbers, before the late 1099, and her draft total expenses equal Schedule C line 28; the Schedule C sheet then adds the late 1099. A candidate who adds the late 1099 to (b) loses (b)'s 4 points.
+- Section 179 on the laptop (not regular or bonus depreciation); the laptop is over the $2,500 de minimis limit, the Rapid B monitor under it.
+- The family trip, gas under the standard mileage rate, the parking ticket and self-employed health insurance are left off Schedule C; the health insurance belongs on Schedule 1.
+- Rapid A puts 1098 box 6 points on a home purchase on line 8a with the interest, and treats 1099-INT box 3 as taxable on the federal return.
+- Rapid C's safe-harbor item expects 110% of last year's tax (AGI over $150,000) without stating the percentage; the other rates are given in the intro.
+- Message senders are fixed (`from` lines aren't templated): Elena by name, the client as "Client portal message"; the client's seeded name is inside each message.
+- Time: 52 minutes, not 50, to keep 6-minute rapid rounds and the 12/10/12 work sections.
+
 ## Step types needed
 
 `inbox_reply`, `spreadsheet`, `journal_entry`, `document_review`. These four cover all three examples and most future accounting scenarios.
