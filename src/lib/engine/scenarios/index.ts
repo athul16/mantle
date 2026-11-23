@@ -14,6 +14,7 @@ import { immigrationH1bPacket } from "./immigration-h1b-packet";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 import { piDiazDemand } from "./pi-diaz-demand";
 import { realestateAlderClosing } from "./realestate-alder-closing";
+import { taxHollisScheduleC } from "./tax-hollis-schedule-c";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -30,6 +31,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
+  [`${taxHollisScheduleC.slug}@v${taxHollisScheduleC.version}`]: taxHollisScheduleC,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
