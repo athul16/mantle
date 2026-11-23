@@ -547,7 +547,7 @@ Planted, one per screen, shuffled across the screens and rows:
 
 Each suspicious vendor shows exactly one indicator. The eight clean vendors have a street address that matches no employee, an EIN, and at least two weeks between set-up and first payment. Each screen: the right flag and reason 5 (half for the right vendor with another reason); each clean vendor flagged costs 1 (the false-flag penalty, capped at the screen's earned points).
 
-Then `vendor-list` (`multiple_choice`, multi-select, 5, 2 minutes): "Which vendors go on the follow-up list?" with all 12 vendor names in screen order. Each right pick earns 1.25; each wrong pick costs 0.625 (5 ÷ 8 clean vendors); floored at 0.
+Then `vendor-list` (`multiple_choice`, multi-select, 5, 2 minutes): "Which vendors go on the follow-up list?" with all 12 vendor names in screen order. Each right pick earns 1.25; each wrong pick costs 5 ÷ 8 = 0.625 (clean vendors); the step score is floored at 0 and rounded to the cent, so one wrong pick on an otherwise perfect list shows as 0.62.
 
 ### Rapid round B: duplicate hunt (10 points)
 
@@ -584,7 +584,7 @@ Invoice number formats vary across all rows, so a format alone gives nothing awa
 | --- | --- | --- |
 | Rapid A: red flag or normal | Call and reason, half the item each; 10 × ½ + 5 × 1 | 10 |
 | Vendor review | Per screen: flag and sign 5 (half for another sign), −1 per clean vendor flagged; × 4 | 20 |
-| Follow-up list | Multi-select: +1.25 per right vendor, −0.625 per wrong one | 5 |
+| Follow-up list | Multi-select: +1.25 per right vendor, −0.625 per wrong one (rounded to the cent) | 5 |
 | Rapid B: duplicate hunt | The second payment's row; 10 × ½ + 5 × 1 | 10 |
 | Reply to the suspect | Rubric (reviewer) | 5 |
 | Flagged total | Sum of the flagged vendor's payments | 5 |
@@ -594,7 +594,7 @@ Invoice number formats vary across all rows, so a format alone gives nothing awa
 | Findings memo | Rubric (reviewer) | 15 |
 | **Total** | | **100** |
 
-A perfect attempt shows 75 automatic points until a reviewer marks the three replies. Each trap answered wrongly costs exactly its own points (tested): missing a shell vendor costs that screen's 5, the right vendor with the wrong sign 2.5, flagging a clean vendor 1; a wrong flagged total 5; each missing vendor on the follow-up list 1.25 and each clean one added 0.625.
+A perfect attempt shows 75 automatic points until a reviewer marks the three replies. Each trap answered wrongly costs exactly its own points (tested): missing a shell vendor costs that screen's 5, the right vendor with the wrong sign 2.5, flagging a clean vendor 1; a wrong flagged total 5; each missing vendor on the follow-up list 1.25 and each clean one added 0.62 (0.625 rounded to the cent).
 
 ### Accepted for v1 (forced by the current step types)
 

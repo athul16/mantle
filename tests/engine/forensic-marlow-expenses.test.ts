@@ -674,14 +674,14 @@ describe("forensic-marlow-expenses: scoring", () => {
       }
     });
 
-    it("follow-up list: each flagged vendor left off costs 1.25, each clean vendor added 0.625", () => {
+    it("follow-up list: each flagged vendor left off costs 1.25, each clean vendor added 0.625 (0.62 after rounding to the cent)", () => {
       for (const seed of seeds) {
         const list = screen(seed).step("vendor-list").config as Choice;
         const perfect = perfectAnswers(seed)["vendor-list"].selected;
         const clean = list.options.filter((o) => !perfect.includes(o.id));
         expect(clean.length).toBe(8);
         expect(lost(seed, (a) => void a["vendor-list"].selected.pop())).toBe(1.25);
-        expect(lost(seed, (a) => void a["vendor-list"].selected.push(clean[0].id))).toBe(0.625);
+        expect(lost(seed, (a) => void a["vendor-list"].selected.push(clean[0].id))).toBeCloseTo(0.62, 6);
         expect(lost(seed, (a) => void (a["vendor-list"].selected = list.options.map((o) => o.id)))).toBe(5);
       }
     });
