@@ -566,7 +566,7 @@ Invoice number formats vary across all rows, so a format alone gives nothing awa
 
 ### Rapid round C: quick analytics (10 points)
 
-12 items × 25 s: four of each kind, the four "total" items (1 point each) in slots 3, 6, 9, 12 and the other eight (0.75 each) shuffled.
+12 items × 25 s in a fixed rotation (month, split, total), four of each: the four "total" items (1 point each) in slots 3, 6, 9, 12, the other eight 0.75 each. The rotation is fixed because each kind has its own fields; every item's content is seeded.
 
 - **Which month breaks the pattern:** six months (July to December 2025) of one expense category; five within ±8% of a baseline, one 1.9× to 2.8× it. Pick the month.
 - **Split payments:** seven payments to four vendors; one vendor has two payments within two days, each under the limit, adding up to more than it. Decoys: two payments from one vendor three weeks or more apart, and two same-day payments that stay under the limit together. Pick the vendor.
