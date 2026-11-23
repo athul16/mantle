@@ -47,7 +47,7 @@ type RapidKey = { items: Record<string, Record<string, { choice?: string; value?
 
 /** "$1,234.56" → 123456 (cents). */
 const cents = (s: string) => {
-  const m = s.match(/-?\$?[\d,]+(?:\.\d\d)?/);
+  const m = s.match(/-?\$?\d[\d,]*(?:\.\d\d)?/);
   expect(m, `an amount in "${s}"`).not.toBeNull();
   const t = m![0].replace(/[$,]/g, "");
   return Math.round(Number(t) * 100);
