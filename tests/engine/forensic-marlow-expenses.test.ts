@@ -353,7 +353,7 @@ function rapidAnswers(seed: string) {
 const REASON_FOR: Record<Indicator, string> = { po_box: "po_box", no_tax_id: "no_tax_id", employee_address: "employee_address", same_day: "same_day" };
 
 /** A strong candidate's answers, built only from the screen. */
-function perfectAnswers(seed: string) {
+function buildPerfect(seed: string) {
   const { suspicious, flagged } = readVendors(seed);
   const vendorAnswers = Object.fromEntries(
     VENDOR_STEPS.map((stepId) => [
@@ -385,6 +385,13 @@ function perfectAnswers(seed: string) {
     "findings-sheet": { cells },
     "findings-memo": { body: `Sam, ${flagged.name} received ${money(flaggedTotal)}. Next steps: preserve records, interviews, bank records.` },
   };
+}
+
+const perfectCache = new Map<string, ReturnType<typeof buildPerfect>>();
+/** Cached per seed (solving every rapid item is slow); each call gets its own copy. */
+function perfectAnswers(seed: string): ReturnType<typeof buildPerfect> {
+  if (!perfectCache.has(seed)) perfectCache.set(seed, buildPerfect(seed));
+  return structuredClone(perfectCache.get(seed)!);
 }
 
 type Answers = ReturnType<typeof perfectAnswers>;
