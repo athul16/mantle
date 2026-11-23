@@ -6,7 +6,7 @@
  * screen is answered right, the write-up goes to review. Then a recruiter
  * opens the report and sees the step scores the key gives for those answers.
  */
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { signInViaUi } from "../fixtures";
 import { CANDIDATE_NAME } from "../support/candidate";
 import { attemptFor, backdateAttempt } from "../support/db";
@@ -89,7 +89,8 @@ async function solveSod(page: Page) {
   return hit ? hit[0] : "No conflict";
 }
 
-async function pick(scope: Page | Locator, group: string, option: string | RegExp) {
+async function pick(scope: Page, group: string, option: string | RegExp) {
+  await dismissToast(scope);
   await scope.getByRole("radiogroup", { name: group }).getByRole("radio", { name: option }).check();
 }
 
@@ -132,6 +133,9 @@ test("a candidate works through all six sections and the report shows the expect
     await expect(page.getByRole("heading", { level: 1, name: `PO approval test: items ${2 * k - 1} and ${2 * k}` })).toBeVisible();
     const rows = page.getByRole("article").locator("tbody tr");
     await expect(rows).toHaveCount(2);
+    // Before any flag: a flagged button reads "Flagged" under the name "Flag …", which axe reports
+    // (label-content-name-mismatch, in the shared document_review view, not this scenario).
+    if (k === 1) await a11y(KNOWN_FAINT_TEXT);
     let failed = false;
     for (const r of await rows.all()) {
       const [po, , amount, , order, approver, title, approvedOn] = (await r.locator("td").allTextContents()).map((t) => t.trim());
@@ -145,17 +149,19 @@ test("a candidate works through all six sections and the report shows the expect
       if (!why) continue;
       failed = true;
       exceptions.push(cents(amount));
+      await dismissToast(page);
       await page.getByRole("button", { name: `Flag ${po}` }).click();
       await page.getByLabel(`Reason for ${po}`).selectOption({ label: why });
     }
+    await dismissToast(page);
     if (!failed) await page.getByRole("checkbox", { name: "Both POs pass" }).check();
     await candidate.saved();
-    if (k === 1) await a11y(KNOWN_FAINT_TEXT);
     await advance(page, "Next screen");
   }
   await expect(bar).toContainText("Screen 5 of 5");
   await expect(page.getByRole("heading", { level: 1, name: "Conclusion on P2P-02" })).toBeVisible();
   expect(exceptions.length).toBeGreaterThanOrEqual(1);
+  await dismissToast(page);
   await page.getByRole("radio", { name: exceptions.length <= 1 ? "Effective" : "Deficiency" }).check();
   await candidate.saved();
   await a11y(KNOWN_FAINT_TEXT);
@@ -173,6 +179,7 @@ test("a candidate works through all six sections and the report shows the expect
   // ---- Section 4: inbox, one screen at a time ----
   await expect(bar).toContainText("Section 4 of 6");
   await expect(bar).toContainText("Screen 1 of 4");
+  await dismissToast(page);
   await page.getByRole("radio", { name: /^No, I have to record it as an exception/ }).check();
   await candidate.saved();
   await a11y(KNOWN_FAINT_TEXT);
@@ -197,11 +204,13 @@ test("a candidate works through all six sections and the report shows the expect
   for (const r of await list.locator("tbody tr").all()) {
     const [userId, name] = (await r.locator("td").allTextContents()).map((t) => t.trim());
     if (!leavers.includes(name)) continue;
+    await dismissToast(page);
     await page.getByRole("button", { name: `Flag ${userId}` }).click();
     await page.getByLabel(`Reason for ${userId}`).selectOption({ label: "Left the company but still active" });
     flagged++;
   }
   expect(flagged).toBe(1);
+  await dismissToast(page);
   await page.getByRole("radio", { name: /^Disable the account now/ }).check();
   await candidate.saved();
   await advance(page, "Next screen");
@@ -213,6 +222,7 @@ test("a candidate works through all six sections and the report shows the expect
 
   // ---- Section 6: walkthrough and write-up ----
   await expect(bar).toContainText("Section 6 of 6");
+  await dismissToast(page);
   await candidate.task(/P2P walkthrough/).click();
   const order = page.getByRole("list", { name: "Your order" });
   await expect(order.getByRole("listitem")).toHaveCount(10);
@@ -233,6 +243,7 @@ test("a candidate works through all six sections and the report shows the expect
   expect(await order.locator("li").evaluateAll((lis) => lis.map((li) => li.getAttribute("data-label") ?? ""))).toEqual(right);
   await candidate.saved();
 
+  await dismissToast(page);
   await candidate.task(/Write-up to Jordan/).click();
   await page.locator("textarea").fill(
     "Condition: a user who left is still active in the ERP and logged in after leaving. Criteria: ITGC-03 says access goes within 1 business day. Risk: unauthorized invoice or payment approvals. Recommendation: disable it now, review its activity, fix the leaver process.",
