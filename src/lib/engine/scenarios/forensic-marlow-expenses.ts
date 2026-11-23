@@ -173,6 +173,15 @@ const initials = (name: string) =>
 
 const ein = (rng: Rng) => `${rng.int(10, 99)}-${rng.int(1_000_000, 9_999_999)}`;
 
+/**
+ * Nudges the first amount by a cent when the rows add up to whole dollars, so a derived total always
+ * carries cents. Every amount in `rows` already has cents, and keeps them.
+ */
+function keepCents(rows: { amount: number }[]) {
+  if (!rows.length || rows.reduce((t, r) => t + r.amount, 0) % 100 !== 0) return;
+  rows[0].amount += rows[0].amount % 100 === 99 ? -1 : 1;
+}
+
 // ---- Rapid rounds ----
 
 /** Every third item (3, 6, 9, …) holds the harder kinds. */
@@ -556,6 +565,7 @@ function buildAnalytics(rng: Rng, v: Values, limit: number): RapidKeyItems {
       const mine = rng.int(2, 3);
       const owners = [...Array(mine).fill(target), ...Array.from({ length: 6 - mine }, (_, j) => others[j % 2])];
       const rows = owners.map((vendor) => ({ day: Q1 + rng.int(2, 87), vendor, amount: oddCents(rng, 12_000, 480_000) }));
+      keepCents(rows.filter((r) => r.vendor === target));
       setRows(n, rows);
       v[`rc_${n}_vendor`] = target;
       const total = rows.filter((r) => r.vendor === target).reduce((t, r) => t + r.amount, 0);
@@ -974,6 +984,15 @@ export const forensicMarlowExpenses = defineScenario({
         payments.push({ day: dayFor(kind), vendor: o.name, inv: `${prefix}-${no}`, amount: amountFor(kind) });
       });
     });
+    // Every vendor total and the grand total carry cents, so no derived total reads like a whole number elsewhere on the page.
+    for (const x of [shell, ...others]) keepCents(payments.filter((p) => p.vendor === x.name && p.amount % 100 !== 0));
+    if (payments.reduce((t, p) => t + p.amount, 0) % 100 === 0) {
+      // A cent on one payment whose vendor total and own cents both stay off whole dollars.
+      const totalOf = (name: string) => payments.filter((p) => p.vendor === name).reduce((t, p) => t + p.amount, 0);
+      const fix = payments.find((p) => p.amount % 100 !== 0 && p.amount % 100 !== 99 && (totalOf(p.vendor) + 1) % 100 !== 0);
+      if (!fix) throw new Error("forensic-marlow-expenses: can't keep cents on the totals");
+      fix.amount += 1;
+    }
     payments.sort((a, b) => a.day - b.day);
     if (payments.length !== EXTRACT_ROWS) throw new Error("forensic-marlow-expenses: extract size");
 
