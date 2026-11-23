@@ -207,15 +207,23 @@ type RedFlagCase =
   | "near_street";
 const RED_EASY: RedFlagCase[] = ["under_limit", "under_limit", "weekend", "weekend", "sequential", "sequential", "normal_expense", "normal_expense", "normal_vendor", "normal_vendor"];
 
-const EXPENSES: [string, string][] = [
-  ["Printer toner and paper", "Office supplies"],
-  ["Volunteer appreciation lunch", "Meals"],
-  ["Laptop for program staff", "Equipment"],
-  ["Van fuel and tolls", "Vehicle"],
-  ["Tent and table rental for the spring fundraiser", "Events"],
-  ["Quarterly HVAC service", "Repairs"],
-  ["Pantry restock", "Program supplies"],
-  ["Grant writing workshop registration", "Training"],
+/** [description, category, the payee's trade]. */
+const EXPENSES: [string, string, string][] = [
+  ["Printer toner and paper", "Office supplies", "Office Supply"],
+  ["Volunteer appreciation lunch", "Meals", "Catering"],
+  ["Laptop for program staff", "Equipment", "IT Services"],
+  ["Courier runs to the county office", "Postage and delivery", "Courier"],
+  ["Tent and table rental for the spring fundraiser", "Events", "Event Rentals"],
+  ["Quarterly building cleaning", "Repairs and maintenance", "Janitorial"],
+  ["Flyers for the spring food drive", "Printing", "Print & Copy"],
+  ["Leaking pipe in the pantry kitchen", "Repairs and maintenance", "Plumbing"],
+];
+/** Bigger tickets for the "just under the limit" lines. */
+const LARGE_EXPENSES: [string, string, string][] = [
+  ["Strategic plan consulting, phase 2", "Professional fees", "Consulting"],
+  ["Office network upgrade", "Equipment", "IT Services"],
+  ["Gala catering deposit", "Events", "Catering"],
+  ["Temporary staff for the holiday drive", "Contract labor", "Staffing"],
 ];
 
 const RAPID_ROWS = 6;
@@ -367,7 +375,8 @@ type Values = Record<string, string | number>;
 function buildRedFlag(rng: Rng, v: Values, ctx: { limit: number; approvers: string[]; town: string }): RapidKeyItems {
   const hard = rng.shuffle<RedFlagCase>(["employee_address", "employee_address", "shared_bank", "shared_bank", rng.pick(["near_lease", "near_street"] as const)]);
   const cases = fillSlots(15, rng.shuffle(RED_EASY), hard);
-  const names = rng.shuffle(STEMS).map((s) => `${s} ${rng.pick(TRADES)}`);
+  const stems = rng.shuffle(STEMS);
+  const names = stems.map((s) => `${s} ${rng.pick(TRADES)}`);
   const lasts = rng.shuffle(LAST);
   const people = rng.shuffle(FIRST).map((f, i) => `${f} ${lasts[i]}`);
   const { limit } = ctx;
@@ -384,7 +393,8 @@ function buildRedFlag(rng: Rng, v: Values, ctx: { limit: number; approvers: stri
       };
       const expense = ["under_limit", "weekend", "normal_expense", "near_lease"].includes(c);
       if (expense) {
-        const [desc, category] = c === "near_lease" ? ["Monthly office rent, per lease", "Rent"] : rng.pick(EXPENSES);
+        const [desc, category, trade] =
+          c === "near_lease" ? ["Monthly office rent, per lease", "Rent", "Properties"] : rng.pick(c === "under_limit" ? LARGE_EXPENSES : EXPENSES);
         const day = q1Day(rng, 4, 85, c === "weekend");
         const amount =
           c === "under_limit"
@@ -394,7 +404,7 @@ function buildRedFlag(rng: Rng, v: Values, ctx: { limit: number; approvers: stri
               : oddCents(rng, limit * 0.1, limit * 0.6);
         set("Expense line", [
           ["Date", dayText(day)],
-          ["Paid to", vendor],
+          ["Paid to", `${stems[i % stems.length]} ${trade}`],
           ["Description", desc],
           ["Category", category],
           ["Amount", formatCents(amount)],
