@@ -137,8 +137,10 @@ test("a candidate works through all six sections and the report shows the expect
     // (label-content-name-mismatch, in the shared document_review view, not this scenario).
     if (k === 1) await a11y(KNOWN_FAINT_TEXT);
     let failed = false;
-    for (const r of await rows.all()) {
-      const [po, , amount, , order, approver, title, approvedOn] = (await r.locator("td").allTextContents()).map((t) => t.trim());
+    // Read both rows before flagging: a flag opens a reason row inside the table, which shifts nth().
+    const cells: string[][] = [];
+    for (const r of await rows.all()) cells.push((await r.locator("td").allTextContents()).map((t) => t.trim()));
+    for (const [po, , amount, , order, approver, title, approvedOn] of cells) {
       const why = /^None/.test(approver)
         ? "No approval on record"
         : !/Director/.test(title)
@@ -201,8 +203,9 @@ test("a candidate works through all six sections and the report shows the expect
   const leavers = ((await list.locator("dd").allTextContents()).find((t) => /\(left /.test(t)) ?? "").split("; ").map((s) => s.replace(/ \(left .+\)$/, "").trim());
   expect(leavers.length).toBe(2);
   let flagged = 0;
-  for (const r of await list.locator("tbody tr").all()) {
-    const [userId, name] = (await r.locator("td").allTextContents()).map((t) => t.trim());
+  const users: string[][] = [];
+  for (const r of await list.locator("tbody tr").all()) users.push((await r.locator("td").allTextContents()).map((t) => t.trim()));
+  for (const [userId, name] of users) {
     if (!leavers.includes(name)) continue;
     await dismissToast(page);
     await page.getByRole("button", { name: `Flag ${userId}` }).click();
