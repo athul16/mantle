@@ -795,12 +795,14 @@ describe("forensic-marlow-expenses: shell-vendor indicators", () => {
 });
 
 describe("forensic-marlow-expenses: duplicate hunt", () => {
+  const solveDuplicates = (seed: string) => rapidItems(seed, "rapid-duplicate").map((item) => ({ item, ...solveDuplicate(item) }));
+
   it(
     "each duplicate differs from its twin only by the planned change: invoice-number format or one day",
     () => {
       const changes = new Map<string, number>();
       for (const seed of SEEDS) {
-        for (const s of solveRapid(seed, "rapid-duplicate")) {
+        for (const s of solveDuplicates(seed)) {
           changes.set(s.kind, (changes.get(s.kind) ?? 0) + 1);
           const rows = s.item.exhibit!.table!.rows;
           const [a, b] = s.pair.map((i) => rows[i]);
@@ -822,7 +824,7 @@ describe("forensic-marlow-expenses: duplicate hunt", () => {
   it("the five 1-point items carry the recurring-charge decoy; the ten ½-point items don't", () => {
     const points = rapidConfig("rapid-duplicate").items.map((i) => i.points);
     for (const seed of SEEDS.slice(0, 50)) {
-      solveRapid(seed, "rapid-duplicate").forEach((s, i) => expect(s.decoy, `${seed} item ${i}`).toBe(points[i] === 1));
+      solveDuplicates(seed).forEach((s, i) => expect(s.decoy, `${seed} item ${i}`).toBe(points[i] === 1));
     }
   });
 
