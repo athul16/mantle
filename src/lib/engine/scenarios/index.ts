@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ServerScenario } from "../server/scenario";
+import { advisoryKestrelP2p } from "./advisory-kestrel-p2p";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
 import { forensicMarlowExpenses } from "./forensic-marlow-expenses";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
@@ -15,6 +16,7 @@ import { immigrationH1bPacket } from "./immigration-h1b-packet";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 import { piDiazDemand } from "./pi-diaz-demand";
 import { realestateAlderClosing } from "./realestate-alder-closing";
+import { taxHollisScheduleC } from "./tax-hollis-schedule-c";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -32,6 +34,8 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
+  [`${taxHollisScheduleC.slug}@v${taxHollisScheduleC.version}`]: taxHollisScheduleC,
+  [`${advisoryKestrelP2p.slug}@v${advisoryKestrelP2p.version}`]: advisoryKestrelP2p,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
