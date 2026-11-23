@@ -495,7 +495,7 @@ describe("advisory-kestrel-p2p: every variant is internally consistent", () => {
     const { msg, step } = screen("abc");
     expect(msg("m1").body).toMatch(/0 or 1 exception, the control is effective\. 2 or more, it's a deficiency/);
     expect(msg("m1").body).toMatch(/on or before the order date/);
-    expect((step("conclusion").config as Choice).prompt).toMatch(/0 or 1 exception.*effective.*2 or more.*deficiency/s);
+    expect((step("conclusion").config as Choice).prompt).toMatch(/0 or 1 exception[\s\S]*effective[\s\S]*2 or more[\s\S]*deficiency/);
   });
 
   it(
