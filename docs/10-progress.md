@@ -145,7 +145,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
-| 2026-11-25 | `retail-wrenfield-trade` v1 (`docs/retail/retail-wrenfield-trade.md`, draft: practitioner review pending, not on the publish allowlist): assistant buyer at Wrenfield & Co., 50 min, 100 points, all automatic; retail maths, line actions and pricing rapid rounds, trade report (returns, mid-period launch, promo note, stock adjustment), PO confirmations vs. terms, critical path and compliance card, open-to-buy, critical path ordering, five values calls. Test-first |
+| 2026-11-25 | `retail-wrenfield-trade` v1 (`docs/retail/retail-wrenfield-trade.md`, draft: practitioner review pending, not on the publish allowlist): assistant buyer at Wrenfield & Co., 50 min, 100 points, all automatic; retail maths, line actions and pricing rapid rounds, trade report (returns, mid-period launch, promo note, stock adjustment), PO confirmations vs. supplier terms and the compliance card, open-to-buy, critical path, five values calls. Test-first |
 | 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
 | 2026-11-17 | PR #58: progress log for PRs #49–#57 and the immigration simulation in the paralegal doc and review pack. Docs only |
