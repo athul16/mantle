@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ServerScenario } from "../server/scenario";
+import { analystCorvidOpsReview } from "./analyst-corvid-ops-review";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
 import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
@@ -29,6 +30,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${piDiazDemand.slug}@v${piDiazDemand.version}`]: piDiazDemand,
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
+  [`${analystCorvidOpsReview.slug}@v${analystCorvidOpsReview.version}`]: analystCorvidOpsReview,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
 };
 
