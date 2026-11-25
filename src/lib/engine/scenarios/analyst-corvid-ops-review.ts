@@ -1179,15 +1179,18 @@ const DEFINITION = {
  * The candidate's screen must not show a computed answer in any form (12.34,
  * 1234 as cents, 1,234.00). A cost per unit or a payback can collide with a
  * figure elsewhere by chance (a rapid-round price, a $M figure on a slide),
- * so the generator draws again when it does.
+ * and the ordering view draws its drag handle at 5.5 and 10.5, so the
+ * generator draws again when a key would match any of them.
  */
 const STATIC_TEXT = JSON.stringify(DEFINITION);
+/** Numbers the step views themselves render on every screen (the ordering drag handle's SVG circles). */
+const VIEW_TEXT = 'cx="5.5" cx="10.5"';
 function leakForms(value: number): RegExp[] {
   const forms = [JSON.stringify(value), value.toFixed(2), String(Math.round(value * 100)), value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })];
   return [...new Set(forms)].filter((f) => !/^\d{1,3}$/.test(f)).map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
 }
 function leaks(values: Values, numbers: number[]): boolean {
-  const text = `${STATIC_TEXT}\n${Object.values(values).join("\n")}`;
+  const text = `${STATIC_TEXT}\n${VIEW_TEXT}\n${Object.values(values).join("\n")}`;
   return numbers.some((n) => n >= 1 && leakForms(n).some((re) => re.test(text)));
 }
 

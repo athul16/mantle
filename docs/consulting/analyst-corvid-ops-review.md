@@ -144,5 +144,5 @@ No statute applies. Definitions are the standard textbook ones: percent change, 
 6. **Mismatched shares accept two reasons** (shares, figure mismatch) because the mis-copied share is both.
 7. **Evidence round has three options**, not four: Supported / Not supported / Contradicted. "Not supported" for a two-point trend and for correlation-as-cause follows the evidence card in the intro.
 8. **Payback partial credit** (half within 0.3 months) covers using the rounded $M run-rate; confirm the width.
-9. **Leak guard.** The shared DOM leak test reads key numbers in several forms; a cost per unit or payback can collide with a figure elsewhere by chance, and the generator redraws the whole variant deterministically from the same seed when it would.
+9. **Leak guard.** The shared DOM leak test reads key numbers in several forms; a cost per unit or payback can collide with a figure elsewhere by chance, and the generator redraws the whole variant deterministically from the same seed when it would. The ordering view's drag-handle SVG renders 5.5 and 10.5 on every screen, so those count as shown text too.
 10. Message senders are role lines because message `from` fields aren't template-filled; bodies sign with the seeded names.
