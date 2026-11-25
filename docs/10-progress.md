@@ -148,6 +148,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-25 | `peopleops-fernhill-onboarding` v1 (branch `feat/sim-peopleops-fernhill-onboarding`, draft: practitioner review pending, `docs/hr/peopleops-fernhill-onboarding.md`): HR coordinator at Fernhill Outdoor Co., 50 min, 100 points: three rapid rounds (onboarding dates, policy calls, screening), onboarding file audit, pay changes, desk with offer check, hiring metrics and five values calls. Not on the publish allowlist |
 | 2026-11-22 | Draft gate for `pnpm scenarios:publish` (branch `feat/publish-draft-gate`): an allowlist in `src/lib/scenarios/publishable.ts` holds the ten versions already in the cloud; everything else prints `skipped (draft)`. `--include-drafts` publishes all, refused unless the Supabase URL is local; Vitest and Playwright setup pass it. Test-first in `tests/engine/publishable.test.ts` |
 | 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
