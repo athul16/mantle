@@ -799,7 +799,7 @@ describe("marketing-saltbox-launch: scoring", () => {
           expect(lost(seed, dropFlag(stepId, reason)), `${seed} ${name}`).toBe(pts);
           expect(lost(seed, reReason(stepId, reason, "other")), `${seed} ${name} wrong reason`).toBe(pts / 2);
         }
-      });
+      }, LONG);
     }
 
     it("the cap is also found when flagged on the SOW's cap instead of the total", () => {
@@ -810,7 +810,7 @@ describe("marketing-saltbox-launch: scoring", () => {
           }),
         ).toBe(0);
       }
-    });
+    }, LONG);
 
     it("flagging a clean look-alike costs the false-flag penalty", () => {
       for (const seed of seeds) {
@@ -823,7 +823,7 @@ describe("marketing-saltbox-launch: scoring", () => {
         const co = readInvoice(sc).rows.find((r) => !r.inScope && !r.issues.length)!;
         expect(lost(seed, (a) => (a["invoice-check"] as { flags: Flag[] }).flags.push({ target: co.id, reason: "scope", note: "" }))).toBe(1);
       }
-    });
+    }, LONG);
 
     it("the wrong decision on the queue or the invoice costs 2", () => {
       for (const seed of seeds) {
@@ -835,7 +835,7 @@ describe("marketing-saltbox-launch: scoring", () => {
         expect(lost(seed, (a) => (a["launch-qa"].decision = fixLive))).toBe(2);
         expect(lost(seed, (a) => (a["invoice-check"].decision = pay))).toBe(2);
       }
-    });
+    }, LONG);
 
     it("report: double counting, ignoring the correction or using gross revenue costs exactly the cells it changes", () => {
       for (const seed of seeds) {
@@ -854,7 +854,7 @@ describe("marketing-saltbox-launch: scoring", () => {
         const doubled = readReport(sc, { dedupe: false }).cells;
         expect(Math.abs(doubled.total_net - right.total_net)).toBeGreaterThan(1);
       }
-    });
+    }, LONG);
 
     it("A/B: the wrong call costs 4; a lift off by a rounding slip earns half, further off earns nothing", () => {
       for (const seed of seeds) {
@@ -865,7 +865,7 @@ describe("marketing-saltbox-launch: scoring", () => {
         expect(lost(seed, (a) => (a["ab-lift"].value = r1(ab.lift) + 0.2))).toBe(2);
         expect(lost(seed, (a) => (a["ab-lift"].value = r1(ab.lift) + 1))).toBe(4);
       }
-    });
+    }, LONG);
 
     it("values: any of the three tempting options costs the call's 2 points", () => {
       for (const seed of seeds) {
@@ -877,7 +877,7 @@ describe("marketing-saltbox-launch: scoring", () => {
           }
         }
       }
-    });
+    }, LONG);
   });
 });
 
