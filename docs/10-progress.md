@@ -148,6 +148,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-25 | `retail-wrenfield-trade` v1 (`docs/retail/retail-wrenfield-trade.md`, draft: practitioner review pending, not on the publish allowlist): assistant buyer at Wrenfield & Co., 50 min, 100 points, all automatic; retail maths, line actions and pricing rapid rounds, trade report (returns, mid-period launch, promo note, stock adjustment), PO confirmations vs. supplier terms and the compliance card, open-to-buy, critical path, five values calls. Test-first |
 | 2026-11-22 | Draft gate for `pnpm scenarios:publish` (branch `feat/publish-draft-gate`): an allowlist in `src/lib/scenarios/publishable.ts` holds the ten versions already in the cloud; everything else prints `skipped (draft)`. `--include-drafts` publishes all, refused unless the Supabase URL is local; Vitest and Playwright setup pass it. Test-first in `tests/engine/publishable.test.ts` |
 | 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
