@@ -148,6 +148,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-25 | `marketing-saltbox-launch` v1 (branch `feat/sim-marketing-saltbox-launch`): marketing coordinator, launch week at Saltbox Provisions. Rapid rounds (campaign metrics, copy vs. launch sheet, budget), channel report with a doubled relaunch, refunds and a spend correction, launch QA of 12 assets with a launch move, desk with agency invoice vs. SOW, A/B readout and lift, five values calls; 100 points, 50 minutes, 6 sections, all auto-scored; draft: practitioner review pending, unpublished (`docs/marketing/marketing-saltbox-launch.md`) |
 | 2026-11-22 | Draft gate for `pnpm scenarios:publish` (branch `feat/publish-draft-gate`): an allowlist in `src/lib/scenarios/publishable.ts` holds the ten versions already in the cloud; everything else prints `skipped (draft)`. `--include-drafts` publishes all, refused unless the Supabase URL is local; Vitest and Playwright setup pass it. Test-first in `tests/engine/publishable.test.ts` |
 | 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
