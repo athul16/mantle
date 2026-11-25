@@ -14,6 +14,7 @@ import { immigrationH1bPacket } from "./immigration-h1b-packet";
 import { litigationMorrowTidewater } from "./litigation-morrow-tidewater";
 import { piDiazDemand } from "./pi-diaz-demand";
 import { realestateAlderClosing } from "./realestate-alder-closing";
+import { retailWrenfieldTrade } from "./retail-wrenfield-trade";
 
 /** Code-defined scenarios, keyed by `slug@vN` (matches scenarios.slug + version). */
 const scenarios: Record<string, ServerScenario> = {
@@ -30,6 +31,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
+  [`${retailWrenfieldTrade.slug}@v${retailWrenfieldTrade.version}`]: retailWrenfieldTrade,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
