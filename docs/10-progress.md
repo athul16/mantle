@@ -145,6 +145,7 @@ The prototype (`design/prototype.html`) shows these, but the backend doesn't sup
 
 | Date | Landed |
 | --- | --- |
+| 2026-11-25 | `marketing-saltbox-launch` v1 (branch `feat/sim-marketing-saltbox-launch`): marketing coordinator, launch week at Saltbox Provisions. Rapid rounds (campaign metrics, copy vs. launch sheet, budget), channel report with a doubled relaunch, refunds and a spend correction, launch QA of 12 assets with a launch move, desk with agency invoice vs. SOW, A/B readout and lift, five values calls; 100 points, 50 minutes, 6 sections, all auto-scored; draft: practitioner review pending, unpublished (`docs/marketing/marketing-saltbox-launch.md`) |
 | 2026-11-17 | Published v1 of the three accounting simulations (`harbor-lane-bank-rec`, `audit-calder-bluestem`, `corporate-ap-ridgeway`) to the cloud library for testing; demos other than petty cash left out |
 | 2026-11-17 | Published v1 of the six paralegal simulations to the cloud library for testing (only those six; accounting and demo scenarios untouched). Docs updated to match |
 | 2026-11-17 | PR #58: progress log for PRs #49–#57 and the immigration simulation in the paralegal doc and review pack. Docs only |
