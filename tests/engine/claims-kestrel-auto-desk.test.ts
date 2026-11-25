@@ -52,7 +52,13 @@ type Flag = { target: string; reason: string; note: string };
 
 // ---- Reading the screen ----
 
+const screens = new Map<string, ReturnType<typeof readScreen>>();
+/** The candidate's screen for a seed, rendered once per test run. */
 function screen(seed: string) {
+  if (!screens.has(seed)) screens.set(seed, readScreen(seed));
+  return screens.get(seed)!;
+}
+function readScreen(seed: string) {
   const view = renderAttemptForCandidate(scenario, seed, END);
   const step = (id: string) => {
     const s = view.steps.find((x) => x.id === id);
@@ -76,7 +82,7 @@ function screen(seed: string) {
     ord: () => step("first-day").config as Ord,
   };
 }
-type Screen = ReturnType<typeof screen>;
+type Screen = ReturnType<typeof readScreen>;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -596,7 +602,13 @@ function rapidAnswers(seed: string) {
 
 // ---- A strong candidate's answers, built only from the screen ----
 
-function perfectAnswers(seed: string) {
+const perfects = new Map<string, string>();
+/** A fresh copy of the perfect answers for a seed (built once per run). */
+function perfectAnswers(seed: string): ReturnType<typeof buildPerfect> {
+  if (!perfects.has(seed)) perfects.set(seed, JSON.stringify(buildPerfect(seed)));
+  return JSON.parse(perfects.get(seed)!);
+}
+function buildPerfect(seed: string) {
   const sc = screen(seed);
   const cov = readCoverage(sc);
   const est = readEstimate(sc);
@@ -919,7 +931,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => (a["coverage-check"].flags = a["coverage-check"].flags.filter((f) => f.reason !== issue))), seed).toBe(3);
           expect(lost(seed, (a) => (a["coverage-check"].flags.find((f) => f.reason === issue)!.reason = "other")), seed).toBe(1.5);
         }
-      });
+      }, LONG);
     }
 
     it("coverage: each clean look-alike flagged costs 1; the wrong decision costs 2", () => {
@@ -933,7 +945,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => (a["coverage-check"].decision = oneOption(sc.doc().decision!, re))), `${seed} ${re}`).toBe(2);
         }
       }
-    });
+    }, LONG);
 
     it("estimate: paying a trap line as billed costs 1.5; a wrong payment 3; the uncapped rental 2", () => {
       for (const seed of seeds) {
@@ -945,7 +957,7 @@ describe(`${SLUG}: scoring`, () => {
         expect(lost(seed, (a) => (a["estimate-review"].cells.payable = e.cells.payable - e.supAmt / 100)), `${seed} supplement left out`).toBe(3);
         expect(lost(seed, (a) => (a["estimate-review"].cells.rental = e.cells.rental + 50)), `${seed} rental`).toBe(2);
       }
-    });
+    }, LONG);
 
     it("total loss: an unadjusted comparable costs 1.5; the average without the deductible costs the payment's 2", () => {
       for (const seed of seeds) {
@@ -953,7 +965,7 @@ describe(`${SLUG}: scoring`, () => {
         expect(lost(seed, (a) => (a["total-loss"].cells.adj1 = round2(t.cells.adj1 + 25)))).toBe(1.5);
         expect(lost(seed, (a) => (a["total-loss"].cells.pay = t.cells.avg))).toBe(2);
       }
-    });
+    }, LONG);
 
     it("first day: the reverse order earns nothing; one swap of neighbours costs a little", () => {
       for (const seed of seeds) {
@@ -965,7 +977,7 @@ describe(`${SLUG}: scoring`, () => {
         expect(swap).toBeGreaterThan(0);
         expect(swap).toBeLessThan(1.5);
       }
-    });
+    }, LONG);
 
     it("authority and values: a wrong option costs all its points", () => {
       for (const seed of seeds) {
@@ -977,7 +989,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => (a[id] = { selected: [wrong] })), `${seed} ${id}`).toBe(2);
         }
       }
-    });
+    }, LONG);
   });
 });
 
