@@ -3,6 +3,7 @@ import "server-only";
 import type { ServerScenario } from "../server/scenario";
 import { advisoryKestrelP2p } from "./advisory-kestrel-p2p";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
+import { bankingStonebridgeRenewal } from "./banking-stonebridge-renewal";
 import { forensicMarlowExpenses } from "./forensic-marlow-expenses";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
 import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
@@ -34,6 +35,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
+  [`${bankingStonebridgeRenewal.slug}@v${bankingStonebridgeRenewal.version}`]: bankingStonebridgeRenewal,
   [`${taxHollisScheduleC.slug}@v${taxHollisScheduleC.version}`]: taxHollisScheduleC,
   [`${advisoryKestrelP2p.slug}@v${advisoryKestrelP2p.version}`]: advisoryKestrelP2p,
 };
