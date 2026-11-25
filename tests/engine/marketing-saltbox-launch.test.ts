@@ -282,7 +282,7 @@ function readAb(sc: Screen) {
   const m = line(sc.mc("ab-readout").prompt, /A had ([\d,]+) visitors and ([\d,]+) orders; B had ([\d,]+) visitors and ([\d,]+) orders/);
   const [va, oa, vb, ob] = m.slice(1, 5).map(num);
   const lift = ((ob / vb) / (oa / va) - 1) * 100;
-  const call = va < min || vb < min ? "run" : lift >= liftMin ? "ship" : "keep";
+  const call: keyof typeof AB_OPTION = va < min || vb < min ? "run" : lift >= liftMin ? "ship" : "keep";
   return { min, liftMin, va, oa, vb, ob, lift, call };
 }
 const AB_OPTION = { run: /^Keep the test running/, ship: /^Ship B: both arms/, keep: /^Keep A:/ };

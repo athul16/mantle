@@ -1246,9 +1246,11 @@ function leakForms(value: number): RegExp[] {
   const forms = [JSON.stringify(value), value.toFixed(2), String(Math.round(value * 100)), value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })];
   return [...new Set(forms)].filter((f) => !/^\d{1,3}$/.test(f)).map((s) => new RegExp(`(?<![\\d.,])${s.replace(/[.$]/g, "\\$&")}(?![\\d.]\\d)`));
 }
+/** A small figure with one decimal or none (1.6, 2) reads like the page's own styling (line-height: 1.6), so it's redrawn too. */
+const shortForm = (n: number) => n >= 1 && n < 10 && Number.isInteger(Math.round(n * 100) / 10);
 function leaks(values: Values, numbers: number[]): boolean {
   const text = `${STATIC_TEXT}\n${Object.values(values).join("\n")}`;
-  return numbers.some((n) => n >= 1 && leakForms(n).some((re) => re.test(text)));
+  return numbers.some((n) => shortForm(n) || (n >= 1 && leakForms(n).some((re) => re.test(text))));
 }
 
 // ---- Generator ----
