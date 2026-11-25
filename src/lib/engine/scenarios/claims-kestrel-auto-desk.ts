@@ -617,7 +617,8 @@ const REASON_OF: Partial<Record<CovKind, string>> = {
 const COLLISIONS = ["hit a light pole", "backed into a concrete post", "slid into a guardrail", "sideswiped a parked truck", "rear-ended at a stop light", "rolled into a drainage ditch"];
 const COMPREHENSIVE = ["hail", "hit a deer", "windshield cracked by a rock", "tree limb fell on the roof", "catalytic converter stolen", "flood water in the cabin"];
 const LIABILITY_LIMITS = ["25/50/25", "50/100/50", "100/300/100"];
-const HOUSEHOLD = ["spouse", "son", "daughter", "partner", "brother", "sister"];
+/** Household relationships, gender-neutral since first names are drawn from a mixed pool. */
+const HOUSEHOLD = ["spouse", "partner", "adult child", "sibling", "household member"];
 
 interface CovRow {
   kind: CovKind;
