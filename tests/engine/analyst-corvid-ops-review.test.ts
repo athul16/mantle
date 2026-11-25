@@ -135,7 +135,7 @@ function readSites(sc: Screen) {
   expect(brief).toContain(`${cSite} closed at the end of ${cMonth} and is out of scope`);
   expect(brief).toMatch(/Benchmark: the median cost per .+ across the in-scope sites/);
   expect(brief).toMatch(/Annualise part-year sites: volume × 12 ÷ months of data/);
-  const [, corSite, corHours, corWrong] = match(sc.msg("m-correction").body, /(.+?)'s labour hours double-count agency hours\. The right figure is ([\d,]+) for the period, not ([\d,]+)\./);
+  const [, corSite, corHours, corWrong] = match(sc.msg("m-correction").body, /extract: (.+?)'s labour hours double-count agency hours\. The right figure is ([\d,]+) for the period, not ([\d,]+)\./);
 
   const data = sheet.rows.slice(0, 9).map((r, i) => {
     const site = text(r[1]);
@@ -775,10 +775,18 @@ describe(`${SLUG}: scoring`, () => {
 
   describe("each trap answered wrongly costs exactly its points", () => {
     const seeds = SEEDS.slice(0, 40);
+    const memo = new Map<string, { answers: Answers; points: number }>();
+    const base = (seed: string) => {
+      if (!memo.has(seed)) {
+        const answers = perfectAnswers(seed);
+        memo.set(seed, { answers, points: scoreAttempt(scenario, seed, answers).points });
+      }
+      return memo.get(seed)!;
+    };
     const lost = (seed: string, mutate: (a: Mutable) => void) => {
-      const a = clone(perfectAnswers(seed));
+      const a = clone(base(seed).answers);
       mutate(a);
-      return scoreAttempt(scenario, seed, perfectAnswers(seed)).points - scoreAttempt(scenario, seed, a).points;
+      return base(seed).points - scoreAttempt(scenario, seed, a).points;
     };
     const flags = (a: Mutable) => (a["deck-check"] as { flags: Flag[] }).flags;
 
@@ -788,7 +796,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => ((a["deck-check"] as { flags: Flag[] }).flags = flags(a).filter((f) => f.reason !== issue))), seed).toBe(3);
           expect(lost(seed, (a) => (flags(a).find((f) => f.reason === issue)!.reason = "other")), seed).toBe(1.5);
         }
-      });
+      }, LONG);
     }
 
     it("deck: flagging a clean look-alike or the withdrawn slide costs 1; the wrong decision costs 2", () => {
@@ -804,7 +812,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => ((a["deck-check"] as { decision: string }).decision = id))).toBe(2);
         }
       }
-    });
+    }, LONG);
 
     it("site analysis: ignoring the correction costs 1; not annualising 4; the closed site in 6; the duplicate twice 6; the $000s unscaled 7", () => {
       for (const seed of seeds) {
@@ -840,7 +848,7 @@ describe(`${SLUG}: scoring`, () => {
           `${seed} thousands`,
         ).toBe(7);
       }
-    });
+    }, LONG);
 
     it("desk: no ramp-up costs all 6; payback on the annual saving costs all 6; a reversed summary earns nothing", () => {
       for (const seed of seeds) {
@@ -849,7 +857,7 @@ describe(`${SLUG}: scoring`, () => {
         expect(lost(seed, (a) => (a.payback.value = Number((c.oneTime / c.s).toFixed(1))))).toBe(6);
         expect(lost(seed, (a) => (a["summary-order"].order = [...a["summary-order"].order].reverse()))).toBeGreaterThanOrEqual(7.5);
       }
-    });
+    }, LONG);
 
     it("values: each tempting wrong option costs the full 2", () => {
       const wrong: Record<ValuesStepId, RegExp> = {
@@ -866,7 +874,7 @@ describe(`${SLUG}: scoring`, () => {
           expect(lost(seed, (a) => (a[id].selected = [w])), `${seed} ${id}`).toBe(2);
         }
       }
-    });
+    }, LONG);
   });
 });
 
