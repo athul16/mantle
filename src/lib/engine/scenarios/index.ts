@@ -3,6 +3,7 @@ import "server-only";
 import type { ServerScenario } from "../server/scenario";
 import { advisoryKestrelP2p } from "./advisory-kestrel-p2p";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
+import { claimsKestrelAutoDesk } from "./claims-kestrel-auto-desk";
 import { forensicMarlowExpenses } from "./forensic-marlow-expenses";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
 import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
@@ -36,6 +37,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
   [`${taxHollisScheduleC.slug}@v${taxHollisScheduleC.version}`]: taxHollisScheduleC,
   [`${advisoryKestrelP2p.slug}@v${advisoryKestrelP2p.version}`]: advisoryKestrelP2p,
+  [`${claimsKestrelAutoDesk.slug}@v${claimsKestrelAutoDesk.version}`]: claimsKestrelAutoDesk,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
