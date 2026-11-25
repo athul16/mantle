@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ServerScenario } from "../server/scenario";
 import { auditCalderBluestem } from "./audit-calder-bluestem";
+import { bankingStonebridgeRenewal } from "./banking-stonebridge-renewal";
 import { corporateApRidgeway } from "./corporate-ap-ridgeway";
 import { corporateHalyardRobotics } from "./corporate-halyard-robotics";
 import { demoEntriesReview } from "./demo-entries-review";
@@ -30,6 +31,7 @@ const scenarios: Record<string, ServerScenario> = {
   [`${corporateHalyardRobotics.slug}@v${corporateHalyardRobotics.version}`]: corporateHalyardRobotics,
   [`${realestateAlderClosing.slug}@v${realestateAlderClosing.version}`]: realestateAlderClosing,
   [`${immigrationH1bPacket.slug}@v${immigrationH1bPacket.version}`]: immigrationH1bPacket,
+  [`${bankingStonebridgeRenewal.slug}@v${bankingStonebridgeRenewal.version}`]: bankingStonebridgeRenewal,
 };
 
 export function getScenario(slug: string, version: number): ServerScenario {
